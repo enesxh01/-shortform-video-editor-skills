@@ -137,19 +137,57 @@ def _make_candidate(source_id: str, segments: list[dict[str, Any]], audio_window
     segment_no_speech = finite_values(
         [item.get("no_speech_prob") for item in chosen], 0.0, 1.0
     )
-    word_probabilities = finite_values(
-        [word.get("probability") for item in chosen for word in item.get("words", [])],
-        0.0, 1.0
+    all_words = [word for item in chosen for word in item.get("words", [])]
+    confidence_items: list[tuple[dict[str, Any], float]] = []
+    for word in all_words:
+        values = finite_values([word.get("probability")], 0.0, 1.0)
+        if values:
+            confidence_items.append((word, values[0]))
+    word_probabilities = [probability for _, probability in confidence_items]
+    low_confidence_items = [
+        (word, probability) for word, probability in confidence_items if probability < 0.55
+    ]
+    low_confidence_spans: list[dict[str, Any]] = []
+    current_span: dict[str, Any] | None = None
+    for word, _probability in low_confidence_items:
+        try:
+            word_start, word_end = float(word["start"]), float(word["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not (math.isfinite(word_start) and math.isfinite(word_end) and word_end > word_start):
+            continue
+        token = str(word.get("text", "")).strip()
+        if current_span is not None and word_start - current_span["end"] <= 0.35:
+            current_span["end"] = round(word_end, 3)
+            current_span["text"] = (current_span["text"] + " " + token).strip()
+        else:
+            if current_span is not None:
+                low_confidence_spans.append(current_span)
+            current_span = {"start": round(word_start, 3), "end": round(word_end, 3), "text": token}
+    if current_span is not None:
+        low_confidence_spans.append(current_span)
+    confidence_coverage = len(confidence_items) / len(all_words) if all_words else None
+    low_confidence_ratio = (
+        len(low_confidence_items) / len(confidence_items) if confidence_items else None
     )
     transcript_diagnostics = {
         "mean_segment_logprob": round(sum(segment_logprobs) / len(segment_logprobs), 4) if segment_logprobs else None,
         "mean_no_speech_probability": round(sum(segment_no_speech) / len(segment_no_speech), 4) if segment_no_speech else None,
         "mean_word_probability": round(sum(word_probabilities) / len(word_probabilities), 4) if word_probabilities else None,
+        "word_confidence_coverage": round(confidence_coverage, 4) if confidence_coverage is not None else None,
+        "low_confidence_word_count": len(low_confidence_items),
+        "low_confidence_word_ratio": round(low_confidence_ratio, 4) if low_confidence_ratio is not None else None,
+        "low_confidence_spans": low_confidence_spans[:8],
         "quality_flag": "insufficient_asr_evidence"
     }
     if segment_logprobs or word_probabilities:
         weak_logprob = bool(segment_logprobs and transcript_diagnostics["mean_segment_logprob"] < -0.8)
-        weak_words = bool(word_probabilities and transcript_diagnostics["mean_word_probability"] < 0.55)
+        weak_words = bool(
+            word_probabilities and (
+                transcript_diagnostics["mean_word_probability"] < 0.55
+                or (len(low_confidence_items) >= 3 and (low_confidence_ratio or 0.0) >= 0.25)
+            )
+        )
         high_no_speech = bool(segment_no_speech and transcript_diagnostics["mean_no_speech_probability"] > 0.35)
         transcript_diagnostics["quality_flag"] = (
             "review_transcript" if weak_logprob or weak_words or high_no_speech else "no_obvious_asr_warning"
@@ -159,6 +197,8 @@ def _make_candidate(source_id: str, segments: list[dict[str, Any]], audio_window
         risks.append("ASR confidence indicators are weak; verify the transcript against the source audio before editing.")
     if transcript_diagnostics["quality_flag"] == "insufficient_asr_evidence":
         risks.append("ASR confidence metadata is unavailable; transcript accuracy has not been assessed.")
+    if transcript_diagnostics["low_confidence_spans"]:
+        risks.append("Some words have low ASR confidence; review the listed timestamp ranges against the original audio.")
     if hook < 5:
         risks.append("No strong textual hook cue detected; manual opening review required.")
     if payoff < 5:

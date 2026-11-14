@@ -88,6 +88,20 @@ class MomentDetectionTests(unittest.TestCase):
         self.assertTrue(any("ASR confidence indicators are weak" in risk for risk in candidate["risks"]))
         self.assertEqual(sum(candidate["score_breakdown"].values()), candidate["score"])
 
+    def test_reports_low_confidence_word_spans_and_confidence_coverage(self):
+        report = analysis_report()
+        for segment_index, segment in enumerate(report["analysis"]["transcription"]["segments"]):
+            for word in segment["words"]:
+                word["probability"] = 0.35 if segment_index < 2 else 0.95
+        candidate = detect_moments(report, min_duration=12, max_duration=35, limit=5)["candidates"][0]
+        diagnostics = candidate["transcript_diagnostics"]
+        self.assertGreater(diagnostics["word_confidence_coverage"], 0.99)
+        self.assertGreaterEqual(diagnostics["low_confidence_word_count"], 3)
+        self.assertGreater(diagnostics["low_confidence_word_ratio"], 0.25)
+        self.assertTrue(diagnostics["low_confidence_spans"])
+        self.assertEqual(diagnostics["quality_flag"], "review_transcript")
+        self.assertTrue(any("timestamp ranges" in risk for risk in candidate["risks"]))
+
     def test_marks_missing_asr_confidence_as_unassessed(self):
         candidate = detect_moments(analysis_report(), min_duration=12, max_duration=35, limit=5)["candidates"][0]
         self.assertEqual(candidate["transcript_diagnostics"]["quality_flag"], "insufficient_asr_evidence")

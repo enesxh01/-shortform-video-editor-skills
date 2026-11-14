@@ -98,3 +98,10 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 
 - The FFmpeg integration suite now creates a deliberately irregular-frame-cadence H.264 source with continuous AAC audio, verifies the bounded probe identifies likely VFR, renders it through the timestamp-rebase/CFR/audio-resample path, then verifies a 60/1 CFR output and video/audio stream durations aligned within 100 ms.
 - This is a synthetic regression test for ordinary VFR cadence gaps; it does not establish perceptual lip-sync for arbitrary damaged timestamps or prove all real-world VFR files are safe.
+
+
+## Transcript confidence localization (implemented; advisory)
+
+- Candidate reports now expose word-confidence coverage, low-confidence word count/ratio and up to eight contiguous low-confidence timestamp spans.
+- A candidate is flagged for transcript review when average ASR confidence is weak or at least three words and 25% of confidence-scored words are below the advisory 0.55 threshold.
+- The heuristic does not change the candidate's ranking score; it surfaces where a human should verify spelling/names against the original audio. ASR probabilities are model estimates, not calibrated truth.
