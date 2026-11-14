@@ -49,7 +49,7 @@ The renderer has initial code for exactly three layouts:
 - `split_vertical`: top/bottom panels from two explicit secondary sources, with centered captions.
 - `blurred_bars_20_60_20`: blurred top 20%, sharp center 60%, blurred bottom 20%.
 
-All three layouts and ASS captions have synthetic FFmpeg integration coverage. The latest GitHub Actions matrix passed on Ubuntu and Windows with Python 3.10 and 3.12 ([run #43618792418](https://github.com/enesxh01/-shortform-video-editor-skills/actions/runs/43617695392)). Split mode requires two secondary video files; provide them with `--split-top-source` and `--split-bottom-source`, plus optional source offsets.
+All three layouts and ASS captions have synthetic FFmpeg integration coverage. The last completed full GitHub Actions matrix passed on Ubuntu and Windows with Python 3.10 and 3.12 ([run #43618792418](https://github.com/enesxh01/-shortform-video-editor-skills/actions/runs/43618792418)). Newer commits are being validated separately. Split mode requires two secondary video files; provide them with `--split-top-source` and `--split-bottom-source`, plus optional source offsets.
 
 ## Skill suite
 
