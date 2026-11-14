@@ -87,3 +87,26 @@ def choose_inference_device(model_size: str, requested: str = "auto",
     else:
         notes.append("NVIDIA GPU telemetry unavailable; using CPU int8.")
     return "cpu", "int8", notes
+
+def check_disk_space(path: str, required_bytes: int, reserve_bytes: int = 512 * 1024 * 1024) -> dict[str, int]:
+    """Fail before expensive work when a target volume cannot preserve a safety reserve."""
+    from pathlib import Path
+
+    target = Path(path).expanduser().resolve()
+    if not target.exists():
+        target = target.parent
+    usage = shutil.disk_usage(target)
+    required = max(0, int(required_bytes)) + max(0, int(reserve_bytes))
+    result = {
+        "total_bytes": int(usage.total),
+        "free_bytes": int(usage.free),
+        "required_bytes": required,
+        "sufficient": int(usage.free) >= required,
+    }
+    if not result["sufficient"]:
+        raise RuntimeError(
+            f"Insufficient free disk space at {target}: {usage.free / (1024 ** 3):.2f} GB free; "
+            f"approximately {required / (1024 ** 3):.2f} GB required including safety reserve."
+        )
+    return result
+\n
