@@ -1190,7 +1190,23 @@ def command_doctor(args: argparse.Namespace) -> int:
         "note": "FFmpeg build advertises NVENC; actual driver/device initialization is only confirmed during a render."
     }
     report["accelerators"]["libx264"] = {"available": "libx264" in encoders_text}
-    report["accelerators"]["subtitles_filter"] = {"available": "subtitles" in filters_text}
+    available_filters = set()
+    for line in filters_text.splitlines():
+        fields = line.split()
+        if len(fields) >= 2 and len(fields[0]) == 3 and all(flag in "TSC." for flag in fields[0]):
+            available_filters.add(fields[1])
+    required_filters = (
+        "subtitles", "fps", "scale", "crop", "setpts", "setsar", "format",
+        "aresample", "blackdetect", "freezedetect", "volumedetect", "ebur128"
+    )
+    report["accelerators"]["filters"] = {
+        name: {"available": name in available_filters, "required": True}
+        for name in required_filters
+    }
+    report["accelerators"]["subtitles_filter"] = {
+        "available": "subtitles" in available_filters,
+        "note": "The filter must also have libass support in the FFmpeg build."
+    }
     required_missing = [
         name for name in ("ffmpeg", "ffprobe")
         if not report["executables"][name]["available"]
@@ -1201,8 +1217,10 @@ def command_doctor(args: argparse.Namespace) -> int:
     ]
     if not report["accelerators"]["libx264"]["available"] and not nvenc_available:
         required_missing.append("ffmpeg_h264_encoder")
-    if not report["accelerators"]["subtitles_filter"]["available"]:
-        required_missing.append("ffmpeg_subtitles_filter")
+    required_missing.extend(
+        f"ffmpeg_filter:{name}" for name in required_filters
+        if name not in available_filters
+    )
     report["missing_required"] = required_missing
     report["missing_optional"] = [
         name for name in ("faster_whisper", "cv2", "yt_dlp")
