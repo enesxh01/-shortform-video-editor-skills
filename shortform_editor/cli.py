@@ -664,7 +664,6 @@ def command_render(args: argparse.Namespace) -> int:
                     parts.append(part)
                     reused_segments.append(index)
                     segment_encoders[index] = record["encoder"]
-                    args._selected_encoder = record["encoder"]
                     continue
                 part.unlink(missing_ok=True)
                 render_state["parts"].pop(str(index), None)

@@ -72,7 +72,7 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 - `render --resume` can be used on the initial render and subsequent retries. It persists per-segment MP4s in a hidden work directory beside the output.
 - Cache identity includes the primary source fingerprint, exact EDL hash, secondary split-source fingerprints, output path, render profile, preview mode and encoder-quality options. Reusing a segment additionally requires a matching SHA-256 digest, FFprobe-confirmed H.264/dimensions/FPS and a successful full FFmpeg decode.
 - Incomplete or altered parts are discarded and re-encoded. Final concat, full decode, staged publication and QC are repeated. A successful QC pass removes the work directory; failed/interrupted jobs preserve it for retry.
-- This has not yet been exercised by a completed CI run or an interrupted real-footage render. Keep the hidden work directory between retries; changing inputs or encoder settings invalidates the cache.
+- The synthetic interruption/recovery integration test now passes in the completed four-platform CI matrix. Real-footage interruption behavior and target-desktop NVENC performance remain unverified. Keep the hidden work directory between retries; changing inputs or encoder settings invalidates the cache.
 
 
 ## VFR and audio timestamp handling (partial)
