@@ -168,5 +168,16 @@ class CropGeometryTests(unittest.TestCase):
 
 
 
+    def test_analyze_project_cli_accepts_manual_visual_roi(self):
+        from shortform_editor.cli import build_parser
+        args = build_parser().parse_args([
+            "analyze-project", "input.mp4", "-o", "job",
+            "--visuals", "--visual-roi", "0.2", "0.1", "0.3", "0.4"
+        ])
+        self.assertTrue(args.visuals)
+        self.assertEqual(args.visual_roi, [0.2, 0.1, 0.3, 0.4])
+
+
+
 if __name__ == "__main__":
     unittest.main()
