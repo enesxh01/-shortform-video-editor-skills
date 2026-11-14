@@ -53,7 +53,7 @@ The renderer has initial code for exactly three layouts:
 - `split_vertical`: top/bottom panels from two explicit secondary sources, with centered captions.
 - `blurred_bars_20_60_20`: blurred top 20%, sharp center 60%, blurred bottom 20%.
 
-All three layouts and ASS captions have synthetic FFmpeg integration coverage. The last completed full GitHub Actions matrix passed on Ubuntu and Windows with Python 3.10 and 3.12 ([run #43621233208](https://github.com/enesxh01/-shortform-video-editor-skills/actions/runs/43621233208)). Newer commits are being validated separately. Split mode requires two secondary video files; provide them with `--split-top-source` and `--split-bottom-source`, plus optional source offsets.
+All three layouts and ASS captions have synthetic FFmpeg integration coverage. The latest full GitHub Actions matrix passed on Ubuntu and Windows with Python 3.10 and 3.12 ([run #43622463389](https://github.com/enesxh01/-shortform-video-editor-skills/actions/runs/43622463389)). The run passed 187 tests, synthetic FFmpeg integration, all four isolated skill installers and one-command setup checks. Split mode requires two secondary video files; provide them with `--split-top-source` and `--split-bottom-source`, plus optional source offsets.
 
 ## Skill suite
 
@@ -97,7 +97,7 @@ Linux/macOS:
 bash scripts/setup.sh
 ```
 
-These setup scripts install the editable CLI package plus the audio, visual and download extras, install the OpenCode skills with backups, and run `shortform-editor doctor`, which checks the FFmpeg filters and H.264 encoder required by rendering and QC. They do not silently install system packages or change your OS PATH. If FFmpeg is missing, install an FFmpeg build that includes ffprobe, libx264 (or NVENC) and the subtitles filter, then rerun setup. The scripts print an OS-appropriate installation hint where possible.
+These setup scripts install the editable CLI package plus the audio, visual and download extras, install the OpenCode skills with backups, and run `shortform-editor doctor`, which checks the FFmpeg H.264/AAC encoders and required render/QC filters. They do not silently install system packages or change your OS PATH. If FFmpeg is missing, install an FFmpeg build that includes ffprobe, libx264 (or NVENC) and the subtitles filter, then rerun setup. The scripts print an OS-appropriate installation hint where possible.
 
 For a skills-only update after the CLI is already installed, use `bash scripts/install.sh` or `powershell -ExecutionPolicy Bypass -File scripts/install.ps1`.
 
