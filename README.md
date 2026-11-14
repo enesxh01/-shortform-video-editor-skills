@@ -88,6 +88,8 @@ Then run:
 
 ```bash
 shortform-editor analyze-project input.mp4 -o job-output/ --model small --device auto --visuals
+# If interrupted, resume the same job with identical options:
+shortform-editor analyze-project input.mp4 -o job-output/ --model small --device auto --visuals --resume
 # For top/bottom split: add --layout split_vertical --split-top-source top.mp4 --split-bottom-source bottom.mp4
 ```
 
