@@ -8,6 +8,16 @@ A local-first OpenCode skill suite with an early executable Python/FFmpeg founda
 git clone --branch implementation/foundation-and-install-fixes https://github.com/enesxh01/-shortform-video-editor-skills.git
 ```
 
+
+
+For a non-face subject such as a gameplay character, car or ball, you can manually seed a normalized tracking box (x, y, width, height from 0 to 1):
+
+```bash
+shortform-editor analyze-visuals gameplay.mp4 -o visual-analysis.json --no-face-detection --track-roi 0.32 0.18 0.24 0.42 --sample-rate 3 --max-frames 240
+```
+
+This uses CSRT when the installed OpenCV-contrib build exposes it. It is user-seeded tracking, not automatic object detection; if tracking is lost, the report marks the fallback. Review the resulting crop keyframes.
+
 ## Goals
 
 - Find self-contained, compelling moments in long-form video.
