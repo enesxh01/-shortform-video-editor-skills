@@ -14,6 +14,13 @@ Get-ChildItem -Path $Root -Directory | ForEach-Object {
     }
 }
 $RuntimeSource = Join-Path $Root "shortform_editor"
+$ExampleSource = Join-Path $Root "examples"
+$ExampleTarget = Join-Path $Dest "shortform-video-editor/examples"
+if (Test-Path $ExampleSource) {
+    if (Test-Path $ExampleTarget) { Remove-Item -Recurse -Force $ExampleTarget }
+    Copy-Item -Recurse $ExampleSource $ExampleTarget
+    Write-Host "Installed EDL examples"
+}
 $SkillRuntime = Join-Path $Dest "shortform-video-editor/runtime"
 if (Test-Path $RuntimeSource) {
     New-Item -ItemType Directory -Force -Path $SkillRuntime | Out-Null
