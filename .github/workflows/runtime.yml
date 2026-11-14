@@ -24,3 +24,16 @@ jobs:
           test -f "$RUNNER_TEMP/opencode-skills/references/viral-scoring.md"
           test -f "$RUNNER_TEMP/opencode-skills/schemas/edit-decision-list.schema.json"
           test -f "$RUNNER_TEMP/opencode-skills/shortform-video-editor/examples/edit-decision-list.example.json"
+
+  windows-installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install OpenCode skills
+        shell: pwsh
+        run: |
+          .\scripts\install.ps1 "$env:RUNNER_TEMP\opencode-skills"
+          if (!(Test-Path "$env:RUNNER_TEMP\opencode-skills\shortform-video-editor\runtime\cli.py")) { throw "Runtime was not installed" }
+          if (!(Test-Path "$env:RUNNER_TEMP\opencode-skills\references\viral-scoring.md")) { throw "Shared references were not installed" }
+          if (!(Test-Path "$env:RUNNER_TEMP\opencode-skills\schemas\edit-decision-list.schema.json")) { throw "EDL schema was not installed" }
+          if (!(Test-Path "$env:RUNNER_TEMP\opencode-skills\shortform-video-editor\examples\edit-decision-list.example.json")) { throw "Example EDL was not installed" }
