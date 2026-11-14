@@ -55,7 +55,7 @@ class FrameTimingDiagnosticsTests(unittest.TestCase):
         self.assertEqual(report["sample_windows"], 4)
         args = runner.call_args.args[0]
         self.assertIn("0.0%+#10,33.222%+#10,66.444%+#10,99.667%+#10", args)
-        self.assertIn("best_effort_timestamp_time", args)
+        self.assertTrue(any("best_effort_timestamp_time" in item for item in args))
         self.assertEqual(args[-1], str(source))
 
     def test_probe_malformed_json_returns_unknown_instead_of_failing(self):
