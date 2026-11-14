@@ -23,3 +23,4 @@ jobs:
           test -f "$RUNNER_TEMP/opencode-skills/shortform-video-editor/runtime/cli.py"
           test -f "$RUNNER_TEMP/opencode-skills/references/viral-scoring.md"
           test -f "$RUNNER_TEMP/opencode-skills/schemas/edit-decision-list.schema.json"
+          test -f "$RUNNER_TEMP/opencode-skills/shortform-video-editor/examples/edit-decision-list.example.json"
