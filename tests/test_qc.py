@@ -43,6 +43,16 @@ class QCTests(unittest.TestCase):
         result = assess_probe(report, "")
         self.assertEqual(result["status"], "warning")
 
+    def test_flags_stream_timing_metadata_mismatch(self):
+        report = probe()
+        report["streams"][0]["start_time"] = "0.0"
+        report["streams"][0]["duration"] = "10.0"
+        report["streams"][1]["start_time"] = "0.3"
+        report["streams"][1]["duration"] = "9.0"
+        result = assess_probe(report, "")
+        self.assertEqual(result["status"], "fail")
+        self.assertIn("Audio/video stream start or duration metadata differs beyond tolerance", result["failures"])
+
 
 if __name__ == "__main__":
     unittest.main()
