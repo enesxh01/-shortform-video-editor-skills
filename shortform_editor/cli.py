@@ -179,15 +179,15 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
                 previous_crop_time = crop_time
             pacing_review = segment.get("pacing_review")
             if pacing_review:
-                previous_decision_end = start
+                previous_decision_start = start
                 for decision_index, decision in enumerate(pacing_review.get("decisions", [])):
                     decision_start = timestamp_seconds(decision["source_in"])
                     decision_end = timestamp_seconds(decision["source_out"])
                     if decision_end <= decision_start or decision_start < start or decision_end > end:
-                        messages.append(f"segments[{index}].pacing_review.decisions[{decision_index}] must be ordered inside the segment source range")
-                    if decision_start < previous_decision_end - 0.001:
-                        messages.append(f"segments[{index}].pacing_review.decisions[{decision_index}] overlaps or is out of order")
-                    previous_decision_end = decision_end
+                        messages.append(f"segments[{index}].pacing_review.decisions[{decision_index}] must fit inside the segment source range")
+                    if decision_start < previous_decision_start - 0.001:
+                        messages.append(f"segments[{index}].pacing_review.decisions[{decision_index}] must be ordered by source_in")
+                    previous_decision_start = decision_start
             for caption_index, caption in enumerate(segment.get("captions", [])):
                 caption_start = timestamp_seconds(caption["start"])
                 caption_end = timestamp_seconds(caption["end"])
