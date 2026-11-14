@@ -6,6 +6,15 @@ from typing import Any
 from .cli import PipelineError, file_stat_signature, probe_media
 
 
+def create_face_tracker(cv2: Any):
+    """Return a CSRT tracker when the OpenCV contrib build exposes one."""
+    factory = getattr(cv2, "TrackerCSRT_create", None)
+    if factory is None:
+        legacy = getattr(cv2, "legacy", None)
+        factory = getattr(legacy, "TrackerCSRT_create", None) if legacy is not None else None
+    return factory() if callable(factory) else None
+
+
 def compute_crop_box(width: int, height: int, center_x: float, center_y: float,
                      target_aspect: float = 9 / 16) -> dict[str, float]:
     if width <= 0 or height <= 0 or target_aspect <= 0:
@@ -164,6 +173,12 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
     ) if "/" in str(video_stream.get("avg_frame_rate", "")) else 0.0
 
     samples = []
+    face_tracker = None
+    tracker_factory = None
+    if detect_faces:
+        tracker_factory = getattr(cv2, "TrackerCSRT_create", None)
+        if tracker_factory is None and getattr(cv2, "legacy", None) is not None:
+            tracker_factory = getattr(cv2.legacy, "TrackerCSRT_create", None)
     previous_gray = None
     previous_center = (width / 2.0, height / 2.0)
     smoothed_center = previous_center
@@ -178,6 +193,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             previous_gray = None
             previous_center = (width / 2.0, height / 2.0)
             smoothed_center = previous_center
+            face_tracker = None
             previous_region = region_id
         capture.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000.0)
         ok, frame = capture.read()
@@ -193,6 +209,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             diff = cv2.absdiff(previous_gray, gray)
             motion_score = float(diff.mean()) / 255.0
             if motion_score >= 0.22:
+                face_tracker = None
                 scene_changes.append({
                     "time_seconds": round(timestamp + video_time_offset, 3),
                     "change_score": round(motion_score, 4)
@@ -210,12 +227,29 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
                     )
                 )
         if selected_face is not None:
+            tracker_box = tuple(float(value) for value in selected_face)
+            if callable(tracker_factory):
+                face_tracker = tracker_factory()
+                face_tracker.init(frame, tracker_box)
             cx_small = float(selected_face[0] + selected_face[2] / 2)
             cy_small = float(selected_face[1] + selected_face[3] / 2)
             center_x = cx_small / frame.shape[1] * width
             center_y = cy_small / frame.shape[0] * height
             confidence = 0.45
             subject = "face_detection"
+        elif face_tracker is not None:
+            tracking_ok, tracked_box = face_tracker.update(frame)
+            if tracking_ok:
+                x, y, box_w, box_h = tracked_box
+                center_x = (float(x) + float(box_w) / 2) / frame.shape[1] * width
+                center_y = (float(y) + float(box_h) / 2) / frame.shape[0] * height
+                confidence = 0.32
+                subject = "face_tracking"
+            else:
+                face_tracker = None
+                center_x, center_y = width / 2.0, height / 2.0
+                confidence = 0.1
+                subject = "center_fallback"
         else:
             center_x, center_y = width / 2.0, height / 2.0
             confidence = 0.1
@@ -264,7 +298,8 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
         "limitations": [
             "This baseline detects scene-change candidates and frontal faces only; it does not understand objects, actions, gameplay HUDs, hands or sports context.",
             "Haar face detections are not identity recognition and are not reliable for every angle, lighting condition or demographic.",
-            "No face detection means a safe center crop, not inferred subject tracking.",
+            "CSRT tracking can bridge missed frontal-face detections when the opencv-contrib build exposes the tracker; it is not general object/action tracking and may fail during fast motion, occlusion or scene changes.",
+            "No face detection and no valid active tracker means a safe center crop.",
             "Sampling timestamps can drift on variable-frame-rate media; verify crop keyframes against the actual export.",
             "Crop plans are suggestions; no video is modified by this analysis."
         ]
