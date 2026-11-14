@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,7 +12,11 @@ class ConcatManifestTests(unittest.TestCase):
             media = Path(directory) / ("creator's cut" + chr(92) + "final.mp4")
             entry = _concat_demuxer_entry(media)
         self.assertIn("creator" + chr(92) + "'s cut", entry)
-        self.assertIn(chr(92) + chr(92) + "final.mp4", entry)
+        if os.name == "nt":
+            # Windows path separators are normalized to forward slashes before FFmpeg parsing.
+            self.assertIn("/final.mp4", entry)
+        else:
+            self.assertIn(chr(92) + chr(92) + "final.mp4", entry)
         self.assertTrue(entry.startswith("file '"))
         self.assertTrue(entry.endswith("'" + chr(10)))
 
