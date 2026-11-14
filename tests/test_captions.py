@@ -101,5 +101,40 @@ class CaptionTests(unittest.TestCase):
         self.assertIn(r"First line\NSecond line", content)
 
 
+    def test_face_aware_caption_position_moves_caption_above_lower_face(self):
+        from shortform_editor.captions import apply_face_aware_caption_positions
+        captions = [{"start": "00:00:01.000", "end": "00:00:03.000", "text": "Hello"}]
+        samples = [{
+            "time_seconds": 1.5,
+            "subject_bbox_normalized": {"x": 0.45, "y": 0.74, "width": 0.10, "height": 0.20},
+            "crop_9_16": {"x": 656.0, "y": 0.0, "width": 608.0, "height": 1080.0}
+        }]
+        result = apply_face_aware_caption_positions(captions, samples, 1920, 1080)
+        self.assertEqual(result[0]["position"], "top")
+        self.assertEqual(result[0]["position_reason"], "face_overlap_with_lower_caption_safe_area")
+
+    def test_face_aware_caption_position_keeps_caption_below_upper_face(self):
+        from shortform_editor.captions import apply_face_aware_caption_positions
+        captions = [{"start": "00:00:01.000", "end": "00:00:03.000", "text": "Hello"}]
+        samples = [{
+            "time_seconds": 1.5,
+            "subject_bbox_normalized": {"x": 0.45, "y": 0.08, "width": 0.10, "height": 0.18},
+            "crop_9_16": {"x": 656.0, "y": 0.0, "width": 608.0, "height": 1080.0}
+        }]
+        result = apply_face_aware_caption_positions(captions, samples, 1920, 1080)
+        self.assertEqual(result[0]["position"], "bottom")
+
+    def test_top_caption_position_uses_top_alignment(self):
+        segment = {"captions": [{
+            "start": "00:00:01.000", "end": "00:00:02.000", "text": "Top caption",
+            "position": "top"
+        }]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "top.ass"
+            write_ass_subtitles(segment, "fullscreen", 0.0, path)
+            content = path.read_text(encoding="utf-8")
+        self.assertIn(r"{\\an8}", content)
+
+
 if __name__ == "__main__":
     unittest.main()
