@@ -211,13 +211,29 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
                     if decision_start < previous_decision_start - 0.001:
                         messages.append(f"segments[{index}].pacing_review.decisions[{decision_index}] must be ordered by source_in")
                     previous_decision_start = decision_start
+            previous_caption_end = start
             for caption_index, caption in enumerate(segment.get("captions", [])):
                 caption_start = timestamp_seconds(caption["start"])
                 caption_end = timestamp_seconds(caption["end"])
+                caption_path = f"segments[{index}].captions[{caption_index}]"
                 if caption_end <= caption_start:
-                    messages.append(f"segments[{index}].captions[{caption_index}] end must be after start")
+                    messages.append(f"{caption_path} end must be after start")
                 if caption_start < start or caption_end > end:
-                    messages.append(f"segments[{index}].captions[{caption_index}] must fit inside the segment source range")
+                    messages.append(f"{caption_path} must fit inside the segment source range")
+                if caption_start < previous_caption_end - 0.001:
+                    messages.append(f"{caption_path} overlaps or is out of chronological order with the previous caption")
+                previous_caption_end = max(previous_caption_end, caption_end)
+                caption_text = str(caption.get("text", ""))
+                line_count = len(caption_text.replace("\\r\\n", "\\n").replace("\\r", "\\n").split("\\n"))
+                if segment["layout"] in {"split_vertical", "blurred_bars_20_60_20"} and line_count != 1:
+                    messages.append(f"{caption_path} must be exactly one line for {segment['layout']} layout")
+                if segment["layout"] == "fullscreen" and line_count > 3:
+                    messages.append(f"{caption_path} may contain at most three lines in fullscreen layout")
+                position = caption.get("position", "auto")
+                if segment["layout"] == "split_vertical" and position not in {"auto", "center"}:
+                    messages.append(f"{caption_path}.position must remain centered in split_vertical layout")
+                if segment["layout"] == "blurred_bars_20_60_20" and position not in {"auto", "bottom"}:
+                    messages.append(f"{caption_path}.position must remain in the main composition for blurred-bars layout")
                 previous_word_end = caption_start
                 for word_index, word in enumerate(caption.get("words", [])):
                     word_start = timestamp_seconds(word["start"])
