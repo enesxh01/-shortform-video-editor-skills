@@ -173,15 +173,19 @@ def probe_media(source: Path) -> dict[str, Any]:
             nominal_frame_rate = float(Fraction(video_stream.get("avg_frame_rate") or video_stream.get("r_frame_rate") or "30/1"))
         except (ValueError, ZeroDivisionError):
             nominal_frame_rate = 30.0
+        try:
+            duration_seconds = float(data.get("format", {}).get("duration") or 0)
+        except (TypeError, ValueError):
+            duration_seconds = None
         data["frame_timing"] = probe_frame_timing(
             source, ffprobe,
-            duration_seconds=float(data.get("format", {}).get("duration") or 0),
+            duration_seconds=duration_seconds,
             nominal_frame_rate=nominal_frame_rate
         )
     except (PipelineError, OSError) as exc:
         data["frame_timing"] = {
             "status": "unavailable", "variable_frame_rate": None,
-            "sampled_frames": 0, "scope": "initial_frame_sample_only",
+            "sampled_frames": 0, "scope": "stratified_frame_samples",
             "warning": f"Frame-timing sample unavailable: {type(exc).__name__}: {exc}"
         }
     data["tool_versions"] = {
