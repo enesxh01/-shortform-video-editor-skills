@@ -62,6 +62,7 @@ Then run:
 
 ```bash
 shortform-editor analyze-project input.mp4 -o job-output/ --model small --device auto --visuals
+# For split-screen, add --layout split_vertical --split-top-source top.mp4 --split-bottom-source bottom.mp4
 # For top/bottom split: add --layout split_vertical --split-top-source top.mp4 --split-bottom-source bottom.mp4
 ```
 
@@ -86,6 +87,7 @@ shortform-editor qc output.mp4 -o qc-report.json
 shortform-editor repair input.mp4 repaired.mp4
 shortform-editor record-feedback job-output/candidates.json --candidate-id moment-... --decision approve
 shortform-editor apply-feedback job-output/candidates.json -o ranked.json
+shortform-editor validate-semantic-review semantic-review.json --probe job-output/probe.json --candidates job-output/candidates.json
 ```
 
 ### Implementation limits
