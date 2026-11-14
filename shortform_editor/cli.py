@@ -197,6 +197,8 @@ def command_render(args: argparse.Namespace) -> int:
     output = Path(args.output).expanduser().resolve()
     if output in {source, edl_path}:
         raise PipelineError("Output must not overwrite the source media or EDL")
+    if output.suffix.lower() != ".mp4":
+        raise PipelineError("The current renderer produces MP4; use an output filename ending in .mp4")
     if not 0 <= args.crf <= 51:
         raise PipelineError("--crf must be between 0 and 51")
     if any(segment.get("layout") != "fullscreen" for segment in edl.get("segments", [])):
@@ -255,7 +257,7 @@ def command_render(args: argparse.Namespace) -> int:
         assembled = tmpdir / "assembled.mp4"
         run_checked([
             ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
-            "-f", "concat", "-safe", "1", "-i", str(concat_file),
+            "-f", "concat", "-safe", "0", "-i", str(concat_file),
             "-c", "copy", "-movflags", "+faststart", str(assembled)
         ])
         run_checked([ffmpeg, "-hide_banner", "-v", "error", "-i", str(assembled), "-f", "null", "-"])
