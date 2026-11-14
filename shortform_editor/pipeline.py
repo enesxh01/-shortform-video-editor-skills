@@ -10,7 +10,7 @@ from typing import Any
 
 from .audio import analyze_audio
 from .caption_generation import generate_captions
-from .cli import PipelineError, probe_media
+from .cli import PipelineError, probe_media, timestamp_seconds
 from .moments import detect_moments
 from .pacing import analyze_pacing
 from .visual import analyze_visuals
@@ -42,15 +42,22 @@ def _write_json(path: Path, data: dict[str, Any]) -> None:
 
 def analyze_project(source: Path, output_dir: Path, model: str = "small",
                     device: str = "auto", top_candidates: int = 5,
-                    layout: str = "fullscreen", include_visuals: bool = False) -> dict[str, Any]:
+                    layout: str = "fullscreen", include_visuals: bool = False,
+                    split_top_source: Path | None = None, split_bottom_source: Path | None = None,
+                    split_top_in: str = "00:00:00.000",
+                    split_bottom_in: str = "00:00:00.000") -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
     output_dir = output_dir.expanduser().resolve()
     if output_dir == source or source.is_relative_to(output_dir):
         raise PipelineError("Output directory must not be the source file or a parent containing the source")
     if not 1 <= top_candidates <= 20:
         raise PipelineError("Top candidate count must be between 1 and 20")
-    if layout not in {"fullscreen", "blurred_bars_20_60_20"}:
-        raise PipelineError("Project analysis currently drafts fullscreen or blurred-bars layouts; split needs explicit secondary sources")
+    if layout not in {"fullscreen", "blurred_bars_20_60_20", "split_vertical"}:
+        raise PipelineError(f"Unsupported project layout: {layout}")
+    if layout == "split_vertical" and (split_top_source is None or split_bottom_source is None):
+        raise PipelineError("split_vertical requires --split-top-source and --split-bottom-source")
+    if layout != "split_vertical" and (split_top_source is not None or split_bottom_source is not None):
+        raise PipelineError("Split secondary sources can only be supplied with layout=split_vertical")
 
     if output_dir.exists() and any(output_dir.iterdir()):
         raise PipelineError("Output directory is not empty; choose a new job directory to avoid overwriting prior artifacts")
@@ -84,6 +91,16 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
     try:
         probe = stage("probe", lambda: probe_media(source))
         _write_json(output_dir / "probe.json", probe)
+
+        split_probes = {}
+        split_paths = {}
+        if layout == "split_vertical":
+            for key, raw_path in (("split_top", split_top_source), ("split_bottom", split_bottom_source)):
+                path = raw_path.expanduser().resolve(strict=True)
+                if path == source:
+                    raise PipelineError(f"{key} must be a separate source file, not the primary input")
+                split_paths[key] = path
+                split_probes[key] = probe_media(path)
 
         audio = stage("audio", lambda: analyze_audio(source, model_size=model, device=device))
         _write_json(output_dir / "audio-analysis.json", audio)
@@ -139,6 +156,28 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                 "confidence": candidate["confidence"],
                 "captions": captions
             }
+            if layout == "split_vertical":
+                clip_duration = candidate["source_out_seconds"] - candidate["source_in_seconds"]
+                split_specs = {}
+                split_valid = True
+                for key, start_text in (("split_top", split_top_in), ("split_bottom", split_bottom_in)):
+                    split_start = timestamp_seconds(start_text)
+                    split_end = split_start + clip_duration
+                    split_duration = float(split_probes[key].get("format", {}).get("duration") or 0)
+                    if split_end > split_duration + 0.05:
+                        warnings.append(f"Skipped {candidate['candidate_id']}: {key} source is too short for {clip_duration:.2f}s")
+                        split_valid = False
+                        break
+                    split_specs[key] = {
+                        "path": str(split_paths[key]),
+                        "fingerprint": split_probes[key]["source"]["fingerprint"],
+                        "source_in": _timecode(split_start),
+                        "source_out": _timecode(split_end)
+                    }
+                if not split_valid:
+                    continue
+                segment_edl.update(split_specs)
+
             if visuals and layout == "fullscreen":
                 crop_frames = [
                     item for item in visuals["analysis"]["crop_keyframes"]
