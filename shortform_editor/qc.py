@@ -59,6 +59,25 @@ def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 
             "status": "passed",
             "detail": f"Audio codec {audio.get('codec_name')}, {audio.get('channels')} channels"
         })
+        if video:
+            try:
+                video_start = float(video.get("start_time") or 0.0)
+                audio_start = float(audio.get("start_time") or 0.0)
+                video_duration = float(video.get("duration") or report.get("format", {}).get("duration") or 0.0)
+                audio_duration = float(audio.get("duration") or 0.0)
+                start_delta = abs(video_start - audio_start)
+                duration_delta = abs(video_duration - audio_duration) if audio_duration > 0 and video_duration > 0 else 0.0
+                timing_ok = start_delta <= 0.1 and duration_delta <= 0.25
+                checks.append({
+                    "name": "stream_timing",
+                    "status": "passed" if timing_ok else "major",
+                    "detail": f"Stream start delta {start_delta:.3f}s; duration delta {duration_delta:.3f}s (metadata only)"
+                })
+                if not timing_ok:
+                    failures.append("Audio/video stream start or duration metadata differs beyond tolerance")
+            except (TypeError, ValueError):
+                checks.append({"name": "stream_timing", "status": "warning", "detail": "Stream timing metadata unavailable"})
+                warnings.append("Stream timing metadata unavailable")
     else:
         checks.append({"name": "audio_stream", "status": "warning", "detail": "No audio stream found"})
         warnings.append("No audio stream")
