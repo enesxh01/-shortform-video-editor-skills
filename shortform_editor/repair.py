@@ -53,6 +53,9 @@ def repair_technical_export(source: Path, output: Path, width: int = 1080,
         ])
         run_checked([ffmpeg, "-hide_banner", "-v", "error", "-i", str(staged), "-f", "null", "-"])
         final_probe = probe_media(staged)
+        source_after_repair = probe_media(source)
+        if source_after_repair["source"]["fingerprint"] != source_probe["source"]["fingerprint"]:
+            raise PipelineError("Source media changed during repair; refusing to publish an output from an unstable source")
         os.replace(staged, output)
         staged = None
     finally:
