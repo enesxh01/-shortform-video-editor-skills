@@ -30,7 +30,7 @@ The current renderer supports:
 
 Per-segment captions use ASS/libass. Word-level karaoke highlighting is available when caption word timestamps are supplied. Fullscreen captions use a bold outlined bottom style; split-layout captions are centered and use a smaller single-line style. Fonts depend on the host's font availability. A build without FFmpeg libass support cannot render captions and must fail clearly.
 
-The current split layout requires two explicit secondary videos; it does not silently duplicate one source or guess the second panel. Each segment may optionally specify `fade_in_seconds` and `fade_out_seconds` from 0 to 2 seconds; these fade video and available source audio to/from black. They default to zero.
+The current split layout requires two explicit secondary videos; it does not silently duplicate one source or guess the second panel. Each segment may optionally specify `fade_in_seconds` and `fade_out_seconds` from 0 to 2 seconds; these fade video and available source audio to/from black. They default to zero. Optional `color_grade` values control brightness, contrast, saturation and gamma, while `sharpen` applies bounded FFmpeg unsharp masking. All look controls default to neutral/off and are validated before rendering; aggressive values can amplify noise or clip tones.
 
 ## 60 FPS policy
 
