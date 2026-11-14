@@ -53,7 +53,7 @@ The renderer has initial code for exactly three layouts:
 - `split_vertical`: top/bottom panels from two explicit secondary sources, with centered captions.
 - `blurred_bars_20_60_20`: blurred top 20%, sharp center 60%, blurred bottom 20%.
 
-All three layouts and ASS captions have synthetic FFmpeg integration coverage. The latest full GitHub Actions matrix passed on Ubuntu and Windows with Python 3.10 and 3.12 ([run #43622463389](https://github.com/enesxh01/-shortform-video-editor-skills/actions/runs/43622463389)). The run passed 187 tests, synthetic FFmpeg integration, all four isolated skill installers and one-command setup checks. Split mode requires two secondary video files; provide them with `--split-top-source` and `--split-bottom-source`, plus optional source offsets.
+All three layouts and ASS captions have synthetic FFmpeg integration coverage. The latest full GitHub Actions matrix passed on Ubuntu and Windows with Python 3.10 and 3.12 ([run #43623089940](https://github.com/enesxh01/-shortform-video-editor-skills/actions/runs/43623089940)). The run passed 189 tests, synthetic FFmpeg integration, all four isolated skill installers and one-command setup checks. Split mode requires two secondary video files; provide them with `--split-top-source` and `--split-bottom-source`, plus optional source offsets.
 
 ## Skill suite
 
@@ -120,7 +120,7 @@ shortform-editor analyze-project input.mp4 -o job-output/ --model small --device
 
 This orchestrates:
 1. Source probe and SHA-256 fingerprint, plus an advisory 240-frame timestamp-cadence sample across up to eight evenly spaced windows (`likely_cfr`, `likely_vfr`, or unknown). This is not full-file VFR proof. The renderer rebases each segment's video PTS, converts to CFR, and resamples audio timestamps to compensate for ordinary clock drift; arbitrary damaged timestamps still need human sync review.
-2. Audio extraction, optional faster-whisper ASR and word timestamps.
+2. Audio extraction, timestamped generic energy-rise/transient cues, optional faster-whisper ASR and word timestamps.
 3. Transcript-led moment candidate ranking.
 4. Review-only retention/pacing analysis.
 5. Optional visual scene sampling and frontal-face crop keyframes.
