@@ -56,3 +56,6 @@ The current split layout requires two explicit secondary videos; it does not sil
 ## Verification
 
 A successful process exit is insufficient. Probe and decode the output, verify expected duration/frame count/streams, inspect representative frames and motion, and run the QC skill.
+
+
+After assembling and decode-checking the final MP4, the `render` command automatically runs the independent technical QC pass and includes its report in the JSON result. A failed QC result returns a non-zero exit code while preserving the rendered file for inspection. Warnings (for example, a source with no audio stream) remain non-fatal.
