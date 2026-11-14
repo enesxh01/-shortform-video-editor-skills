@@ -55,20 +55,20 @@ def build_ffmpeg_crop_filter(keyframes: list[dict[str, Any]], clip_start: float,
         if points and frame_number <= points[-1][0]:
             points[-1] = (frame_number, x, y)
         else:
-            points.append((frame_number, x, y))
+            points.append((frame_number, x, y, bool(item.get("scene_cut", False))))
     if not points or crop_width is None or crop_height is None:
         return None
 
     def expression(axis: int) -> str:
-        values = [(frame, point[axis]) for point in points]
+        values = [(point[0], point[axis], point[3]) for point in points]
         expr = f"{values[-1][1]:.2f}"
         for index in range(len(values) - 2, -1, -1):
-            n1, v1 = values[index]
-            n2, v2 = values[index + 1]
+            n1, v1, _ = values[index]
+            n2, v2, next_is_cut = values[index + 1]
             span = max(1, n2 - n1)
-            interp = f"({v1:.2f}+({v2-v1:.2f})*(n-{n1})/{span})"
+            interp = f"{v1:.2f}" if next_is_cut else f"({v1:.2f}+({v2-v1:.2f})*(n-{n1})/{span})"
             expr = f"if(lt(n,{n2}),{interp},{expr})"
-        first_n, first_value = values[0]
+        first_n, first_value, _ = values[0]
         return f"if(lt(n,{first_n}),{first_value:.2f},{expr})"
 
     return (
@@ -223,6 +223,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
         samples.append({
             "time_seconds": round(timestamp + video_time_offset, 3),
             "region_index": region_id,
+            "scene_cut": motion_score >= 0.22,
             "subject_evidence": subject,
             "confidence": confidence,
             "center": {"x": round(smoothed_center[0], 2), "y": round(smoothed_center[1], 2)},
