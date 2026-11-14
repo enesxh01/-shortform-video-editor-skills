@@ -127,7 +127,10 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                     if candidate["source_in_seconds"] <= item["time_seconds"] <= candidate["source_out_seconds"]
                 ]
                 if any(item["subject_evidence"] == "face_detection" for item in crop_frames):
-                    segment_edl["crop_keyframes"] = crop_frames
+                    segment_edl["crop_keyframes"] = [
+                        {"time_seconds": item["time_seconds"], "crop_9_16": item["crop_9_16"]}
+                        for item in crop_frames
+                    ]
 
             edl = {
                 "schema_version": "1.0",
