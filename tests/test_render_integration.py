@@ -245,7 +245,7 @@ class RenderIntegrationTests(unittest.TestCase):
             original_run_checked = run_checked
 
             def interrupt_second_segment(command):
-                if command[0].endswith("ffmpeg") and str(command[-1]).endswith("part-0001.mp4"):
+                if Path(command[0]).stem.lower() == "ffmpeg" and str(command[-1]).endswith("part-0001.mp4"):
                     raise PipelineError("simulated interruption after first segment")
                 return original_run_checked(command)
 
