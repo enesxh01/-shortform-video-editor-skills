@@ -32,11 +32,23 @@ def require_tool(name: str) -> str:
 
 
 def run_checked(args: list[str]) -> subprocess.CompletedProcess[str]:
+    process = subprocess.Popen(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     try:
-        return subprocess.run(args, check=True, text=True, capture_output=True)
-    except subprocess.CalledProcessError as exc:
-        detail = (exc.stderr or exc.stdout or str(exc)).strip()
-        raise PipelineError(f"Command failed ({exc.returncode}): {detail}") from exc
+        stdout, stderr = process.communicate()
+    except KeyboardInterrupt:
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        process.communicate()
+        raise
+    completed = subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
+    if process.returncode != 0:
+        detail = (stderr or stdout or f"exit code {process.returncode}").strip()
+        raise PipelineError(f"Command failed ({process.returncode}): {detail}")
+    return completed
 
 
 def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
