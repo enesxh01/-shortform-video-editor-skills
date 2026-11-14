@@ -492,6 +492,27 @@ def command_generate_captions(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_qc(args: argparse.Namespace) -> int:
+    from .qc import run_qc
+
+    report = run_qc(
+        Path(args.source).expanduser().resolve(strict=True),
+        expected_width=args.width,
+        expected_height=args.height,
+        expected_fps=args.fps
+    )
+    output = json.dumps(report, indent=2, ensure_ascii=False) + "\\n"
+    if args.output:
+        destination = Path(args.output).expanduser().resolve()
+        if destination == Path(args.source).expanduser().resolve():
+            raise PipelineError("QC report cannot overwrite the media file")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(output, encoding="utf-8")
+    else:
+        print(output, end="")
+    return 0 if report["status"] == "passed" else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -539,6 +560,13 @@ def build_parser() -> argparse.ArgumentParser:
     captions.add_argument("--candidate-id")
     captions.add_argument("--layout", default="fullscreen", choices=["fullscreen", "split_vertical", "blurred_bars_20_60_20"])
     captions.set_defaults(func=command_generate_captions)
+    qc = sub.add_parser("qc", help="run technical black/freeze/codec/frame-rate/audio-peak checks")
+    qc.add_argument("source")
+    qc.add_argument("-o", "--output")
+    qc.add_argument("--width", type=int, default=1080)
+    qc.add_argument("--height", type=int, default=1920)
+    qc.add_argument("--fps", default="60/1")
+    qc.set_defaults(func=command_qc)
     render = sub.add_parser("render", help="render approved EDL segments into a vertical MP4")
     render.add_argument("source")
     render.add_argument("edl")
