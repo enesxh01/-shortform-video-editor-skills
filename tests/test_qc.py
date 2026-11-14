@@ -95,18 +95,14 @@ class QCTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "source.mp4"
             source.write_bytes(b"placeholder")
-            with patch("shortform_editor.repair.probe_media", return_value={
-                "format": {"duration": "1.0"},
-                "source": {"fingerprint": "sha256:source"}
-            }), patch("shortform_editor.repair.file_stat_signature", return_value=(1, 1, 1, 1)), \
+            with patch("shortform_editor.repair.probe_media", side_effect=[
+                     {"format": {"duration": "1.0"}, "source": {"fingerprint": "sha256:source"}},
+                     {"format": {"duration": "1.0"}, "source": {"fingerprint": "sha256:output"}}
+                 ]), patch("shortform_editor.repair.file_stat_signature", return_value=(1, 1, 1, 1)), \
                  patch("shortform_editor.repair.require_tool", return_value="ffmpeg"), \
                  patch("shortform_editor.repair.run_checked") as run, \
                  patch("shortform_editor.repair.os.replace"), \
-                 patch("shortform_editor.repair.run_qc", return_value={"status": "passed", "checks": [], "failures": []}), \
-                 patch("shortform_editor.repair.probe_media", side_effect=[
-                     {"format": {"duration": "1.0"}, "source": {"fingerprint": "sha256:source"}},
-                     {"format": {"duration": "1.0"}, "source": {"fingerprint": "sha256:output"}}
-                 ]):
+                 patch("shortform_editor.repair.run_qc", return_value={"status": "passed", "checks": [], "failures": []}):
                 result = repair_technical_export(
                     source, Path(directory) / "out.mp4", fps="120/2"
                 )
