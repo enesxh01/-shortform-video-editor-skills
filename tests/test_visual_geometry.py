@@ -34,6 +34,14 @@ class CropGeometryTests(unittest.TestCase):
         self.assertEqual(sampled[-1][1], 0)
         self.assertLess(sampled[0][0], sampled[-1][0])
 
+    def test_scene_cut_holds_old_crop_then_jumps_to_new_scene(self):
+        keyframes = [
+            {"time_seconds": 0.0, "scene_cut": False, "crop_9_16": {"x": 20, "y": 0, "width": 202.5, "height": 360}},
+            {"time_seconds": 1.0, "scene_cut": True, "crop_9_16": {"x": 100, "y": 0, "width": 202.5, "height": 360}}
+        ]
+        expression = build_ffmpeg_crop_filter(keyframes, 0.0, "60/1", 640, 360)
+        self.assertIn("if(lt(n,60),20.00,100.00)", expression)
+
     def test_builds_interpolated_crop_expression(self):
         keyframes = [
             {"time_seconds": 0.0, "crop_9_16": {"x": 20, "y": 0, "width": 202.5, "height": 360}},
