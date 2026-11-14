@@ -7,6 +7,12 @@ description: Apply restrained premium editorial styling, readable captions, purp
 
 Create polished, modern editorial short-form videos. Restraint and readability beat visual noise.
 
+## Executable caption baseline
+
+Generate word-timed caption groups with `shortform-editor generate-captions audio-analysis.json candidates.json -o captions.json --layout fullscreen`. Add the resulting caption array to the selected EDL segment before approval and rendering. The renderer burns ASS/libass captions with outlined bold typography and optional word-level karaoke highlighting. Split captions are centered; fullscreen and blurred-bars captions use bottom placement by default.
+
+This is the initial static/Karaoke baseline only. Per-word scale/position animation, custom font packaging, advanced emphasis rules, three-line layout tuning and face/HUD-aware safe-area placement are not implemented. Review spelling and timing against the source.
+
 ## Captions
 
 - Use accurate, speech-synchronized captions. Verify hook/payoff wording against audio.
