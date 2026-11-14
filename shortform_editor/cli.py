@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import hashlib
 import json
 import math
@@ -454,6 +455,52 @@ def _segment_look_filters(segment: dict[str, Any]) -> list[str]:
     return filters
 
 
+
+
+def _write_render_state(path: Path, state: dict[str, Any]) -> None:
+    staged = None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix=".render-state-",
+                                         suffix=".tmp", dir=path.parent, delete=False) as handle:
+            staged = Path(handle.name)
+            json.dump(state, handle, indent=2, ensure_ascii=False)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(staged, path)
+    finally:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+
+
+def _render_part_is_reusable(part: Path, record: Any, ffmpeg: str, ffprobe: str,
+                             width: int, height: int, fps: str) -> bool:
+    if not isinstance(record, dict) or not part.is_file():
+        return False
+    expected_digest = record.get("sha256")
+    if not isinstance(expected_digest, str) or len(expected_digest) != 64:
+        return False
+    try:
+        if sha256_file(part) != expected_digest or part.stat().st_size <= 0:
+            return False
+        metadata = json.loads(run_checked([
+            ffprobe, "-v", "error", "-show_streams", "-show_format", "-of", "json", str(part)
+        ]).stdout)
+        video = next((stream for stream in metadata.get("streams", [])
+                      if stream.get("codec_type") == "video"), None)
+        if not video or video.get("codec_name") != "h264":
+            return False
+        if (int(video.get("width", 0)), int(video.get("height", 0))) != (width, height):
+            return False
+        if Fraction(video.get("avg_frame_rate", "0/1")) != Fraction(fps):
+            return False
+        run_checked([ffmpeg, "-hide_banner", "-v", "error", "-i", str(part), "-f", "null", "-"])
+        return True
+    except (PipelineError, OSError, ValueError, TypeError, ZeroDivisionError, json.JSONDecodeError):
+        return False
+
+
 def command_render(args: argparse.Namespace) -> int:
     edl_path = Path(args.edl).expanduser().resolve(strict=True)
     edl = json.loads(edl_path.read_text(encoding="utf-8"))
@@ -535,10 +582,53 @@ def command_render(args: argparse.Namespace) -> int:
     except RuntimeError as exc:
         raise PipelineError(str(exc)) from exc
 
+
+    resume_enabled = bool(getattr(args, "resume", False))
+    render_workdir = output.parent / f".{output.name}.shortform-work"
+    render_state_path = render_workdir / "render-state.json"
+    render_state: dict[str, Any] | None = None
+    reused_segments: list[int] = []
+    if resume_enabled:
+        split_fingerprints = [
+            {"segment": index, "source": key, "fingerprint": edl["segments"][index][key]["fingerprint"]}
+            for index, key in sorted(split_paths)
+        ]
+        render_settings = {
+            "source_fingerprint": probe["source"]["fingerprint"],
+            "edl_sha256": sha256_file(edl_path),
+            "split_sources": split_fingerprints,
+            "output": str(output),
+            "render": render,
+            "crf": args.crf,
+            "preset": args.preset,
+            "encoder": getattr(args, "encoder", "auto"),
+            "nvenc_preset": getattr(args, "nvenc_preset", "p5"),
+            "nvenc_cq": getattr(args, "nvenc_cq", 19),
+            "preview": preview_mode
+        }
+        settings_sha256 = hashlib.sha256(
+            json.dumps(render_settings, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        render_workdir.mkdir(parents=True, exist_ok=True)
+        if render_state_path.exists():
+            try:
+                render_state = json.loads(render_state_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+                raise PipelineError(f"Cannot resume render: render state is unreadable: {exc}") from exc
+            if not isinstance(render_state, dict) or render_state.get("settings_sha256") != settings_sha256:
+                raise PipelineError("Cannot resume render: source, EDL, output or encoder settings changed; use a new output path or remove the old work directory")
+            if not isinstance(render_state.get("parts"), dict):
+                raise PipelineError("Cannot resume render: render state has an invalid parts manifest")
+        else:
+            render_state = {"schema_version": "1.0", "settings_sha256": settings_sha256,
+                            "settings": render_settings, "parts": {}}
+            _write_render_state(render_state_path, render_state)
+
     from .captions import ffmpeg_subtitles_filter, write_ass_subtitles
     from .visual import build_ffmpeg_crop_filter
 
-    with tempfile.TemporaryDirectory(prefix="shortform-render-") as tmp:
+    render_context = nullcontext(str(render_workdir)) if resume_enabled else tempfile.TemporaryDirectory(prefix="shortform-render-")
+    with render_context as tmp:
         tmpdir = Path(tmp)
         parts: list[Path] = []
         for index, segment in enumerate(edl["segments"]):
@@ -546,6 +636,15 @@ def command_render(args: argparse.Namespace) -> int:
             clip_end = timestamp_seconds(segment["source_out"])
             clip_duration = clip_end - clip_start
             part = tmpdir / f"part-{index:04d}.mp4"
+            if resume_enabled and render_state is not None:
+                record = render_state["parts"].get(str(index))
+                if _render_part_is_reusable(part, record, ffmpeg, require_tool("ffprobe"), width, height, fps):
+                    parts.append(part)
+                    reused_segments.append(index)
+                    continue
+                part.unlink(missing_ok=True)
+                render_state["parts"].pop(str(index), None)
+                _write_render_state(render_state_path, render_state)
             layout = segment["layout"]
             ass_path = tmpdir / f"captions-{index:04d}.ass"
             subtitle_path = write_ass_subtitles(segment, layout, clip_start, ass_path)
@@ -665,6 +764,9 @@ def command_render(args: argparse.Namespace) -> int:
                 args._selected_encoder = "libx264"
                 args._encoder_fallback = "NVENC failed; CPU libx264 fallback used"
             parts.append(part)
+            if resume_enabled and render_state is not None:
+                render_state["parts"][str(index)] = {"sha256": sha256_file(part), "size_bytes": part.stat().st_size}
+                _write_render_state(render_state_path, render_state)
 
         concat_file = tmpdir / "concat.txt"
         concat_file.write_text("".join(_concat_demuxer_entry(p) for p in parts), encoding="utf-8")
@@ -703,6 +805,9 @@ def command_render(args: argparse.Namespace) -> int:
         qc_report, actual_duration, expected_duration,
         tolerance=max(0.1, 0.025 * len(edl["segments"]))
     )
+    if resume_enabled and qc_report["status"] in {"passed", "warning"}:
+        shutil.rmtree(render_workdir, ignore_errors=True)
+
     creative_quality = assess_edit_quality(edl)
 
     print(json.dumps({
@@ -711,6 +816,7 @@ def command_render(args: argparse.Namespace) -> int:
         "output_sha256": final_probe["source"]["sha256"],
         "render": render,
         "segments": len(edl["segments"]),
+        "resumed_segments": reused_segments,
         "layouts": sorted({segment["layout"] for segment in edl["segments"]}),
         "captions": sum(len(segment.get("captions", [])) for segment in edl["segments"]),
         "status": "preview_rendered_and_decode_checked" if preview_mode else "rendered_and_decode_checked",
@@ -1108,6 +1214,7 @@ def build_parser() -> argparse.ArgumentParser:
     render.add_argument("--preset", default="medium", choices=["ultrafast", "fast", "medium", "slow", "veryslow"])
     render.add_argument("--crf", type=int, default=18)
     render.add_argument("--overwrite", action="store_true")
+    render.add_argument("--resume", action="store_true", help="persist and reuse verified segment encodes after interruption; pass on the first run and every retry")
     render.add_argument("--encoder", choices=["auto", "libx264", "h264_nvenc"], default="auto",
                         help="auto prefers NVIDIA NVENC when available, then safely falls back to CPU libx264")
     render.add_argument("--nvenc-preset", default="p5", choices=["p1", "p2", "p3", "p4", "p5", "p6", "p7"])
