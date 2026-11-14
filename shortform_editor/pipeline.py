@@ -1,0 +1,170 @@
+from __future__ import annotations
+
+import json
+import re
+import time
+from pathlib import Path
+from typing import Any
+
+from .audio import analyze_audio
+from .caption_generation import generate_captions
+from .cli import PipelineError, probe_media
+from .moments import detect_moments
+from .pacing import analyze_pacing
+from .visual import analyze_visuals
+
+
+def _timecode(seconds: float) -> str:
+    millis = max(0, round(seconds * 1000))
+    hours, rest = divmod(millis, 3_600_000)
+    minutes, rest = divmod(rest, 60_000)
+    secs, ms = divmod(rest, 1000)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}.{ms:03d}"
+
+
+def _write_json(path: Path, data: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def analyze_project(source: Path, output_dir: Path, model: str = "small",
+                    device: str = "auto", top_candidates: int = 5,
+                    layout: str = "fullscreen", include_visuals: bool = False) -> dict[str, Any]:
+    source = source.expanduser().resolve(strict=True)
+    output_dir = output_dir.expanduser().resolve()
+    if output_dir == source or source.is_relative_to(output_dir):
+        raise PipelineError("Output directory must not be the source file or a parent containing the source")
+    if not 1 <= top_candidates <= 20:
+        raise PipelineError("Top candidate count must be between 1 and 20")
+    if layout not in {"fullscreen", "blurred_bars_20_60_20"}:
+        raise PipelineError("Project analysis currently drafts fullscreen or blurred-bars layouts; split needs explicit secondary sources")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    stages = []
+    warnings = []
+
+    def stage(name: str, function):
+        started = time.perf_counter()
+        result = function()
+        stages.append({
+            "stage": name,
+            "status": "completed",
+            "duration_seconds": round(time.perf_counter() - started, 3)
+        })
+        return result
+
+    try:
+        probe = stage("probe", lambda: probe_media(source))
+        _write_json(output_dir / "probe.json", probe)
+
+        audio = stage("audio", lambda: analyze_audio(source, model_size=model, device=device))
+        _write_json(output_dir / "audio-analysis.json", audio)
+
+        candidates = stage("moment_detection", lambda: detect_moments(audio, limit=top_candidates))
+        _write_json(output_dir / "candidates.json", candidates)
+
+        pacing = stage("retention_pacing", lambda: analyze_pacing(audio, candidates))
+        _write_json(output_dir / "pacing.json", pacing)
+
+        visuals = None
+        if include_visuals:
+            try:
+                visuals = stage("visual_analysis", lambda: analyze_visuals(source))
+                _write_json(output_dir / "visual-analysis.json", visuals)
+            except PipelineError as exc:
+                warnings.append(f"Visual analysis unavailable: {exc}")
+
+        video_stream = next(s for s in probe["streams"] if s.get("codec_type") == "video")
+        time_base = video_stream.get("time_base") or "1/90000"
+        source_fps = video_stream.get("avg_frame_rate") or "30/1"
+        try:
+            from fractions import Fraction
+            if Fraction(source_fps) <= 0:
+                source_fps = "30/1"
+        except (ValueError, ZeroDivisionError):
+            source_fps = "30/1"
+
+        drafts = []
+        for candidate in candidates["candidates"]:
+            try:
+                caption_report = generate_captions(audio, candidate, layout=layout)
+                captions = caption_report["captions"]
+            except PipelineError as exc:
+                captions = []
+                warnings.append(f"No captions for {candidate['candidate_id']}: {exc}")
+
+            safe_id = re.sub(r"[^a-zA-Z0-9_-]", "_", candidate["candidate_id"])
+            edl = {
+                "schema_version": "1.0",
+                "project_id": probe["source"]["sha256"][:12],
+                "source": {
+                    "fingerprint": probe["source"]["fingerprint"],
+                    "time_base": time_base,
+                    "frame_rate": source_fps,
+                    "variable_frame_rate": None
+                },
+                "render": {
+                    "width": 1080,
+                    "height": 1920,
+                    "fps_target": "60/1",
+                    "fps_mode": "cfr",
+                    "fps_conversion": "duplicate_drop",
+                    "container": "mp4",
+                    "video_codec": "h264",
+                    "audio_codec": "aac"
+                },
+                "segments": [{
+                    "id": candidate["candidate_id"],
+                    "source_in": _timecode(candidate["source_in_seconds"]),
+                    "source_out": _timecode(candidate["source_out_seconds"]),
+                    "timeline_start": "00:00:00.000",
+                    "layout": layout,
+                    "reason": f"{candidate['family']}: {candidate['transcript_excerpt'][:180]}",
+                    "confidence": candidate["confidence"],
+                    "captions": captions
+                }],
+                "approval": {"status": "draft", "approved_by_user": False}
+            }
+            edl_path = output_dir / "edl" / f"{safe_id}.json"
+            _write_json(edl_path, edl)
+            drafts.append({
+                "candidate_id": candidate["candidate_id"],
+                "edl": str(edl_path),
+                "caption_count": len(captions),
+                "approval_required": True
+            })
+
+        status = "partial" if warnings or not candidates["candidates"] else "analysis_complete_drafts_pending_review"
+        manifest = {
+            "schema_version": "1.0",
+            "status": status,
+            "source": {
+                "path": str(source),
+                "fingerprint": probe["source"]["fingerprint"],
+                "duration_seconds": probe.get("format", {}).get("duration")
+            },
+            "stages": stages,
+            "artifacts": {
+                "probe": "probe.json",
+                "audio": "audio-analysis.json",
+                "candidates": "candidates.json",
+                "pacing": "pacing.json",
+                "visuals": "visual-analysis.json" if visuals else None
+            },
+            "draft_edls": drafts,
+            "warnings": warnings,
+            "next_step": "Review candidate boundaries and EDL drafts, add/adjust layouts and captions, then explicitly set approval.status=approved and approved_by_user=true before rendering."
+        }
+        _write_json(output_dir / "manifest.json", manifest)
+        return manifest
+    except KeyboardInterrupt:
+        manifest = {
+            "schema_version": "1.0",
+            "status": "cancelled",
+            "source": str(source),
+            "completed_stages": stages,
+            "warnings": warnings,
+            "note": "Interrupted by user. Completed stage artifacts are preserved; rerun the command to continue from scratch."
+        }
+        _write_json(output_dir / "manifest.json", manifest)
+        raise
