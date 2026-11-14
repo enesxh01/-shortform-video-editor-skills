@@ -85,5 +85,18 @@ class CropGeometryTests(unittest.TestCase):
 
 
 
+    def test_analyze_visuals_cli_accepts_normalized_manual_roi(self):
+        from shortform_editor.cli import build_parser
+        args = build_parser().parse_args([
+            "analyze-visuals", "gameplay.mp4", "--no-face-detection",
+            "--track-roi", "0.32", "0.18", "0.24", "0.42",
+            "--sample-rate", "3"
+        ])
+        self.assertEqual(args.track_roi, [0.32, 0.18, 0.24, 0.42])
+        self.assertTrue(args.no_face_detection)
+        self.assertEqual(args.sample_rate, 3.0)
+
+
+
 if __name__ == "__main__":
     unittest.main()
