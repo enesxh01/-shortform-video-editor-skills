@@ -11,7 +11,7 @@ Find moments people may want to keep watching and share. Do not promise virality
 
 After audio analysis, run `shortform-editor find-moments audio-analysis.json -o candidates.json`. The current implementation proposes transcript-aligned windows and ranks them with an explainable 100-point heuristic using hook/payoff text cues, speech density, lexical variety, audio energy support and boundary evidence.
 
-Treat every candidate as low-confidence (0.35) and human-review-required. The cue lexicon is English-biased, does not understand semantics, and does not estimate virality. It is a triage baseline only. Do not increase its confidence or describe it as AI understanding. Then perform the OpenCode model's full-transcript semantic second pass using `references/semantic-review.md`; the model must use exact transcript timestamps and explain evidence, never invent boundaries.
+Treat every candidate as low-confidence (0.35) and human-review-required. The cue lexicon is English-biased, does not understand semantics, and does not estimate virality. It is a triage baseline only. Do not increase its confidence or describe it as AI understanding. Then perform the OpenCode model's full-transcript semantic second pass using `references/semantic-review.md`; the model must use exact transcript timestamps and explain evidence, never invent boundaries. Validate its JSON with `shortform-editor validate-semantic-review review.json --probe probe.json --candidates candidates.json` before creating additional EDL drafts.
 
 ## Analyze the whole recording
 
