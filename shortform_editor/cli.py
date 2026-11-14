@@ -849,6 +849,8 @@ def command_download_source(args: argparse.Namespace) -> int:
     report = download_source(args.url, Path(args.output_dir), args.max_filesize_mb)
     if args.report:
         report_path = Path(args.report).expanduser().resolve()
+        if report_path == Path(report["source_path"]).expanduser().resolve():
+            raise PipelineError("Download report must not overwrite the downloaded source media")
         report_path.parent.mkdir(parents=True, exist_ok=True)
         report_path.write_text(
             json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
