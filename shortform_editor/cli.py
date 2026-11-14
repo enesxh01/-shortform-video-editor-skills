@@ -206,6 +206,31 @@ def render(edl_path, output):
         target.with_suffix(target.suffix+".manifest.json").write_text(json.dumps(manifest,indent=2),encoding="utf-8")
     return manifest
 
+def transcribe(source, output, model_name="small", device="auto", compute_type="auto", language=None):
+    """Optional local ASR adapter using faster-whisper; model download occurs on first use."""
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError as e:
+        raise EditorError("Transcription needs the optional faster-whisper package. Install with: python -m pip install faster-whisper") from e
+    info=probe(source)
+    model=WhisperModel(model_name,device=device,compute_type=compute_type)
+    segments,meta=model.transcribe(info["path"],language=language,word_timestamps=True,
+        vad_filter=True,beam_size=5,condition_on_previous_text=True)
+    result={"schema_version":"1.0","source":info,"engine":"faster-whisper",
+        "model":model_name,"language":meta.language,"language_probability":meta.language_probability,
+        "duration":meta.duration,"segments":[],"words":[]}
+    for seg in segments:
+        item={"start":seg.start,"end":seg.end,"text":seg.text.strip(),
+              "avg_logprob":seg.avg_logprob,"no_speech_prob":seg.no_speech_prob,
+              "words":[]}
+        for word in (seg.words or []):
+            w={"start":word.start,"end":word.end,"text":word.word,
+               "probability":word.probability}
+            item["words"].append(w); result["words"].append(w)
+        result["segments"].append(item)
+    Path(output).expanduser().resolve().write_text(json.dumps(result,indent=2,ensure_ascii=False),encoding="utf-8")
+    return result
+
 def main():
     p=argparse.ArgumentParser(description="Local-first short-form video editor runtime")
     sub=p.add_subparsers(dest="command",required=True)
@@ -213,6 +238,7 @@ def main():
     v=sub.add_parser("validate",help="Validate an EDL"); v.add_argument("edl"); v.add_argument("--source")
     r=sub.add_parser("render",help="Render an approved EDL"); r.add_argument("edl"); r.add_argument("-o","--output",required=True)
     q=sub.add_parser("qc",help="Probe and fully decode an exported video"); q.add_argument("video")
+    tr=sub.add_parser("transcribe",help="Run optional local word-timestamp ASR"); tr.add_argument("source"); tr.add_argument("-o","--output",required=True); tr.add_argument("--model",default="small"); tr.add_argument("--device",default="auto"); tr.add_argument("--compute-type",default="auto"); tr.add_argument("--language")
     args=p.parse_args()
     try:
         if args.command=="inspect":
@@ -228,6 +254,9 @@ def main():
         elif args.command=="qc":
             info=probe(args.video); run(["ffmpeg","-v","error","-i",info["path"],"-f","null","-"])
             print(json.dumps({"decode":"passed","probe":info},indent=2))
+        elif args.command=="transcribe":
+            result=transcribe(args.source,args.output,args.model,args.device,args.compute_type,args.language)
+            print(json.dumps({"output":str(Path(args.output).expanduser().resolve()),"language":result["language"],"segments":len(result["segments"]),"words":len(result["words"]),"model":args.model},indent=2))
     except (EditorError,ValueError,KeyError,json.JSONDecodeError) as e:
         print(f"ERROR: {e}",file=sys.stderr); sys.exit(2)
 if __name__=="__main__": main()
