@@ -12,7 +12,7 @@ Render only from a validated, versioned EDL. Probe inputs and verify stream mapp
 ## Default export profile
 
 - Container: MP4.
-- Video: H.264 (libx264 baseline fallback; hardware encoders only after quality/compatibility validation).
+- Video: H.264; `--encoder auto` prefers NVIDIA `h264_nvenc` when listed by FFmpeg and retries with CPU `libx264` if NVENC fails. Use `--encoder libx264` to force software encoding or `--encoder h264_nvenc` to require NVENC. NVENC defaults to preset p5 and VBR CQ 19; equal numeric quality settings are not equivalent across encoders.
 - Frame size: 1080x1920 (9:16).
 - Frame rate target: 60 fps CFR by default.
 - Pixel format: yuv420p for broad compatibility.
@@ -30,7 +30,7 @@ The current renderer supports:
 
 Per-segment captions use ASS/libass. Word-level karaoke highlighting is available when caption word timestamps are supplied. Fullscreen captions use a bold outlined bottom style; split-layout captions are centered and use a smaller single-line style. Fonts depend on the host's font availability. A build without FFmpeg libass support cannot render captions and must fail clearly.
 
-The current split layout requires two explicit secondary videos; it does not silently duplicate one source or guess the second panel.
+The current split layout requires two explicit secondary videos; it does not silently duplicate one source or guess the second panel. Each segment may optionally specify `fade_in_seconds` and `fade_out_seconds` from 0 to 2 seconds; these fade video and available source audio to/from black. They default to zero.
 
 ## 60 FPS policy
 
@@ -61,4 +61,4 @@ A successful process exit is insufficient. Probe and decode the output, verify e
 After assembling and decode-checking the final MP4, the `render` command automatically runs the independent technical QC pass and includes its report in the JSON result. A failed QC result returns a non-zero exit code while preserving the rendered file for inspection. Warnings (for example, a source with no audio stream) remain non-fatal.
 
 
-Multi-segment EDLs are concatenated in array order. Timeline gaps/overlaps and transitions are intentionally unsupported; semantic validation rejects a non-sequential `timeline_start` rather than rendering a misleading timeline.
+Multi-segment EDLs are concatenated in array order. Per-segment fade-to/from-black transitions are supported, but cross-dissolves, transition overlaps, motion transitions and timeline gaps/overlaps are not. Semantic validation rejects a non-sequential `timeline_start` rather than rendering a misleading timeline.
