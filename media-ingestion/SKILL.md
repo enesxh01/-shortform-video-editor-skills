@@ -8,7 +8,7 @@ description: Safely inspect, validate, fingerprint, and stage local or linked vi
 - Accept user-provided local files or explicitly supported links. Do not bypass access controls or download private content without authorization.
 - Validate file type by probing content, not trusting extension alone.
 - Inspect duration, dimensions, codec, pixel format, average/nominal frame rate, time base, rotation metadata, color metadata, audio streams, channels, sample rate, start timestamps, and corruption.
-- Read the `frame_timing` probe diagnostic when present. It samples up to 240 initial decoded video-frame timestamps and may report `likely_cfr`, `likely_vfr`, or `insufficient_samples`. Treat this as an initial-sample heuristic only: do not claim the entire file is CFR/VFR from it, and do not claim timestamps were normalized.
+- Read the `frame_timing` probe diagnostic when present. It samples up to 240 decoded video-frame timestamps across up to eight evenly spaced windows throughout the source when duration is known and may report `likely_cfr`, `likely_vfr`, or `insufficient_samples`. Treat this as a bounded multi-window heuristic only: do not claim the entire file is CFR/VFR from it, and do not claim timestamps were normalized.
 - If `frame_timing.variable_frame_rate` is `true`, warn that arbitrary VFR timecode mapping remains a limitation and recommend a short preview plus audio/video sync inspection before final approval. If it is `null`, report cadence as unknown rather than assuming CFR.
 - Record source checksum, file size, probe JSON, tool version, and ingestion time.
 - Preserve original file unchanged. Use a project-local staging reference; copy only when needed.
