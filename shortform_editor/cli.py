@@ -136,7 +136,7 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
                 pieces=[]
                 for word in words:
                     duration=max(1,round((seconds(word["end"])-seconds(word["start"]))*100))
-                    pieces.append("{\\\\k"+str(duration)+"}"+ass_escape(word["text"]))
+                    pieces.append("{\\k"+str(duration)+"}"+ass_escape(word["text"]))
                 text=" ".join(pieces)
             else:
                 text=ass_escape(c["text"])
