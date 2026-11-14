@@ -163,7 +163,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
     scene_changes = []
     timestamp_items = (
         sample_region_timestamps(regions, duration, video_time_offset, sample_rate, max_frames)
-        if regions else [(item, 0) for item in sample_timestamps(duration, sample_rate, max_frames)]
+        if regions is not None else [(item, 0) for item in sample_timestamps(duration, sample_rate, max_frames)]
     )
     previous_region = None
     for frame_index, (timestamp, region_id) in enumerate(timestamp_items):
