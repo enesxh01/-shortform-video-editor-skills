@@ -8,13 +8,26 @@ from .cli import PipelineError, probe_media
 
 
 def _download_size_guard(max_bytes: int):
-    """Abort a yt-dlp transfer as soon as its observed byte count exceeds the cap."""
+    """Abort when cumulative observed bytes across video/audio streams exceed the cap."""
+    last_by_file: dict[str, int] = {}
+    total_downloaded = 0
+
     def check_progress(progress: dict[str, Any]) -> None:
+        nonlocal total_downloaded
         downloaded = progress.get("downloaded_bytes")
-        if isinstance(downloaded, (int, float)) and downloaded > max_bytes:
+        if not isinstance(downloaded, (int, float)) or downloaded < 0:
+            return
+        filename = str(progress.get("filename") or "<unknown>")
+        current = int(downloaded)
+        previous = last_by_file.get(filename, 0)
+        # yt-dlp reports cumulative bytes for a file; a lower value means a retry/reset.
+        total_downloaded += current if current < previous else current - previous
+        last_by_file[filename] = current
+        if total_downloaded > max_bytes:
             raise PipelineError(
                 f"Download exceeded the configured maximum size of {max_bytes} bytes"
             )
+
     return check_progress
 
 
