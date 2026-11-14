@@ -235,8 +235,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
         previous_center = smoothed_center
 
     capture.release()
-    final_source_probe = probe_media(source)
-    if final_source_probe["source"]["fingerprint"] != report["source"]["fingerprint"]:
+    if file_stat_signature(source) != source_signature:
         raise PipelineError("Source media changed during visual analysis; discard crop suggestions and restart from the new source version")
     return {
         "schema_version": "1.0",
