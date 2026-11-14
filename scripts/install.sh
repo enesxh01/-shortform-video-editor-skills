@@ -32,8 +32,8 @@ fi
 
 for shared_dir in references schemas config docs; do
   if [[ -d "$ROOT/$shared_dir" ]]; then
-    rm -rf "$DEST/$shared_dir"
-    cp -R "$ROOT/$shared_dir" "$DEST/$shared_dir"
+    mkdir -p "$DEST/$shared_dir"
+    cp -R "$ROOT/$shared_dir"/. "$DEST/$shared_dir"/
     echo "Installed shared $shared_dir"
   fi
 done
