@@ -168,6 +168,28 @@ class CropGeometryTests(unittest.TestCase):
 
 
 
+    def test_manual_roi_optical_flow_tracks_translation_without_contrib_tracker(self):
+        import cv2
+        import numpy as np
+        from shortform_editor.visual import _advance_optical_flow, _optical_flow_features
+
+        rng = np.random.default_rng(7)
+        first = np.zeros((140, 180), dtype=np.uint8)
+        first[30:90, 40:100] = rng.integers(0, 256, size=(60, 60), dtype=np.uint8)
+        transform = np.float32([[1, 0, 7], [0, 1, 4]])
+        second = cv2.warpAffine(first, transform, (180, 140))
+        initial_box = (40.0, 30.0, 60.0, 60.0)
+        points = _optical_flow_features(cv2, first, initial_box)
+        self.assertIsNotNone(points)
+        self.assertGreaterEqual(len(points), 4)
+        tracked = _advance_optical_flow(cv2, first, second, points, initial_box)
+        self.assertIsNotNone(tracked)
+        updated_box, next_points, inliers = tracked
+        self.assertGreaterEqual(inliers, 4)
+        self.assertGreaterEqual(len(next_points), 4)
+        self.assertAlmostEqual(updated_box[0], 47.0, delta=2.0)
+        self.assertAlmostEqual(updated_box[1], 34.0, delta=2.0)
+
     def test_analyze_project_cli_accepts_manual_visual_roi(self):
         from shortform_editor.cli import build_parser
         args = build_parser().parse_args([

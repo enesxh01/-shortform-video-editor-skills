@@ -108,6 +108,69 @@ def build_ffmpeg_crop_filter(keyframes: list[dict[str, Any]], clip_start: float,
     )
 
 
+
+def _optical_flow_features(cv2: Any, gray: Any, bbox: tuple[float, float, float, float]):
+    """Find trackable corners inside a manually selected ROI using built-in OpenCV."""
+    import numpy as np
+    x, y, width, height = (int(round(value)) for value in bbox)
+    frame_height, frame_width = gray.shape[:2]
+    x = min(max(x, 0), frame_width - 1)
+    y = min(max(y, 0), frame_height - 1)
+    width = min(width, frame_width - x)
+    height = min(height, frame_height - y)
+    if width < 8 or height < 8:
+        return None
+    mask = np.zeros((frame_height, frame_width), dtype=np.uint8)
+    mask[y:y + height, x:x + width] = 255
+    return cv2.goodFeaturesToTrack(
+        gray, maxCorners=80, qualityLevel=0.01, minDistance=4,
+        mask=mask, blockSize=7
+    )
+
+
+def _advance_optical_flow(cv2: Any, previous_gray: Any, current_gray: Any,
+                          points: Any, bbox: tuple[float, float, float, float]):
+    """Track a manual ROI by robust median KLT motion; return None on tracking loss."""
+    import numpy as np
+    try:
+        next_points, status, _errors = cv2.calcOpticalFlowPyrLK(
+            previous_gray, current_gray, points, None,
+            winSize=(21, 21), maxLevel=3,
+            criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01)
+        )
+    except Exception:
+        return None
+    if next_points is None or status is None:
+        return None
+    old = np.asarray(points).reshape(-1, 2)
+    new = np.asarray(next_points).reshape(-1, 2)
+    valid = np.asarray(status).reshape(-1).astype(bool)
+    if len(old) != len(new) or len(valid) != len(old) or int(valid.sum()) < 4:
+        return None
+    displacement = new[valid] - old[valid]
+    median_motion = np.median(displacement, axis=0)
+    residual = np.linalg.norm(displacement - median_motion, axis=1)
+    inliers = residual <= max(2.5, float(np.median(residual)) * 2.5)
+    if int(inliers.sum()) < 4:
+        return None
+    dx, dy = np.median(displacement[inliers], axis=0)
+    x, y, width, height = (float(value) for value in bbox)
+    frame_height, frame_width = current_gray.shape[:2]
+    x = min(max(x + float(dx), 0.0), max(0.0, frame_width - width))
+    y = min(max(y + float(dy), 0.0), max(0.0, frame_height - height))
+    updated_bbox = (x, y, width, height)
+    reseeded = _optical_flow_features(cv2, current_gray, updated_bbox)
+    retained = np.asarray(next_points)[valid][inliers].reshape(-1, 1, 2)
+    if reseeded is not None and len(reseeded) >= 4:
+        next_tracking_points = reseeded
+    elif len(retained) >= 4:
+        next_tracking_points = retained
+    else:
+        return None
+    return updated_bbox, next_tracking_points, int(inliers.sum())
+
+
+
 def sample_timestamps(duration: float, sample_rate: float = 1.0,
                      max_frames: int = 120) -> list[float]:
     if duration <= 0 or sample_rate <= 0 or max_frames < 2:
@@ -212,6 +275,10 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
     )
     previous_region = None
     roi_seeded = False
+    flow_points = None
+    flow_bbox = None
+    flow_active = False
+    flow_previous_gray = None
     for frame_index, (timestamp, region_id) in enumerate(timestamp_items):
         if region_id != previous_region:
             previous_gray = None
@@ -219,6 +286,10 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             smoothed_center = previous_center
             face_tracker = None
             roi_seeded = False
+            flow_points = None
+            flow_bbox = None
+            flow_active = False
+            flow_previous_gray = None
             previous_region = region_id
         capture.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000.0)
         ok, frame = capture.read()
@@ -235,6 +306,9 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             motion_score = float(diff.mean()) / 255.0
             if motion_score >= 0.22:
                 face_tracker = None
+                flow_active = False
+                flow_points = None
+                flow_previous_gray = None
                 scene_changes.append({
                     "time_seconds": round(timestamp + video_time_offset, 3),
                     "change_score": round(motion_score, 4)
@@ -261,13 +335,25 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
                     face_tracker = candidate_tracker if initialized is not False else None
                 except Exception:
                     face_tracker = None
+            if face_tracker is None:
+                try:
+                    flow_points = _optical_flow_features(cv2, gray, roi_box)
+                    flow_active = flow_points is not None and len(flow_points) >= 4
+                    flow_bbox = roi_box
+                    flow_previous_gray = gray.copy() if flow_active else None
+                except Exception:
+                    flow_points, flow_bbox, flow_previous_gray = None, None, None
+                    flow_active = False
             x, y, box_w, box_h = roi_box
             subject_bbox_normalized = {"x": tracking_roi[0], "y": tracking_roi[1],
                                        "width": tracking_roi[2], "height": tracking_roi[3]}
             center_x = (x + box_w / 2) / frame.shape[1] * width
             center_y = (y + box_h / 2) / frame.shape[0] * height
-            confidence = 0.55 if face_tracker is not None else 0.25
-            subject = "manual_roi_tracking_seed" if face_tracker is not None else "manual_roi_seed_only"
+            confidence = 0.55 if face_tracker is not None else (0.4 if flow_active else 0.25)
+            subject = (
+                "manual_roi_tracking_seed" if face_tracker is not None else
+                ("manual_roi_optical_flow_seed" if flow_active else "manual_roi_seed_only")
+            )
             roi_seeded = True
         elif tracking_roi is not None and face_tracker is not None:
             try:
@@ -288,6 +374,27 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
                 subject = "manual_roi_tracking"
             else:
                 face_tracker = None
+                center_x, center_y = width / 2.0, height / 2.0
+                confidence = 0.05
+                subject = "manual_roi_tracking_lost"
+        elif tracking_roi is not None and flow_active and flow_points is not None and flow_bbox is not None and flow_previous_gray is not None:
+            tracked = _advance_optical_flow(cv2, flow_previous_gray, gray, flow_points, flow_bbox)
+            flow_previous_gray = gray.copy()
+            if tracked is not None:
+                flow_bbox, flow_points, feature_count = tracked
+                x, y, box_w, box_h = flow_bbox
+                subject_bbox_normalized = {
+                    "x": max(0.0, x / frame.shape[1]),
+                    "y": max(0.0, y / frame.shape[0]),
+                    "width": min(1.0, box_w / frame.shape[1]),
+                    "height": min(1.0, box_h / frame.shape[0])
+                }
+                center_x = (x + box_w / 2) / frame.shape[1] * width
+                center_y = (y + box_h / 2) / frame.shape[0] * height
+                confidence = min(0.65, 0.3 + feature_count / 100.0 * 0.35)
+                subject = "manual_roi_optical_flow"
+            else:
+                flow_active = False
                 center_x, center_y = width / 2.0, height / 2.0
                 confidence = 0.05
                 subject = "manual_roi_tracking_lost"
@@ -387,7 +494,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             "crop_keyframes": samples
         },
         "limitations": [
-            "This baseline detects scene-change candidates and frontal faces. An optional user-supplied normalized ROI can seed CSRT tracking for a visible object, character or gameplay subject, but it does not automatically detect arbitrary objects, actions, HUDs, hands or sports context.",
+            "This baseline detects scene-change candidates and frontal faces. An optional user-supplied normalized ROI can seed CSRT tracking when OpenCV-contrib exposes it, or built-in KLT optical-flow tracking when CSRT is unavailable. Optical flow tracks visual features inside the user-selected box; it does not automatically detect arbitrary objects, actions, HUDs, hands or sports context.",
             "Haar face detections are not identity recognition and are not reliable for every angle, lighting condition or demographic.",
             "CSRT tracking can bridge missed frontal-face detections or follow a user-seeded ROI when the opencv-contrib build exposes the tracker; it may fail during fast motion, occlusion, large appearance changes or scene cuts. A lost manual ROI falls back to center framing.",
             "No face detection and no valid active tracker means a safe center crop.",
