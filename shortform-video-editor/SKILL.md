@@ -37,7 +37,7 @@ When the repository's Python package is installed with `python -m pip install -e
 
 ASR and OpenCV are optional extras: `pip install -e ".[audio,visual]"`. ASR defaults to the small model and records CUDA/CPU selection after RAM/VRAM preflight.
 
-The `analyze-project` command is the preferred end-to-end entry point. After the command, the OpenCode agent must perform the semantic full-transcript second pass described in `viral-moment-detection/references/semantic-review.md`, compare semantic discoveries with heuristic candidates, and create additional draft EDLs only from exact transcript timestamps. It requires the `[audio]` extra and creates one draft EDL per candidate; the user must inspect and explicitly approve each EDL before rendering. Optional visual analysis requires `[visual]`. For `split_vertical`, pass `--split-top-source` and `--split-bottom-source` (and optional `--split-top-in` / `--split-bottom-in`) so the orchestrator can fingerprint and time-bound both panel sources. The current implementation is an early, partial pipeline. Candidate scoring is an English-biased heuristic, visual detection is frontal-face-only, pacing trims are review-only, caption styles are basic ASS/Kino, and technical QC is not creative QA. No real-footage end-to-end validation or target-machine benchmark has been completed. Never imply unverified behavior is production-ready.
+The `analyze-project` command is the preferred end-to-end entry point. After the command, the OpenCode agent must perform the semantic full-transcript second pass described in `viral-moment-detection/references/semantic-review.md`, compare semantic discoveries with heuristic candidates, and create additional draft EDLs only from exact transcript timestamps. It requires the `[audio]` extra and creates one draft EDL per candidate; the user must inspect and explicitly approve each EDL before rendering. Optional visual analysis requires `[visual]`. The current `analyze-project` CLI does not accept secondary split-source arguments. To use `split_vertical`, add explicit `split_top` and `split_bottom` source specs (paths, SHA-256 fingerprints and source in/out times) to a manually reviewed EDL; the renderer verifies both sources before rendering. The current implementation is an early, partial pipeline. Candidate scoring is an English-biased heuristic, visual detection is frontal-face-only, pacing trims are review-only, caption styles are basic ASS/Kino, and technical QC is not creative QA. No real-footage end-to-end validation or target-machine benchmark has been completed. Never imply unverified behavior is production-ready.
 
 ## Workflow
 
@@ -58,7 +58,7 @@ The `analyze-project` command is the preferred end-to-end entry point. After the
 - `split_vertical`: explicit top/bottom secondary sources stacked vertically; centered caption style.
 - `blurred_bars_20_60_20`: blurred 20% top, sharp 60% center, blurred 20% bottom.
 
-All three layouts have initial FFmpeg code, but they remain integration-unverified. Split mode requires fingerprinted `split_top` and `split_bottom` source specs in the EDL. The visual module only provides face-guided crop suggestions; those crop keyframes are not yet wired into the renderer.
+All three layouts have initial FFmpeg code and a synthetic integration test; the latest CI result is pending. Split mode requires fingerprinted `split_top` and `split_bottom` source specs in the EDL. The visual module only provides face-guided crop suggestions; those crop keyframes are not yet wired into the renderer.
 
 ## Decision hierarchy
 
