@@ -284,8 +284,13 @@ def command_render(args: argparse.Namespace) -> int:
     if errors:
         raise PipelineError("Refusing to render invalid EDL:\n- " + "\n- ".join(errors))
     preview_mode = bool(getattr(args, "preview", False))
-    if not preview_mode and (edl["approval"]["status"] != "approved" or not edl["approval"]["approved_by_user"]):
-        raise PipelineError("Rendering final output requires explicit user approval in the EDL")
+    if not preview_mode:
+        approval = edl["approval"]
+        if approval["status"] != "approved" or not approval["approved_by_user"]:
+            raise PipelineError("Rendering final output requires explicit user approval in the EDL")
+        from .approval import edl_approval_hash
+        if approval.get("approved_edl_sha256") != edl_approval_hash(edl):
+            raise PipelineError("EDL content changed after approval; review the current preview and approve this exact version again")
 
     ffmpeg = require_tool("ffmpeg")
     render = edl["render"]
