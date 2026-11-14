@@ -58,8 +58,10 @@ class PipelineOrchestrationTests(unittest.TestCase):
                       "crop_9_16": {"x": 10, "y": 0, "width": 200, "height": 360}, "center": {"x": 110, "y": 180}},
                      {"time_seconds": 5.0, "subject_evidence": "center_fallback", "confidence": 0.1,
                       "crop_9_16": {"x": 20, "y": 0, "width": 200, "height": 360}, "center": {"x": 120, "y": 180}}
-                 ]}}):
+                 ]}}) as visual_mock:
                 manifest = analyze_project(source, output, top_candidates=1, include_visuals=True)
+                visual_mock.assert_called_once()
+                self.assertEqual(visual_mock.call_args.kwargs["regions"], [(2.0, 18.0)])
 
             self.assertEqual(manifest["status"], "analysis_complete_drafts_pending_review")
             self.assertTrue((output / "audio-analysis.json").exists())
