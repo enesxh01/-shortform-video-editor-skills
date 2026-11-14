@@ -59,6 +59,9 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
         raise PipelineError("split_vertical requires --split-top-source and --split-bottom-source")
     if layout != "split_vertical" and (split_top_source is not None or split_bottom_source is not None):
         raise PipelineError("Split secondary sources can only be supplied with layout=split_vertical")
+    if layout == "split_vertical":
+        timestamp_seconds(split_top_in)
+        timestamp_seconds(split_bottom_in)
 
     if output_dir.exists() and any(output_dir.iterdir()):
         raise PipelineError("Output directory is not empty; choose a new job directory to avoid overwriting prior artifacts")
