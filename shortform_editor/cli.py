@@ -261,6 +261,8 @@ def command_render(args: argparse.Namespace) -> int:
     ffmpeg = require_tool("ffmpeg")
     render = edl["render"]
     width, height, fps = render["width"], render["height"], render["fps_target"]
+    primary_video = next(s for s in probe["streams"] if s.get("codec_type") == "video")
+    source_width, source_height = int(primary_video["width"]), int(primary_video["height"])
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists() and not args.overwrite:
         raise PipelineError(f"Output already exists (use --overwrite): {output}")
@@ -284,6 +286,7 @@ def command_render(args: argparse.Namespace) -> int:
             split_paths[(index, key)] = path
 
     from .captions import ffmpeg_subtitles_filter, write_ass_subtitles
+    from .visual import build_ffmpeg_crop_filter
 
     with tempfile.TemporaryDirectory(prefix="shortform-render-") as tmp:
         tmpdir = Path(tmp)
@@ -308,10 +311,16 @@ def command_render(args: argparse.Namespace) -> int:
             cmd += ["-t", f"{clip_duration:.6f}"]
 
             if layout == "fullscreen":
-                vf = (
-                    f"scale={width}:{height}:force_original_aspect_ratio=increase,"
-                    f"crop={width}:{height},setsar=1,fps={fps},format=yuv420p"
+                crop_filter = build_ffmpeg_crop_filter(
+                    segment.get("crop_keyframes", []), clip_start, fps, source_width, source_height
                 )
+                if crop_filter:
+                    vf = f"{crop_filter},scale={width}:{height},setsar=1,fps={fps},format=yuv420p"
+                else:
+                    vf = (
+                        f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+                        f"crop={width}:{height},setsar=1,fps={fps},format=yuv420p"
+                    )
                 if subtitle_filter:
                     vf += f",{subtitle_filter}"
                 cmd += ["-map", "0:v:0", "-map", "0:a?", "-vf", vf]
