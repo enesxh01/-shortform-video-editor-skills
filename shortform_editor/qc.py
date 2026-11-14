@@ -9,7 +9,8 @@ from .cli import PipelineError, probe_media, require_tool, run_checked
 
 
 BLACK_RE = re.compile(r"black_start:([0-9.]+).*?black_end:([0-9.]+).*?black_duration:([0-9.]+)")
-FREEZE_START_RE = re.compile(r"freeze_start:([0-9.]+)")\nFREEZE_END_RE = re.compile(r"freeze_end:([0-9.]+)")
+FREEZE_START_RE = re.compile(r"freeze_start:([0-9.]+)")
+FREEZE_END_RE = re.compile(r"freeze_end:([0-9.]+)")
 VOLUME_RE = re.compile(r"(mean_volume|max_volume):\s*(-?[0-9.]+) dB")
 
 
