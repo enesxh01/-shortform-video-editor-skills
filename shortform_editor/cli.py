@@ -318,7 +318,6 @@ def command_render(args: argparse.Namespace) -> int:
 
     # Validate and fingerprint both secondary sources before any render work begins.
     split_paths: dict[tuple[int, str], Path] = {}
-    split_fingerprints: dict[tuple[int, str], str] = {}
     split_signatures: dict[tuple[int, str], tuple[int, int, int, int]] = {}
     for index, segment in enumerate(edl["segments"]):
         if segment["layout"] != "split_vertical":
@@ -335,7 +334,6 @@ def command_render(args: argparse.Namespace) -> int:
             if timestamp_seconds(spec["source_out"]) > secondary_duration + 0.05:
                 raise PipelineError(f"segments[{index}].{key} source_out exceeds secondary source duration")
             split_paths[(index, key)] = path
-            split_fingerprints[(index, key)] = spec["fingerprint"]
             split_signatures[(index, key)] = file_stat_signature(path)
 
     from .captions import ffmpeg_subtitles_filter, write_ass_subtitles
