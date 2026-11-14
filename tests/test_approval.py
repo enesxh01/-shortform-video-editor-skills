@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from shortform_editor.approval import approve_edl_file
+from shortform_editor.approval import approve_edl_file, edl_approval_hash
 from shortform_editor.cli import PipelineError
 
 
@@ -52,7 +52,10 @@ class ApprovalTests(unittest.TestCase):
                 result = approve_edl_file(edl_path, source, confirm=True)
             saved = json.loads(edl_path.read_text(encoding="utf-8"))
             self.assertEqual(result["status"], "approved")
-            self.assertEqual(saved["approval"], {"status": "approved", "approved_by_user": True})
+            self.assertEqual(saved["approval"]["status"], "approved")
+            self.assertTrue(saved["approval"]["approved_by_user"])
+            self.assertEqual(saved["approval"]["approved_edl_sha256"], edl_approval_hash(saved))
+            self.assertTrue(saved["approval"]["approved_at"])
 
     def test_rejects_wrong_source_fingerprint(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -67,6 +70,13 @@ class ApprovalTests(unittest.TestCase):
             }):
                 with self.assertRaises(PipelineError):
                     approve_edl_file(edl_path, source, confirm=True)
+
+
+    def test_edl_content_edit_invalidates_approval_hash(self):
+        edl = make_edl("sha256:" + "a" * 64)
+        approved_hash = edl_approval_hash(edl)
+        edl["segments"][0]["reason"] = "Changed after approval"
+        self.assertNotEqual(approved_hash, edl_approval_hash(edl))
 
 
 if __name__ == "__main__":
