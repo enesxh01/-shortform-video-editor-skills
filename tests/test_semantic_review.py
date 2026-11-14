@@ -89,5 +89,29 @@ class SemanticReviewTests(unittest.TestCase):
         self.assertTrue(any("not ordered by descending score" in error for error in errors))
 
 
+    def test_rejects_baseline_ids_or_scores_that_do_not_match_candidate_report(self):
+        review = review_fixture()
+        fingerprint = review["source_fingerprint"]
+        candidates = {
+            "source_fingerprint": fingerprint,
+            "candidates": [{"candidate_id": "moment-baseline-other", "score": 65}]
+        }
+        errors = validate_semantic_review(review, candidates=candidates)
+        self.assertTrue(any("do not match the candidate report" in error for error in errors))
+
+        review = review_fixture()
+        review["baseline_candidate_ids"] = ["moment-baseline-1"]
+        review["final_ranked_candidates"].append({
+            "candidate_id": "moment-baseline-1", "score": 20,
+            "confidence": "low", "rationale": "Baseline candidate"
+        })
+        candidates = {
+            "source_fingerprint": fingerprint,
+            "candidates": [{"candidate_id": "moment-baseline-1", "score": 65}]
+        }
+        errors = validate_semantic_review(review, candidates=candidates)
+        self.assertTrue(any("score differs from baseline candidate score" in error for error in errors))
+
+
 if __name__ == "__main__":
     unittest.main()
