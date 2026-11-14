@@ -36,7 +36,10 @@ def run_checked(args: list[str]) -> subprocess.CompletedProcess[str]:
     try:
         stdout, stderr = process.communicate()
     except KeyboardInterrupt:
-        process.terminate()
+        try:
+            process.terminate()
+        except OSError:
+            pass
         try:
             process.wait(timeout=5)
         except subprocess.TimeoutExpired:
