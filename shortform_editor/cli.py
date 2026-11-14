@@ -1215,7 +1215,7 @@ def command_doctor(args: argparse.Namespace) -> int:
     available_filters = set()
     for line in filters_text.splitlines():
         fields = line.split()
-        if len(fields) >= 2 and len(fields[0]) == 3 and all(flag in "TSC." for flag in fields[0]):
+        if len(fields) >= 2 and fields[0] and all(flag in "TSC." for flag in fields[0]):
             available_filters.add(fields[1])
     required_filters = (
         "subtitles", "fps", "scale", "crop", "setpts", "setsar", "format",
