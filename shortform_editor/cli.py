@@ -86,7 +86,7 @@ def analyze_frame_timestamps(timestamps: list[Any], min_samples: int = 12,
     deltas = [right - left for left, right in zip(values, values[1:])]
     positive = [delta for delta in deltas if delta > 0]
     non_monotonic = sum(delta < 0 for delta in deltas)
-    gap_limit = max(1.0, statistics.median(positive) * 5) if positive else 1.0
+    gap_limit = max(0.25, statistics.median(positive) * 5) if positive else 0.25
     local_intervals = [delta for delta in deltas if 0 < delta <= gap_limit]
     windows = len(sample_window_starts or [0])
     if len(local_intervals) < min_samples - 1:
