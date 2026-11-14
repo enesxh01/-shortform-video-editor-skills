@@ -238,8 +238,11 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             confidence = 0.45
             subject = "face_detection"
         elif face_tracker is not None:
-            tracking_ok, tracked_box = face_tracker.update(frame)
-            if tracking_ok:
+            try:
+                tracking_ok, tracked_box = face_tracker.update(frame)
+            except Exception:
+                tracking_ok, tracked_box = False, None
+            if tracking_ok and tracked_box is not None:
                 x, y, box_w, box_h = tracked_box
                 center_x = (float(x) + float(box_w) / 2) / frame.shape[1] * width
                 center_y = (float(y) + float(box_h) / 2) / frame.shape[0] * height
