@@ -9,7 +9,7 @@ This file describes repository evidence, not intended behavior. A documented des
 | Feature | Status | Evidence / boundary |
 |---|---|---|
 | Media ingestion | Partial, unverified | Python CLI invokes ffprobe, checks for a video stream, records metadata and SHA-256. No safe staging, proxy mapping, full corruption diagnosis or source-specific time-base normalization yet. |
-| Audio intelligence | Design-only | ASR, word timing, VAD, speaker evidence and event detection are specified; no pipeline code or model dependency is selected. |
+| Audio intelligence | Partial implementation, unit-tested components; real-media/model run pending | FFmpeg extraction to temporary mono 16 kHz PCM, RMS/peak windows, sustained silence candidates, optional faster-whisper transcription with word timestamps and built-in VAD; CUDA int8_float16 attempted then CPU int8 fallback, actual backend recorded. No diarization, overlap/laughter/emotion classifier or multi-mic separation. |
 | Viral moment detection | Design-only | Editorial scoring rubric and skill instructions exist; no candidate extraction, ranking engine or real-footage evaluation. |
 | Retention and pacing | Design-only | Context-preserving edit rules exist; no silence/repetition analysis or automated edit suggestions. |
 | Visual storytelling | Design-only | Scene/subject/tracking/OCR/crop rules exist; no vision inference or smart reframing code. |
