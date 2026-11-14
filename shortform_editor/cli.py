@@ -303,6 +303,8 @@ def command_render(args: argparse.Namespace) -> int:
         raise PipelineError("The current renderer produces MP4; use an output filename ending in .mp4")
     if not 0 <= args.crf <= 51:
         raise PipelineError("--crf must be between 0 and 51")
+    if not 0 <= getattr(args, "nvenc_cq", 19) <= 51:
+        raise PipelineError("--nvenc-cq must be between 0 and 51")
     if edl.get("render", {}).get("fps_mode") != "cfr":
         raise PipelineError("The current renderer supports fps_mode=cfr only")
     if edl.get("render", {}).get("fps_conversion") != "duplicate_drop":
@@ -445,7 +447,8 @@ def command_render(args: argparse.Namespace) -> int:
             encoder = getattr(args, "_selected_encoder", None)
             if encoder is None:
                 requested_encoder = getattr(args, "encoder", "auto")
-                encoder_listing = run_checked([ffmpeg, "-hide_banner", "-encoders"]).stdout
+                encoder_result = run_checked([ffmpeg, "-hide_banner", "-encoders"])
+                encoder_listing = (encoder_result.stdout or "") + (encoder_result.stderr or "")
                 has_nvenc = "h264_nvenc" in encoder_listing
                 if requested_encoder == "h264_nvenc" and not has_nvenc:
                     raise PipelineError("h264_nvenc was requested but this FFmpeg build does not list the encoder")
