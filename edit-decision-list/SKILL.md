@@ -25,3 +25,6 @@ The installed schema is at `schemas/edit-decision-list.schema.json` inside this 
 - Record why an edit was made and which evidence supports it.
 
 The current EDL is intentionally a minimal first contract. Captions, crop keyframes, tracking, transitions, overlays, per-segment audio processing and provenance expansion remain future schema work; do not add undocumented properties because strict validation rejects them.
+
+
+The optional `pacing_review` segment field stores ordered, source-bounded `keep`, `trim`, and `preserve_pause` evidence plus repeated-word flags. It is review metadata only and must not be interpreted as an instruction to cut automatically.
