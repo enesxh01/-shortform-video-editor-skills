@@ -49,6 +49,10 @@
             "boolean",
             "null"
           ]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
