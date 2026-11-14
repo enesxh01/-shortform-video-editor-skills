@@ -86,8 +86,38 @@ def sample_timestamps(duration: float, sample_rate: float = 1.0,
     return [round(index * step, 3) for index in range(count)]
 
 
+
+def sample_region_timestamps(regions: list[tuple[float, float]], duration: float,
+                            source_offset: float, sample_rate: float = 1.0,
+                            max_frames: int = 120) -> list[tuple[float, int]]:
+    intervals = []
+    for index, (source_start, source_end) in enumerate(regions):
+        local_start = max(0.0, float(source_start) - source_offset)
+        local_end = min(duration, float(source_end) - source_offset)
+        if local_end > local_start:
+            intervals.append((local_start, local_end, index))
+    if not intervals:
+        return []
+    total = sum(end - start for start, end, _ in intervals)
+    count = min(max_frames, max(len(intervals), int(total * sample_rate)))
+    step = total / count
+    sampled = []
+    cumulative = 0.0
+    interval_index = 0
+    for sample_index in range(count):
+        virtual_time = sample_index * step
+        while interval_index < len(intervals) - 1 and virtual_time >= cumulative + (intervals[interval_index][1] - intervals[interval_index][0]):
+            cumulative += intervals[interval_index][1] - intervals[interval_index][0]
+            interval_index += 1
+        start, end, region_id = intervals[interval_index]
+        local_time = min(end - 0.001, start + virtual_time - cumulative)
+        sampled.append((round(max(0.0, local_time), 3), region_id))
+    return sampled
+
+
 def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 120,
-                    detect_faces: bool = True) -> dict[str, Any]:
+                    detect_faces: bool = True,
+                    regions: list[tuple[float, float]] | None = None) -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
     report = probe_media(source)
     video_stream = next((s for s in report.get("streams", []) if s.get("codec_type") == "video"), None)
@@ -130,8 +160,17 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
     previous_center = (width / 2.0, height / 2.0)
     smoothed_center = previous_center
     scene_changes = []
-    timestamps = sample_timestamps(duration, sample_rate, max_frames)
-    for frame_index, timestamp in enumerate(timestamps):
+    timestamp_items = (
+        sample_region_timestamps(regions, duration, video_time_offset, sample_rate, max_frames)
+        if regions else [(item, 0) for item in sample_timestamps(duration, sample_rate, max_frames)]
+    )
+    previous_region = None
+    for frame_index, (timestamp, region_id) in enumerate(timestamp_items):
+        if region_id != previous_region:
+            previous_gray = None
+            previous_center = (width / 2.0, height / 2.0)
+            smoothed_center = previous_center
+            previous_region = region_id
         capture.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000.0)
         ok, frame = capture.read()
         if not ok:
@@ -182,6 +221,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
         crop = compute_crop_box(width, height, smoothed_center[0], smoothed_center[1])
         samples.append({
             "time_seconds": round(timestamp + video_time_offset, 3),
+            "region_index": region_id,
             "subject_evidence": subject,
             "confidence": confidence,
             "center": {"x": round(smoothed_center[0], 2), "y": round(smoothed_center[1], 2)},
@@ -206,6 +246,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             "requested_sample_rate_fps": sample_rate,
             "effective_sample_rate_fps": round(len(samples) / duration, 4),
             "sampled_frames": len(samples),
+            "sampling_regions": regions or [[0.0, duration]],
             "scene_change_candidates": scene_changes,
             "crop_keyframes": samples
         },
