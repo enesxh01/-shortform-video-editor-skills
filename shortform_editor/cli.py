@@ -296,8 +296,8 @@ def _concat_demuxer_entry(path: Path) -> str:
     if any(ord(character) < 32 or ord(character) == 127 for character in value):
         raise PipelineError("Media paths used by the concat renderer cannot contain control characters")
     # FFmpeg's concat demuxer uses its own token parser, not shell quoting.
-    escaped = value.replace("\\\\", "\\\\\\\\").replace("'", "\\\\'")
-    return f"file '{escaped}'\\n"
+    escaped = value.replace("\\", "\\\\").replace("'", "\\'")
+    return f"file '{escaped}'\n"
 
 def _segment_fade_filters(segment: dict[str, Any], duration: float) -> tuple[list[str], list[str]]:
     fade_in = float(segment.get("fade_in_seconds", 0.0))
