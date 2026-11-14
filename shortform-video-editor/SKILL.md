@@ -54,7 +54,7 @@ FFmpeg and ffprobe must also be installed separately and available on PATH. Rest
 - `shortform-editor analyze-visuals INPUT.mp4 -o visual.json` — optional OpenCV scene-change and face-guided crop evidence.
 - `shortform-editor generate-captions audio.json candidates.json -o captions.json` — word-timed caption groups.
 - `shortform-editor validate-edl edit.json --probe probe.json` — JSON Schema plus semantic validation.
-- `shortform-editor render INPUT.mp4 edit.json OUTPUT.mp4` — approved EDL render.
+- `shortform-editor render INPUT.mp4 edit.json OUTPUT.mp4` — approved EDL render; `--encoder auto` prefers NVIDIA NVENC and falls back to libx264, while `--encoder libx264` forces CPU. Optional `--nvenc-preset p5 --nvenc-cq 19` tune NVENC quality.
 - `shortform-editor qc OUTPUT.mp4 -o qc.json` — technical export QC.
 - `shortform-editor record-feedback candidates.json --candidate-id ID --decision approve|edited|reject` — local editorial feedback.
 - `shortform-editor apply-feedback candidates.json -o ranked.json` — bounded local preference ranking.
@@ -73,7 +73,7 @@ The `analyze-project` command is the preferred end-to-end entry point. After the
 5. Review candidate boundaries for context, setup, complete payoff, and clean ending.
 6. Author and validate the draft EDL. Create a 30 fps preview with `shortform-editor render-preview INPUT.mp4 DRAFT_EDL.json preview.mp4`; previewing never changes approval.
 7. Only after explicit user approval of that exact EDL, run `shortform-editor approve-edl DRAFT_EDL.json --source INPUT.mp4 --confirm`. This re-probes and validates the source fingerprint before atomically recording approval.
-8. Render from the original source with `shortform-editor render`; it refuses unapproved EDLs and automatically runs technical QC. Default target is 1080x1920, 60 fps CFR, H.264 MP4, unless the user or platform specifies otherwise. See `references/export-and-fps.md`.
+8. Render from the original source with `shortform-editor render`; it refuses unapproved EDLs and automatically runs technical QC. Default target is 1080x1920, 60 fps CFR, H.264 MP4, with automatic NVENC preference and CPU fallback. EDL segments may optionally set `fade_in_seconds` and `fade_out_seconds` (0–2 seconds each); these fade video and available source audio to/from black. Cross-dissolves are not yet supported, so do not claim them. See `references/export-and-fps.md`.
 9. Run additional standalone technical checks when needed. State which visual checks remain manual or unimplemented.
 10. Present previews, rationale, export settings, QC results and uncertainties. Require human approval.
 11. Record only explicit persistent preferences.
@@ -84,7 +84,7 @@ The `analyze-project` command is the preferred end-to-end entry point. After the
 - `split_vertical`: explicit top/bottom secondary sources stacked vertically; centered caption style.
 - `blurred_bars_20_60_20`: blurred 20% top, sharp 60% center, blurred 20% bottom.
 
-All three layouts have initial FFmpeg code and a synthetic integration test; the latest CI result is pending. Split mode requires fingerprinted `split_top` and `split_bottom` source specs in the EDL. Fullscreen rendering supports the face-guided crop keyframes produced by visual analysis, interpolating crop movement with FFmpeg. Face detection is limited to frontal Haar-cascade detections, so inspect framing carefully.
+All three layouts support optional synchronized per-segment fade-in/fade-out effects and have initial FFmpeg code plus a synthetic integration test; the latest CI result is pending. Split mode requires fingerprinted `split_top` and `split_bottom` source specs in the EDL. Fullscreen rendering supports the face-guided crop keyframes produced by visual analysis, interpolating crop movement with FFmpeg. Face detection is limited to frontal Haar-cascade detections, so inspect framing carefully.
 
 ## Decision hierarchy
 
