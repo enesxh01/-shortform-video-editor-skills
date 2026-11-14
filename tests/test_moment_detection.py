@@ -1,6 +1,6 @@
 import unittest
 
-from shortform_editor.moments import detect_moments
+from shortform_editor.moments import _has_cue, detect_moments
 from shortform_editor.cli import PipelineError
 
 
