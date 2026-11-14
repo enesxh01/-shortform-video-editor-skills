@@ -53,7 +53,8 @@ FFmpeg and ffprobe must also be installed separately and available on PATH. Rest
 - `shortform-editor analyze-audio INPUT.mp4 -o audio.json` — audio energy/silence analysis and optional faster-whisper ASR.
 - `shortform-editor find-moments audio.json -o candidates.json` — low-confidence transcript-led candidate heuristic.
 - `shortform-editor analyze-pacing audio.json candidates.json -o pacing.json` — review-only pacing suggestions.
-- `shortform-editor analyze-visuals INPUT.mp4 -o visual.json` — optional OpenCV scene-change and face-guided crop evidence.
+- `shortform-editor analyze-visuals INPUT.mp4 -o visual.json` — optional OpenCV scene-change and face-guided crop evidence. For a human-selected non-face subject, add `--track-roi X Y WIDTH HEIGHT` (normalized 0..1) to seed CSRT tracking.
+- `shortform-editor analyze-project INPUT.mp4 -o JOB_DIR --visuals --visual-roi X Y WIDTH HEIGHT` — seed the same tracker in each candidate window. The ROI is part of the job fingerprint, so change it only when starting a new job rather than resuming.
 - `shortform-editor generate-captions audio.json candidates.json -o captions.json` — word-timed caption groups.
 - `shortform-editor validate-edl edit.json --probe probe.json` — JSON Schema plus semantic validation.
 - `shortform-editor render INPUT.mp4 approved-edl.json OUTPUT.mp4` — approved EDL render; `--encoder auto` prefers NVIDIA NVENC and falls back to libx264, while `--encoder libx264` forces CPU. Optional `--nvenc-preset p5 --nvenc-cq 19` tune NVENC quality. Add `--resume` on the first run and every retry to persist verified segment encodes; resume rejects changed source, EDL or encoding settings and reuses only hash-matching, FFprobe-validated, fully decoded segments.
