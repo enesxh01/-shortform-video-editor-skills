@@ -1212,16 +1212,20 @@ def command_doctor(args: argparse.Namespace) -> int:
     }
     report["accelerators"]["libx264"] = {"available": libx264_available}
     report["accelerators"]["aac"] = {"available": aac_available, "required": True}
-    available_filters = set()
-    for line in filters_text.splitlines():
-        fields = line.split()
-        if len(fields) >= 2 and fields[0] and all(flag in "TSC." for flag in fields[0]):
-            available_filters.add(fields[1])
     required_filters = (
         "subtitles", "fps", "scale", "crop", "setpts", "setsar", "format",
         "aresample", "blackdetect", "freezedetect", "volumedetect", "ebur128",
         "split", "overlay", "vstack", "boxblur", "fade", "eq", "unsharp", "null"
     )
+    available_filters = set()
+    for line in filters_text.splitlines():
+        # FFmpeg's filter table starts each row with capability flags, then the
+        # filter name and input/output signature. Only inspect the first fields;
+        # this tolerates flag-format differences across FFmpeg releases.
+        fields = line.split()
+        available_filters.update(name for name in required_filters if name in fields[:3])
+    if not available_filters and filters_text:
+        report["accelerators"]["ffmpeg_filter_listing_sample"] = filters_text.splitlines()[:12]
     report["accelerators"]["filters"] = {
         name: {"available": name in available_filters, "required": True}
         for name in required_filters
