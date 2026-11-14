@@ -599,17 +599,21 @@ def command_repair(args: argparse.Namespace) -> int:
 def command_analyze_project(args: argparse.Namespace) -> int:
     from .pipeline import analyze_project
 
-    manifest = analyze_project(
-        Path(args.source).expanduser().resolve(strict=True),
-        Path(args.output_dir).expanduser().resolve(),
-        model=args.model,
-        device=args.device,
-        top_candidates=args.top,
-        layout=args.layout,
-        include_visuals=args.visuals
-    )
+    try:
+        manifest = analyze_project(
+            Path(args.source).expanduser().resolve(strict=True),
+            Path(args.output_dir).expanduser().resolve(),
+            model=args.model,
+            device=args.device,
+            top_candidates=args.top,
+            layout=args.layout,
+            include_visuals=args.visuals
+        )
+    except KeyboardInterrupt:
+        print("Analysis cancelled. Completed artifacts and a cancellation manifest were preserved.", file=sys.stderr)
+        return 130
     print(json.dumps(manifest, indent=2, ensure_ascii=False))
-    return 0 if manifest["status"] != "cancelled" else 130
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
