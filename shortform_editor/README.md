@@ -8,6 +8,10 @@ This folder contains the executable local rendering/inspection runtime. The skil
 - FFmpeg and ffprobe installed and available on PATH
 - No Python third-party packages required for core commands
 
+## Optional local transcription
+
+Install faster-whisper only if you want local ASR: `python -m pip install faster-whisper`. Then run `python shortform_editor/cli.py transcribe SOURCE -o project/transcript.json --model small --device auto --compute-type auto`. The first run downloads the selected model; no model is downloaded by the installer or other commands. Choose `--model medium` for potentially better accuracy if VRAM/RAM and speed permit. Word-level timestamps, language confidence, segment log probabilities, and VAD-filtered segments are saved as JSON. Review names, numbers, slang, and non-English transcription manually.
+
 ## Commands
 
 ```powershell
