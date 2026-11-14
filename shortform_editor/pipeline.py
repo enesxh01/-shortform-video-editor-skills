@@ -248,7 +248,7 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                     "fingerprint": probe["source"]["fingerprint"],
                     "time_base": time_base,
                     "frame_rate": source_fps,
-                    "variable_frame_rate": None
+                    "variable_frame_rate": probe.get("frame_timing", {}).get("variable_frame_rate")
                 },
                 "render": {
                     "width": 1080,
