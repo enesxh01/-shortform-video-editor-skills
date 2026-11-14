@@ -15,7 +15,10 @@ def _ass_time(seconds: float) -> str:
 
 
 def _escape_ass(text: str) -> str:
-    return text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}").replace("\r\n", "\\N").replace("\n", "\\N")
+    normalized = text.replace("\\r\\n", "\\n").replace("\\n", "\n")
+    normalized = normalized.replace("\r\\n", "\n").replace("\r", "\n")
+    escaped = normalized.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
+    return escaped.replace("\n", r"\N").replace("\r\n", "\\N").replace("\n", "\\N")
 
 
 def _needs_space(previous: str, current: str) -> bool:
