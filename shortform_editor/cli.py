@@ -563,6 +563,22 @@ def command_repair(args: argparse.Namespace) -> int:
     return 0 if result["qc_after_repair"]["status"] == "passed" else 1
 
 
+def command_analyze_project(args: argparse.Namespace) -> int:
+    from .pipeline import analyze_project
+
+    manifest = analyze_project(
+        Path(args.source).expanduser().resolve(strict=True),
+        Path(args.output_dir).expanduser().resolve(),
+        model=args.model,
+        device=args.device,
+        top_candidates=args.top,
+        layout=args.layout,
+        include_visuals=args.visuals
+    )
+    print(json.dumps(manifest, indent=2, ensure_ascii=False))
+    return 0 if manifest["status"] != "cancelled" else 130
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -640,6 +656,15 @@ def build_parser() -> argparse.ArgumentParser:
     repair.add_argument("--preset", default="medium", choices=["ultrafast", "fast", "medium", "slow", "veryslow"])
     repair.add_argument("--overwrite", action="store_true")
     repair.set_defaults(func=command_repair)
+    analyze = sub.add_parser("analyze-project", help="run source-to-candidate analysis and create draft EDLs")
+    analyze.add_argument("source")
+    analyze.add_argument("-o", "--output-dir", required=True)
+    analyze.add_argument("--model", default="small", choices=["tiny", "base", "small", "medium", "large-v3"])
+    analyze.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    analyze.add_argument("--top", type=int, default=5)
+    analyze.add_argument("--layout", default="fullscreen", choices=["fullscreen", "blurred_bars_20_60_20"])
+    analyze.add_argument("--visuals", action="store_true", help="run optional OpenCV visual sampling")
+    analyze.set_defaults(func=command_analyze_project)
     render = sub.add_parser("render", help="render approved EDL segments into a vertical MP4")
     render.add_argument("source")
     render.add_argument("edl")
