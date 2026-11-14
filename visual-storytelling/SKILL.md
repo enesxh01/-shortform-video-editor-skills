@@ -7,6 +7,12 @@ description: Analyze subjects, actions, scenes, framing, and visual continuity t
 
 Use computer vision to support editorial decisions, not to replace understanding.
 
+## Executable baseline
+
+Install the optional visual dependency with `python -m pip install -e ".[visual]"`, then run `shortform-editor analyze-visuals SOURCE -o visual-analysis.json`. The current module samples frames, estimates scene-change candidates from frame differences, detects frontal faces with OpenCV's bundled Haar cascade when enabled, smooths face-center positions, and emits conservative 9:16 crop keyframes. It uses CPU OpenCV; no CUDA model is loaded.
+
+This is not general subject tracking or scene understanding. It cannot detect gameplay HUDs, sports objects, hands, arbitrary products or actions. When a face is not detected it falls back to center framing. Treat all crop plans as review-only.
+
 ## Evidence sources
 
 - Scene detection for structural changes.
@@ -16,7 +22,7 @@ Use computer vision to support editorial decisions, not to replace understanding
 - Selective segmentation/masking only when a specific edit requires it.
 - Audio diarization, transcript context, mouth movement, and visual evidence may jointly support active-speaker estimates. Never infer identity from voice alone.
 
-Check current licenses and terms before selecting model families or distributing dependencies. In particular, review licenses for detector frameworks and segmentation models rather than assuming they are permissive.
+OpenCV's software package is Apache-2.0 licensed. Review the exact bundled Haar cascade asset and third-party dependency notices before redistribution; optional model weights must be checked individually. Do not add AGPL-licensed detector frameworks or model weights without explicit project-owner approval.
 
 ## Framing
 
