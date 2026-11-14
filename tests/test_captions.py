@@ -37,7 +37,8 @@ class CaptionTests(unittest.TestCase):
             write_ass_subtitles(segment, "split_vertical", 0.0, path)
             content = path.read_text(encoding="utf-8")
             self.assertIn("Style: Default,Arial,48", content)
-            self.assertIn(r"{\an5}One line", content)
+            self.assertIn(r"{\an5\q2\fscx", content)
+            self.assertIn("One line", content)
 
     def test_filter_path_escapes_windows_drive_colon(self):
         with tempfile.TemporaryDirectory() as directory:
