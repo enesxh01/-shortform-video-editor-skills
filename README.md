@@ -52,11 +52,23 @@ All three layouts and ASS captions have synthetic FFmpeg integration coverage co
 
 Requirements: Python 3.10+, FFmpeg and ffprobe on PATH.
 
-Install the mandatory CLI dependencies and optional analysis packages:
+From the cloned repository root, install the CLI and all optional workflow extras.
+
+Windows PowerShell:
+
+```powershell
+py -m pip install --upgrade pip
+py -m pip install -e ".[audio,visual,download]"
+```
+
+Linux/macOS:
 
 ```bash
-python -m pip install -e ".[audio,visual]"
+python3 -m pip install --upgrade pip
+python3 -m pip install -e ".[audio,visual,download]"
 ```
+
+The extras enable faster-whisper ASR, OpenCV visual analysis, and optional public-URL ingestion. FFmpeg and ffprobe are separate system requirements; install them with your OS package manager or an official FFmpeg build and confirm both commands work on PATH.
 
 Then run:
 
@@ -119,7 +131,7 @@ Linux/macOS:
 bash scripts/install.sh
 ```
 
-Both installers stage skills before replacing existing installations, preserve prior skill directories in timestamped backups and package each skill's referenced support files.
+Both installers stage and copy the OpenCode skill folders and their referenced support files before replacing existing installations, preserving prior skill directories in timestamped backups. They do not install the Python package or FFmpeg; complete both setup steps above before asking OpenCode to run the CLI.
 
 ## Quality policy
 
