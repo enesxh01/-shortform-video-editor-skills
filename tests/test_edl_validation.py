@@ -134,6 +134,14 @@ class EDLValidationTests(unittest.TestCase):
     def test_split_layout_requires_two_source_specs(self):
         edl = valid_edl()
         edl["segments"][0]["layout"] = "split_vertical"
+        edl["segments"][0]["split_top"] = {
+            "path": "top.mp4", "fingerprint": "sha256:" + ("b" * 64),
+            "source_in": "00:00:02.000", "source_out": "00:00:08.500"
+        }
+        edl["segments"][0]["split_bottom"] = {
+            "path": "bottom.mp4", "fingerprint": "sha256:" + ("c" * 64),
+            "source_in": "00:00:02.000", "source_out": "00:00:08.500"
+        }
         self.assertTrue(validate_edl(edl))
 
     def test_rejects_caption_outside_segment(self):
@@ -229,9 +237,17 @@ class EDLValidationTests(unittest.TestCase):
     def test_split_captions_must_be_one_line(self):
         edl = valid_edl()
         edl["segments"][0]["layout"] = "split_vertical"
+        edl["segments"][0]["split_top"] = {
+            "path": "top.mp4", "fingerprint": "sha256:" + ("b" * 64),
+            "source_in": "00:00:02.000", "source_out": "00:00:08.500"
+        }
+        edl["segments"][0]["split_bottom"] = {
+            "path": "bottom.mp4", "fingerprint": "sha256:" + ("c" * 64),
+            "source_in": "00:00:02.000", "source_out": "00:00:08.500"
+        }
         edl["segments"][0]["captions"] = [{
             "start": "00:00:02.500", "end": "00:00:04.000",
-            "text": "First line\\nSecond line"
+            "text": "First line\nSecond line"
         }]
         self.assertTrue(any("must be exactly one line" in error for error in validate_edl(edl)))
 
@@ -240,7 +256,7 @@ class EDLValidationTests(unittest.TestCase):
         edl["segments"][0]["layout"] = "blurred_bars_20_60_20"
         edl["segments"][0]["captions"] = [{
             "start": "00:00:02.500", "end": "00:00:04.000",
-            "text": "First line\\nSecond line"
+            "text": "First line\nSecond line"
         }]
         self.assertTrue(any("must be exactly one line" in error for error in validate_edl(edl)))
 
@@ -248,7 +264,7 @@ class EDLValidationTests(unittest.TestCase):
         edl = valid_edl()
         edl["segments"][0]["captions"] = [{
             "start": "00:00:02.500", "end": "00:00:04.000",
-            "text": "One\\nTwo\\nThree\\nFour"
+            "text": "One\nTwo\nThree\nFour"
         }]
         self.assertTrue(any("at most three lines" in error for error in validate_edl(edl)))
 
@@ -263,6 +279,14 @@ class EDLValidationTests(unittest.TestCase):
     def test_split_captions_cannot_be_moved_out_of_divider(self):
         edl = valid_edl()
         edl["segments"][0]["layout"] = "split_vertical"
+        edl["segments"][0]["split_top"] = {
+            "path": "top.mp4", "fingerprint": "sha256:" + ("b" * 64),
+            "source_in": "00:00:02.000", "source_out": "00:00:08.500"
+        }
+        edl["segments"][0]["split_bottom"] = {
+            "path": "bottom.mp4", "fingerprint": "sha256:" + ("c" * 64),
+            "source_in": "00:00:02.000", "source_out": "00:00:08.500"
+        }
         edl["segments"][0]["captions"] = [{
             "start": "00:00:02.500", "end": "00:00:04.000",
             "text": "Centered", "position": "top"
