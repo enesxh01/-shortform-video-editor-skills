@@ -335,6 +335,80 @@
                 }
               }
             }
+          },
+          "pacing_review": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "decisions",
+              "repeated_word_flags",
+              "note"
+            ],
+            "properties": {
+              "decisions": {
+                "type": "array",
+                "maxItems": 500,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "decision",
+                    "source_in",
+                    "source_out",
+                    "rationale",
+                    "confidence",
+                    "context_risk"
+                  ],
+                  "properties": {
+                    "decision": {
+                      "type": "string",
+                      "enum": [
+                        "keep",
+                        "trim",
+                        "preserve_pause"
+                      ]
+                    },
+                    "source_in": {
+                      "type": "string",
+                      "pattern": "^(?:(?:[0-9]+):)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
+                    },
+                    "source_out": {
+                      "type": "string",
+                      "pattern": "^(?:(?:[0-9]+):)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
+                    },
+                    "rationale": {
+                      "type": "string",
+                      "maxLength": 500
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "context_risk": {
+                      "type": "string",
+                      "enum": [
+                        "low",
+                        "medium",
+                        "high"
+                      ]
+                    }
+                  }
+                }
+              },
+              "repeated_word_flags": {
+                "type": "array",
+                "maxItems": 100,
+                "items": {
+                  "type": "string",
+                  "maxLength": 80
+                }
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 500
+              }
+            }
           }
         },
         "allOf": [
