@@ -12,7 +12,9 @@ from shortform_editor.cli import command_doctor
 FILTERS = "\n".join([
     " T.. subtitles", " T.. fps", " T.. scale", " T.. crop", " T.. setpts",
     " T.. setsar", " T.. format", " T.. aresample", " T.. blackdetect",
-    " T.. freezedetect", " T.. volumedetect", " T.. ebur128"
+    " T.. freezedetect", " T.. volumedetect", " T.. ebur128", " T.. split",
+    " T.. overlay", " T.. vstack", " T.. boxblur", " T.. fade", " T.. eq",
+    " T.. unsharp", " T.. null"
 ])
 
 
@@ -23,7 +25,7 @@ class DoctorTests(unittest.TestCase):
 
         def run(args):
             if args[-1] == "-encoders":
-                stdout = "Encoders: h264_nvenc libx264"
+                stdout = "Encoders: h264_nvenc libx264 aac"
             elif args[-1] == "-filters":
                 stdout = filters
             else:
@@ -55,9 +57,25 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(report["status"], "ready_with_optional_extras_missing")
         self.assertTrue(report["accelerators"]["h264_nvenc"]["available"])
         self.assertTrue(report["accelerators"]["libx264"]["available"])
+        self.assertTrue(report["accelerators"]["aac"]["available"])
         self.assertTrue(report["accelerators"]["subtitles_filter"]["available"])
         self.assertTrue(report["accelerators"]["filters"]["ebur128"]["available"])
         self.assertEqual(set(report["missing_optional"]), {"faster_whisper", "cv2", "yt_dlp"})
+
+    def test_reports_missing_required_aac_encoder(self):
+        output = StringIO()
+        which, run, find_spec = self._mock_environment()
+        def without_aac(args):
+            result = run(args)
+            if args[-1] == "-encoders":
+                result.stdout = "Encoders: h264_nvenc libx264"
+            return result
+        with patch("shortform_editor.cli.shutil.which", side_effect=which), patch("shortform_editor.cli.run_checked", side_effect=without_aac), patch("importlib.util.find_spec", side_effect=find_spec), redirect_stdout(output):
+            result = command_doctor(Namespace())
+        report = json.loads(output.getvalue())
+        self.assertEqual(result, 2)
+        self.assertIn("ffmpeg_aac_encoder", report["missing_required"])
+        self.assertFalse(report["accelerators"]["aac"]["available"])
 
     def test_reports_missing_required_filter_instead_of_false_ready(self):
         output = StringIO()

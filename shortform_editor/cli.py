@@ -1171,6 +1171,8 @@ def command_doctor(args: argparse.Namespace) -> int:
 
     ffmpeg_path = report["executables"]["ffmpeg"]["path"]
     nvenc_available = False
+    aac_available = False
+    libx264_available = False
     encoders_text = ""
     filters_text = ""
     if ffmpeg_path:
@@ -1185,11 +1187,16 @@ def command_doctor(args: argparse.Namespace) -> int:
             filters_text = filters_result.stdout + filters_result.stderr
         except PipelineError as exc:
             report["accelerators"]["ffmpeg_filter_check"] = str(exc)
+    encoder_tokens = {token for line in encoders_text.splitlines() for token in line.split()}
+    nvenc_available = nvenc_available and "h264_nvenc" in encoder_tokens
+    libx264_available = "libx264" in encoder_tokens
+    aac_available = "aac" in encoder_tokens
     report["accelerators"]["h264_nvenc"] = {
         "available": nvenc_available,
         "note": "FFmpeg build advertises NVENC; actual driver/device initialization is only confirmed during a render."
     }
-    report["accelerators"]["libx264"] = {"available": "libx264" in encoders_text}
+    report["accelerators"]["libx264"] = {"available": libx264_available}
+    report["accelerators"]["aac"] = {"available": aac_available, "required": True}
     available_filters = set()
     for line in filters_text.splitlines():
         fields = line.split()
@@ -1197,7 +1204,8 @@ def command_doctor(args: argparse.Namespace) -> int:
             available_filters.add(fields[1])
     required_filters = (
         "subtitles", "fps", "scale", "crop", "setpts", "setsar", "format",
-        "aresample", "blackdetect", "freezedetect", "volumedetect", "ebur128"
+        "aresample", "blackdetect", "freezedetect", "volumedetect", "ebur128",
+        "split", "overlay", "vstack", "boxblur", "fade", "eq", "unsharp", "null"
     )
     report["accelerators"]["filters"] = {
         name: {"available": name in available_filters, "required": True}
@@ -1215,8 +1223,10 @@ def command_doctor(args: argparse.Namespace) -> int:
         name for name in ("jsonschema", "psutil")
         if not report["python_modules"][name]["available"]
     ]
-    if not report["accelerators"]["libx264"]["available"] and not nvenc_available:
+    if not libx264_available and not nvenc_available:
         required_missing.append("ffmpeg_h264_encoder")
+    if not aac_available:
+        required_missing.append("ffmpeg_aac_encoder")
     required_missing.extend(
         f"ffmpeg_filter:{name}" for name in required_filters
         if name not in available_filters
