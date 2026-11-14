@@ -164,6 +164,17 @@
             "minimum": 0,
             "maximum": 2
           },
+          "color_grade": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "brightness": {"type": "number", "minimum": -0.2, "maximum": 0.2},
+              "contrast": {"type": "number", "minimum": 0.5, "maximum": 2.0},
+              "saturation": {"type": "number", "minimum": 0.0, "maximum": 2.0},
+              "gamma": {"type": "number", "minimum": 0.5, "maximum": 2.0},
+              "sharpen": {"type": "number", "minimum": 0.0, "maximum": 1.5}
+            }
+          },
           "reason": {
             "type": [
               "string",
