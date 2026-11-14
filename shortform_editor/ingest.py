@@ -7,10 +7,23 @@ from typing import Any
 from .cli import PipelineError, probe_media
 
 
+def _download_size_guard(max_bytes: int):
+    """Abort a yt-dlp transfer as soon as its observed byte count exceeds the cap."""
+    def check_progress(progress: dict[str, Any]) -> None:
+        downloaded = progress.get("downloaded_bytes")
+        if isinstance(downloaded, (int, float)) and downloaded > max_bytes:
+            raise PipelineError(
+                f"Download exceeded the configured maximum size of {max_bytes} bytes"
+            )
+    return check_progress
+
+
 def download_source(url: str, output_dir: Path, max_filesize_mb: int = 2048) -> dict[str, Any]:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise PipelineError("Source URL must use http:// or https://")
+    if parsed.username is not None or parsed.password is not None:
+        raise PipelineError("Source URL must not contain embedded credentials")
     if max_filesize_mb < 1 or max_filesize_mb > 20480:
         raise PipelineError("Maximum download size must be between 1 and 20480 MB")
     output_dir = output_dir.expanduser().resolve()
@@ -22,12 +35,14 @@ def download_source(url: str, output_dir: Path, max_filesize_mb: int = 2048) -> 
     except ImportError as exc:
         raise PipelineError("URL ingestion requires the optional download extra: pip install -e '.[download]'") from exc
 
+    max_bytes = max_filesize_mb * 1024 * 1024
     options = {
         "format": "bv*+ba/b",
         "merge_output_format": "mp4",
         "outtmpl": str(output_dir / "source.%(ext)s"),
         "noplaylist": True,
-        "max_filesize": max_filesize_mb * 1024 * 1024,
+        "max_filesize": max_bytes,
+        "progress_hooks": [_download_size_guard(max_bytes)],
         "restrictfilenames": True,
         "windowsfilenames": True,
         "quiet": True,
@@ -37,6 +52,7 @@ def download_source(url: str, output_dir: Path, max_filesize_mb: int = 2048) -> 
         "continuedl": True,
         "overwrites": False,
     }
+
     def cleanup_partial_download() -> None:
         for partial in output_dir.iterdir():
             if partial.is_file():
@@ -62,7 +78,7 @@ def download_source(url: str, output_dir: Path, max_filesize_mb: int = 2048) -> 
         cleanup_partial_download()
         raise PipelineError(f"URL download failed: {type(exc).__name__}: {exc}") from exc
 
-    if downloaded.stat().st_size > max_filesize_mb * 1024 * 1024:
+    if downloaded.stat().st_size > max_bytes:
         cleanup_partial_download()
         raise PipelineError("Downloaded file exceeded the configured maximum size")
     try:
