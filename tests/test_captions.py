@@ -124,6 +124,35 @@ class CaptionTests(unittest.TestCase):
         result = apply_face_aware_caption_positions(captions, samples, 1920, 1080)
         self.assertEqual(result[0]["position"], "bottom")
 
+    def test_supports_optional_per_word_kino_highlight_color(self):
+        segment = {"captions": [{
+            "start": "00:00:01.000", "end": "00:00:02.000",
+            "text": "Important detail",
+            "words": [
+                {"text": "Important", "start": "00:00:01.000", "end": "00:00:01.500", "highlight_color": "#FF0000"},
+                {"text": "detail", "start": "00:00:01.500", "end": "00:00:02.000"}
+            ]
+        }]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "highlight.ass"
+            write_ass_subtitles(segment, "fullscreen", 0.0, path)
+            content = path.read_text(encoding="utf-8")
+        self.assertIn(r"{\c&H000000FF&}", content)
+        self.assertIn(r"{\c}", content)
+
+    def test_rejects_invalid_per_word_highlight_color(self):
+        segment = {"captions": [{
+            "start": "00:00:01.000", "end": "00:00:02.000", "text": "Bad color",
+            "words": [{
+                "text": "Bad", "start": "00:00:01.000", "end": "00:00:02.000",
+                "highlight_color": "red"
+            }]
+        }]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invalid-highlight.ass"
+            with self.assertRaises(PipelineError):
+                write_ass_subtitles(segment, "fullscreen", 0.0, path)
+
     def test_supports_safe_installed_font_name(self):
         segment = {"captions": [{
             "start": "00:00:01.000", "end": "00:00:02.000",
