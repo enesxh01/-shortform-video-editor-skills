@@ -74,7 +74,7 @@ This orchestrates:
 6. Kino caption generation.
 7. One unapproved EDL draft per candidate.
 
-The pipeline does **not** approve or render automatically. Review the candidate boundaries, captions, crop plans and EDL. Render a 30 fps preview first; only after you explicitly approve that exact edit should you run `approve-edl --confirm`, followed by the final render.
+The pipeline does **not** approve or render automatically. Once you explicitly approve an EDL, the render command exports it and automatically runs technical QC. Review the candidate boundaries, captions, crop plans and EDL. Render a 30 fps preview first; only after you explicitly approve that exact edit should you run `approve-edl --confirm`, followed by the final render.
 
 Useful follow-up commands:
 
