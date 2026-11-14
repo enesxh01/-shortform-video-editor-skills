@@ -184,5 +184,58 @@ class EDLValidationTests(unittest.TestCase):
         self.assertIn("properties", load_schema())
 
 
+    def test_split_captions_must_be_one_line(self):
+        edl = valid_edl()
+        edl["segments"][0]["layout"] = "split_vertical"
+        edl["segments"][0]["captions"] = [{
+            "start": "00:00:02.500", "end": "00:00:04.000",
+            "text": "First line\\nSecond line"
+        }]
+        self.assertTrue(any("must be exactly one line" in error for error in validate_edl(edl)))
+
+    def test_blurred_bars_captions_must_be_one_line(self):
+        edl = valid_edl()
+        edl["segments"][0]["layout"] = "blurred_bars_20_60_20"
+        edl["segments"][0]["captions"] = [{
+            "start": "00:00:02.500", "end": "00:00:04.000",
+            "text": "First line\\nSecond line"
+        }]
+        self.assertTrue(any("must be exactly one line" in error for error in validate_edl(edl)))
+
+    def test_fullscreen_captions_are_limited_to_three_lines(self):
+        edl = valid_edl()
+        edl["segments"][0]["captions"] = [{
+            "start": "00:00:02.500", "end": "00:00:04.000",
+            "text": "One\\nTwo\\nThree\\nFour"
+        }]
+        self.assertTrue(any("at most three lines" in error for error in validate_edl(edl)))
+
+    def test_caption_events_must_not_overlap(self):
+        edl = valid_edl()
+        edl["segments"][0]["captions"] = [
+            {"start": "00:00:02.500", "end": "00:00:04.000", "text": "First"},
+            {"start": "00:00:03.500", "end": "00:00:05.000", "text": "Second"}
+        ]
+        self.assertTrue(any("overlaps or is out of chronological order" in error for error in validate_edl(edl)))
+
+    def test_split_captions_cannot_be_moved_out_of_divider(self):
+        edl = valid_edl()
+        edl["segments"][0]["layout"] = "split_vertical"
+        edl["segments"][0]["captions"] = [{
+            "start": "00:00:02.500", "end": "00:00:04.000",
+            "text": "Centered", "position": "top"
+        }]
+        self.assertTrue(any("must remain centered" in error for error in validate_edl(edl)))
+
+    def test_blurred_bars_captions_cannot_be_moved_into_blurred_bars(self):
+        edl = valid_edl()
+        edl["segments"][0]["layout"] = "blurred_bars_20_60_20"
+        edl["segments"][0]["captions"] = [{
+            "start": "00:00:02.500", "end": "00:00:04.000",
+            "text": "Safe", "position": "top"
+        }]
+        self.assertTrue(any("must remain in the main composition" in error for error in validate_edl(edl)))
+
+
 if __name__ == "__main__":
     unittest.main()
