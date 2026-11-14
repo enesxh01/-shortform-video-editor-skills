@@ -233,6 +233,15 @@ class PipelineOrchestrationTests(unittest.TestCase):
                 self.assertEqual(audio_mock.call_count, 1)
                 self.assertEqual(moments_mock.call_count, 1)
                 self.assertEqual(pacing_mock.call_count, 1)
+                # A valid-looking JSON file with the same source fingerprint must not bypass its stored digest.
+                audio_path = output / "audio-analysis.json"
+                audio_path.write_text(json.dumps(audio), encoding="utf-8")
+                resumed_after_tamper = analyze_project(source, output, top_candidates=1, resume=True)
+                self.assertEqual(audio_mock.call_count, 2)
+                self.assertIn("audio", {
+                    item["stage"] for item in resumed_after_tamper["stages"]
+                    if item["status"] == "completed"
+                })
             reused = {
                 item["stage"] for item in resumed["stages"]
                 if item["status"] == "reused_checkpoint"
