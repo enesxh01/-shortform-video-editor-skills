@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -39,6 +41,8 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
     if layout not in {"fullscreen", "blurred_bars_20_60_20"}:
         raise PipelineError("Project analysis currently drafts fullscreen or blurred-bars layouts; split needs explicit secondary sources")
 
+    if output_dir.exists() and any(output_dir.iterdir()):
+        raise PipelineError("Output directory is not empty; choose a new job directory to avoid overwriting prior artifacts")
     output_dir.mkdir(parents=True, exist_ok=True)
     stages = []
     warnings = []
