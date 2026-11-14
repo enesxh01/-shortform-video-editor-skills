@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from .cli import PipelineError, probe_media
+from .cli import PipelineError, file_stat_signature, probe_media
 
 
 def compute_crop_box(width: int, height: int, center_x: float, center_y: float,
@@ -120,9 +120,14 @@ def sample_region_timestamps(regions: list[tuple[float, float]], duration: float
 
 def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 120,
                     detect_faces: bool = True,
-                    regions: list[tuple[float, float]] | None = None) -> dict[str, Any]:
+                    regions: list[tuple[float, float]] | None = None,
+                    probe_report: dict[str, Any] | None = None) -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
-    report = probe_media(source)
+    report = probe_report or probe_media(source)
+    reported_path = Path(report.get("source", {}).get("path", source)).expanduser().resolve()
+    if reported_path != source:
+        raise PipelineError("Supplied probe report belongs to a different source path")
+    source_signature = file_stat_signature(source)
     video_stream = next((s for s in report.get("streams", []) if s.get("codec_type") == "video"), None)
     if not video_stream:
         raise PipelineError("Input contains no video stream")
