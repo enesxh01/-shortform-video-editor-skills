@@ -15,8 +15,12 @@ LABEL_VALUE = {"approve": 1.0, "edited": 0.5, "reject": 0.0}
 def _read_feedback(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise PipelineError(f"Cannot read local feedback file {path}: {exc}") from exc
     records = []
-    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for line_number, line in enumerate(content.splitlines(), 1):
         if not line.strip():
             continue
         try:
