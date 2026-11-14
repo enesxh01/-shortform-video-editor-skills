@@ -40,7 +40,16 @@ class PipelineOrchestrationTests(unittest.TestCase):
             with patch("shortform_editor.pipeline.probe_media", return_value=probe), \
                  patch("shortform_editor.pipeline.analyze_audio", return_value=audio), \
                  patch("shortform_editor.pipeline.detect_moments", return_value={"candidates": [candidate]}), \
-                 patch("shortform_editor.pipeline.analyze_pacing", return_value={"candidates": []}), \
+                 patch("shortform_editor.pipeline.analyze_pacing", return_value={"candidates": [{
+                     "candidate_id": candidate["candidate_id"],
+                     "decisions": [{
+                         "decision": "keep", "source_in": "00:00:02.000",
+                         "source_out": "00:00:18.000", "rationale": "Keep utterance",
+                         "confidence": 0.9, "context_risk": "low"
+                     }],
+                     "repeated_word_flags": ["the"],
+                     "note": "Advisory only"
+                 }]}), \
                  patch("shortform_editor.pipeline.generate_captions", return_value={"captions": [
                      {"start": "00:00:03.000", "end": "00:00:04.000", "text": "Test caption"}
                  ]}), \
@@ -61,6 +70,7 @@ class PipelineOrchestrationTests(unittest.TestCase):
             self.assertEqual(edl["approval"], {"status": "draft", "approved_by_user": False})
             self.assertEqual(edl["segments"][0]["layout"], "fullscreen")
             self.assertEqual(len(edl["segments"][0]["captions"]), 1)
+            self.assertEqual(edl["segments"][0]["pacing_review"]["repeated_word_flags"], ["the"])
             self.assertEqual(set(edl["segments"][0]["crop_keyframes"][0]), {"time_seconds", "crop_9_16"})
             self.assertEqual(validate_edl(edl), [])
 
