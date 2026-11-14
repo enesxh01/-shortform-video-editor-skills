@@ -11,14 +11,14 @@ Create polished, modern editorial short-form videos. Restraint and readability b
 
 Generate word-timed caption groups with `shortform-editor generate-captions audio-analysis.json candidates.json -o captions.json --layout fullscreen`. Add the resulting caption array to the selected EDL segment before approval and rendering. The renderer burns ASS/libass captions with outlined bold typography and optional word-level karaoke highlighting. Split captions are centered; fullscreen and blurred-bars captions use bottom placement by default.
 
-This is the initial static/Karaoke baseline only. Per-word scale/position animation, custom font packaging, advanced emphasis rules, three-line layout tuning and face/HUD-aware safe-area placement are not implemented. Review spelling and timing against the source.
+This is the initial static/Karaoke baseline only. Per-word scale/position animation, custom font packaging, advanced emphasis rules and typography preview are not implemented. Fullscreen drafts with face-analysis evidence can conservatively move captions between top and bottom safe areas; this does not detect HUDs or arbitrary objects. Review spelling and timing against the source.
 
 ## Captions
 
 - Use accurate, speech-synchronized captions. Verify hook/payoff wording against audio.
 - Fullscreen: up to three lines with clear hierarchy.
-- Vertical split: exactly one caption line centered in the divider.
-- Blurred-bars layout: one caption line, positioned safely over the main composition.
+- Vertical split: exactly one caption line centered in the divider; EDL validation rejects explicit positions that move it away from the divider.
+- Blurred-bars layout: exactly one caption line, positioned safely over the sharp main composition (never in the blurred top/bottom bars).
 - Use premium sans-serif typography with selective italic serif accents only when they improve emphasis.
 - Highlight important words through text styling/color, not colored boxes. Do not make every highlight red.
 - Use consistent baseline, line spacing, margins, and safe areas.
