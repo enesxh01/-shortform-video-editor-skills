@@ -69,6 +69,29 @@ class URLIngestionTests(unittest.TestCase):
             self.assertTrue(state["download"])
 
 
+    def test_cleans_partial_files_after_downloader_validation_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "out"
+            output.mkdir()
+
+            class AmbiguousYoutubeDL:
+                def __init__(self, options): pass
+                def __enter__(self): return self
+                def __exit__(self, *args): return False
+                def extract_info(self, url, download):
+                    (output / "first.mp4").write_bytes(b"one")
+                    (output / "second.mp4").write_bytes(b"two")
+                    return {"title": "ambiguous"}
+                def prepare_filename(self, info):
+                    return str(output / "missing.webm")
+
+            fake = types.ModuleType("yt_dlp")
+            fake.YoutubeDL = AmbiguousYoutubeDL
+            with patch.dict(sys.modules, {"yt_dlp": fake}):
+                with self.assertRaisesRegex(PipelineError, "one unambiguous media file"):
+                    download_source("https://example.com/video", output)
+            self.assertEqual(list(output.iterdir()), [])
+
     def test_cleans_partial_files_after_downloader_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "out"
