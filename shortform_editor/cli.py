@@ -148,7 +148,7 @@ def render(edl_path, output):
     with tempfile.TemporaryDirectory(prefix=".shortform-",dir=target.parent) as td:
         td=Path(td); ass=td/"captions.ass"; make_ass(edl,ass)
         inputs=["-i",str(source)]
-        filters=[]; labels=[]
+        filters=[]; labels=[]; next_input=1
         has_audio=bool(info["audio"])
         for i,seg in enumerate(edl["segments"]):
             a,b=seconds(seg["source_in"]),seconds(seg["source_out"])
@@ -163,7 +163,12 @@ def render(edl_path, output):
                 top=Path(seg["split_top"]["path"]).expanduser().resolve()
                 bottom=Path(seg["split_bottom"]["path"]).expanduser().resolve()
                 inputs += ["-i",str(top),"-i",str(bottom)]
-                ti=1+2*i; bi=ti+1
+                ti=next_input; bi=ti+1; next_input+=2
+                for key in ("split_top","split_bottom"):
+                    split_path=Path(seg[key]["path"]).expanduser().resolve()
+                    if not split_path.is_file(): raise EditorError(f"Missing split-screen source: {split_path}")
+                    if seg[key].get("fingerprint") and sha256(split_path)!=seg[key]["fingerprint"]:
+                        raise EditorError(f"Split-screen source fingerprint mismatch: {split_path}")
                 vf=f"[{ti}:v]trim=start={seconds(seg['split_top'].get('source_in',0)):.6f}:end={seconds(seg['split_top'].get('source_out',b-a)):.6f},setpts=PTS-STARTPTS,scale={w}:{h//2}:force_original_aspect_ratio=increase,crop={w}:{h//2}[top{i}];[{bi}:v]trim=start={seconds(seg['split_bottom'].get('source_in',0)):.6f}:end={seconds(seg['split_bottom'].get('source_out',b-a)):.6f},setpts=PTS-STARTPTS,scale={w}:{h-h//2}:force_original_aspect_ratio=increase,crop={w}:{h-h//2}[bot{i}];[top{i}][bot{i}]vstack"
                 base=""
             if layout=="blurred_bars_20_60_20":
