@@ -7,6 +7,12 @@ description: Find and rank genuinely compelling, context-complete short-form mom
 
 Find moments people may want to keep watching and share. Do not promise virality. The goal is editorial quality, not a guaranteed outcome.
 
+## Executable baseline
+
+After audio analysis, run `shortform-editor find-moments audio-analysis.json -o candidates.json`. The current implementation proposes transcript-aligned windows and ranks them with an explainable 100-point heuristic using hook/payoff text cues, speech density, lexical variety, audio energy support and boundary evidence.
+
+Treat every candidate as low-confidence (0.35) and human-review-required. The cue lexicon is English-biased, does not understand semantics, and does not estimate virality. It is a triage baseline only. Do not increase its confidence or describe it as AI understanding. Review the full source around each candidate before using it.
+
 ## Analyze the whole recording
 
 - Search the full timeline, including quiet sections and later segments.
