@@ -56,7 +56,7 @@ def choose_inference_device(model_size: str, requested: str = "auto",
         raise ValueError(f"Unsupported model size: {model_size}")
     if requested not in {"auto", "cpu", "cuda"}:
         raise ValueError(f"Unsupported inference device: {requested}")
-    resources = snapshot or resource_snapshot()
+    resources = snapshot if snapshot is not None else resource_snapshot()
     notes = []
     available_ram = float(resources.get("ram_available_gb", 0))
     required_ram = MODEL_RAM_GB[model_size]
