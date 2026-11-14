@@ -58,8 +58,9 @@ class EDLValidationTests(unittest.TestCase):
 
     def test_rejects_fades_longer_than_segment(self):
         edl = valid_edl()
-        edl["segments"][0]["fade_in_seconds"] = 4.0
-        edl["segments"][0]["fade_out_seconds"] = 3.0
+        edl["segments"][0]["source_out"] = "00:00:04.500"
+        edl["segments"][0]["fade_in_seconds"] = 1.5
+        edl["segments"][0]["fade_out_seconds"] = 1.0
         self.assertTrue(any("fade durations" in error for error in validate_edl(edl)))
 
     def test_rejects_out_before_in(self):
