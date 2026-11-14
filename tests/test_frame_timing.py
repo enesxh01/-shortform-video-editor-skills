@@ -39,10 +39,10 @@ class FrameTimingDiagnosticsTests(unittest.TestCase):
 
     def test_report_discloses_sample_scope_and_no_normalization(self):
         report = analyze_frame_timestamps([index / 30 for index in range(30)])
-        self.assertEqual(report["scope"], "initial_frame_sample_only")
+        self.assertEqual(report["scope"], "stratified_frame_samples")
         self.assertIn("does not normalize timestamps", report["limitation"])
 
-    def test_probe_samples_only_the_initial_video_frames(self):
+    def test_probe_samples_multiple_windows_across_video(self):
         timestamps = [{"best_effort_timestamp_time": str(index / 30)} for index in range(40)]
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "source.mp4"
