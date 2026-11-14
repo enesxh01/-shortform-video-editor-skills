@@ -313,6 +313,25 @@ def command_analyze_audio(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_find_moments(args: argparse.Namespace) -> int:
+    from .moments import detect_moments_file
+
+    result = detect_moments_file(
+        Path(args.analysis).expanduser().resolve(strict=True),
+        Path(args.output).expanduser().resolve(),
+        min_duration=args.min_duration,
+        max_duration=args.max_duration,
+        limit=args.limit
+    )
+    print(json.dumps({
+        "output": str(Path(args.output).expanduser().resolve()),
+        "candidate_count": result["candidate_count"],
+        "method": result["method"],
+        "human_review_required": True
+    }, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -333,6 +352,13 @@ def build_parser() -> argparse.ArgumentParser:
     audio.add_argument("--no-transcribe", action="store_true", help="run audio energy/silence analysis without loading ASR")
     audio.add_argument("--silence-dbfs", type=float, default=-38.0)
     audio.set_defaults(func=command_analyze_audio)
+    moments = sub.add_parser("find-moments", help="rank transcript-led candidate moments with transparent heuristic evidence")
+    moments.add_argument("analysis", help="JSON report from analyze-audio")
+    moments.add_argument("-o", "--output", required=True)
+    moments.add_argument("--min-duration", type=float, default=12.0)
+    moments.add_argument("--max-duration", type=float, default=55.0)
+    moments.add_argument("--limit", type=int, default=10)
+    moments.set_defaults(func=command_find_moments)
     render = sub.add_parser("render", help="render approved EDL segments into a vertical MP4")
     render.add_argument("source")
     render.add_argument("edl")
