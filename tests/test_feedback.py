@@ -10,7 +10,7 @@ class FeedbackTests(unittest.TestCase):
     def test_category_preferences_adjust_ranking_with_bounded_scores(self):
         candidates = {
             "candidates": [
-                {"candidate_id": "a", "family": "comedy_or_reaction", "score": 60},
+                {"candidate_id": "a", "family": "comedy_or_reaction", "score": 99},
                 {"candidate_id": "b", "family": "conflict_or_debate", "score": 61}
             ]
         }
@@ -21,6 +21,7 @@ class FeedbackTests(unittest.TestCase):
         result = apply_feedback(candidates, records)
         self.assertEqual(result["candidates"][0]["candidate_id"], "a")
         self.assertEqual(result["candidates"][0]["feedback_adjustment"], 3.0)
+        self.assertEqual(result["candidates"][0]["score_after_feedback"], 100.0)
         self.assertEqual(result["candidates"][1]["feedback_adjustment"], -3.0)
 
     def test_requires_minimum_observations_before_adjusting(self):
