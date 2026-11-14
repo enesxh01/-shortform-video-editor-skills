@@ -37,6 +37,11 @@ def download_source(url: str, output_dir: Path, max_filesize_mb: int = 2048) -> 
         "continuedl": True,
         "overwrites": False,
     }
+    def cleanup_partial_download() -> None:
+        for partial in output_dir.iterdir():
+            if partial.is_file():
+                partial.unlink(missing_ok=True)
+
     try:
         with yt_dlp.YoutubeDL(options) as downloader:
             info = downloader.extract_info(url, download=True)
@@ -53,15 +58,16 @@ def download_source(url: str, output_dir: Path, max_filesize_mb: int = 2048) -> 
     except PipelineError:
         raise
     except Exception as exc:
+        cleanup_partial_download()
         raise PipelineError(f"URL download failed: {type(exc).__name__}: {exc}") from exc
 
     if downloaded.stat().st_size > max_filesize_mb * 1024 * 1024:
-        downloaded.unlink(missing_ok=True)
+        cleanup_partial_download()
         raise PipelineError("Downloaded file exceeded the configured maximum size")
     try:
         probe = probe_media(downloaded)
     except Exception:
-        downloaded.unlink(missing_ok=True)
+        cleanup_partial_download()
         raise
     return {
         "source_path": str(downloaded),
