@@ -11,7 +11,7 @@ from typing import Any
 from .audio import analyze_audio
 from .caption_generation import generate_captions
 from .feedback import apply_feedback, load_feedback
-from .cli import PipelineError, probe_media, timestamp_seconds
+from .cli import PipelineError, file_stat_signature, probe_media, timestamp_seconds
 from .moments import detect_moments
 from .pacing import analyze_pacing
 from .visual import analyze_visuals
@@ -94,10 +94,12 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
 
     try:
         probe = stage("probe", lambda: probe_media(source))
+        source_signature = file_stat_signature(source)
         _write_json(output_dir / "probe.json", probe)
 
         split_probes = {}
         split_paths = {}
+        split_signatures = {}
         if layout == "split_vertical":
             for key, raw_path in (("split_top", split_top_source), ("split_bottom", split_bottom_source)):
                 path = raw_path.expanduser().resolve(strict=True)
@@ -105,10 +107,13 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                     raise PipelineError(f"{key} must be a separate source file, not the primary input")
                 split_paths[key] = path
                 split_probes[key] = probe_media(path)
+                split_signatures[key] = file_stat_signature(path)
 
         audio = stage("audio", lambda: analyze_audio(source, model_size=model, device=device))
         if audio.get("source", {}).get("fingerprint") != probe["source"]["fingerprint"]:
             raise PipelineError("Source media changed between initial probe and audio analysis; restart the project")
+        if file_stat_signature(source) != source_signature:
+            raise PipelineError("Source media changed during audio analysis; restart the project")
         _write_json(output_dir / "audio-analysis.json", audio)
 
         candidates = stage("moment_detection", lambda: detect_moments(audio, limit=top_candidates))
@@ -146,16 +151,17 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                 )
                 if visuals.get("source", {}).get("fingerprint") != probe["source"]["fingerprint"]:
                     raise PipelineError("Source media changed between initial probe and visual analysis; restart the project")
+                if file_stat_signature(source) != source_signature:
+                    raise PipelineError("Source media changed during visual analysis; restart the project")
                 _write_json(output_dir / "visual-analysis.json", visuals)
             except PipelineError as exc:
                 warnings.append(f"Visual analysis unavailable: {exc}")
 
-        final_source_probe = stage("source_integrity_check", lambda: probe_media(source))
-        if final_source_probe["source"]["fingerprint"] != probe["source"]["fingerprint"]:
+        final_source_signature = stage("source_integrity_check", lambda: file_stat_signature(source))
+        if final_source_signature != source_signature:
             raise PipelineError("Source media changed during project analysis; discard this job and restart from the new source version")
         for key, path in split_paths.items():
-            final_split_probe = probe_media(path)
-            if final_split_probe["source"]["fingerprint"] != split_probes[key]["source"]["fingerprint"]:
+            if file_stat_signature(path) != split_signatures[key]:
                 raise PipelineError(f"{key} media changed during project analysis; restart with stable split sources")
 
         video_stream = next(s for s in probe["streams"] if s.get("codec_type") == "video")
