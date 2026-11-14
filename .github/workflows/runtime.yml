@@ -17,3 +17,9 @@ jobs:
         run: python -m py_compile shortform_editor/cli.py
       - name: Unit tests
         run: python -m unittest discover -s tests -p "test_*.py" -v
+      - name: Installer smoke test
+        run: |
+          bash scripts/install.sh "$RUNNER_TEMP/opencode-skills"
+          test -f "$RUNNER_TEMP/opencode-skills/shortform-video-editor/runtime/cli.py"
+          test -f "$RUNNER_TEMP/opencode-skills/references/viral-scoring.md"
+          test -f "$RUNNER_TEMP/opencode-skills/schemas/edit-decision-list.schema.json"
