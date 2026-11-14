@@ -23,8 +23,12 @@ def _read_feedback(path: Path) -> list[dict[str, Any]]:
             item = json.loads(line)
         except json.JSONDecodeError as exc:
             raise PipelineError(f"Invalid feedback JSONL at line {line_number}: {exc}") from exc
+        if not isinstance(item, dict):
+            raise PipelineError(f"Feedback record at line {line_number} must be a JSON object")
         if item.get("decision") not in LABEL_VALUE:
             raise PipelineError(f"Unknown feedback decision at line {line_number}")
+        if not isinstance(item.get("family"), str) or not item["family"].strip():
+            raise PipelineError(f"Feedback record at line {line_number} has no valid family")
         records.append(item)
     return records
 
@@ -60,7 +64,23 @@ def apply_feedback(candidates: dict[str, Any], records: list[dict[str, Any]],
                    min_observations: int = 3) -> dict[str, Any]:
     if min_observations < 1:
         raise PipelineError("Minimum feedback observations must be positive")
-    valid_records = [item for item in records if item.get("family") and item.get("decision") in LABEL_VALUE]
+    # A candidate may be reviewed more than once; only its latest decision counts.
+    # This prevents repeated clicks on one clip from masquerading as independent examples.
+    latest_by_candidate: dict[tuple[str, str], dict[str, Any]] = {}
+    anonymous_records = []
+    for index, item in enumerate(records):
+        if not isinstance(item, dict) or item.get("decision") not in LABEL_VALUE:
+            continue
+        family = item.get("family")
+        if not isinstance(family, str) or not family.strip():
+            continue
+        candidate_id = item.get("candidate_id")
+        fingerprint = item.get("source_fingerprint") or ""
+        if candidate_id:
+            latest_by_candidate[(str(fingerprint), str(candidate_id))] = item
+        else:
+            anonymous_records.append((index, item))
+    valid_records = list(latest_by_candidate.values()) + [item for _, item in anonymous_records]
     if not valid_records:
         result = dict(candidates)
         result["feedback_learning"] = {"status": "no_feedback", "records_used": 0}
