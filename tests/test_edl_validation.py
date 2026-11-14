@@ -136,5 +136,11 @@ class EDLValidationTests(unittest.TestCase):
         self.assertTrue(any("approved_edl_sha256" in error for error in validate_edl(edl)))
 
 
+    def test_installed_schema_path_resolves_packaged_edl_schema(self):
+        self.assertEqual(SCHEMA_PATH.name, "edl.schema.json")
+        self.assertTrue(SCHEMA_PATH.is_file())
+        self.assertIn("properties", load_schema())
+
+
 if __name__ == "__main__":
     unittest.main()
