@@ -122,3 +122,10 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 ## Latest full CI matrix
 
 - Commit `28f4ff8a` passed all four Linux/Windows × Python 3.10/3.12 jobs. The run includes the setup-script tests, Bash syntax checks, PowerShell syntax parsing, KLT optical-flow fallback tests, synthetic VFR normalization and interrupted render-resume integration tests.
+
+
+## Layout defaults (configured)
+
+- Native 9:16 footage prefers the user's blurred 20/60/20 composition: full-frame blurred background with a sharp, slightly enlarged center 60% and no black bars.
+- Landscape footage prefers fullscreen cropping when the important subject and context remain visible; otherwise blurred bars are preferred.
+- Split vertical is reserved for explicit requests or supplied top/bottom panel sources. Explicit user instructions always override defaults.
