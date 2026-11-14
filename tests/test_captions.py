@@ -124,6 +124,27 @@ class CaptionTests(unittest.TestCase):
         result = apply_face_aware_caption_positions(captions, samples, 1920, 1080)
         self.assertEqual(result[0]["position"], "bottom")
 
+    def test_supports_safe_installed_font_name(self):
+        segment = {"captions": [{
+            "start": "00:00:01.000", "end": "00:00:02.000",
+            "text": "Kino caption", "font_name": "Montserrat SemiBold"
+        }]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "font.ass"
+            write_ass_subtitles(segment, "fullscreen", 0.0, path)
+            content = path.read_text(encoding="utf-8")
+        self.assertIn(r"\fnMontserrat SemiBold", content)
+
+    def test_rejects_unsafe_font_name(self):
+        segment = {"captions": [{
+            "start": "00:00:01.000", "end": "00:00:02.000",
+            "text": "Kino caption", "font_name": "Arial}\\NDialogue: injected"
+        }]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "unsafe.ass"
+            with self.assertRaises(PipelineError):
+                write_ass_subtitles(segment, "fullscreen", 0.0, path)
+
     def test_top_caption_position_uses_top_alignment(self):
         segment = {"captions": [{
             "start": "00:00:01.000", "end": "00:00:02.000", "text": "Top caption",
