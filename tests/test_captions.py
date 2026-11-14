@@ -40,6 +40,29 @@ class CaptionTests(unittest.TestCase):
             self.assertIn(r"{\an5\q2\fscx", content)
             self.assertIn("One line", content)
 
+    def test_caption_safe_area_and_pop_fade_animation(self):
+        segment = {"captions": [{
+            "start": "00:00:01.000", "end": "00:00:02.000", "text": "Safe caption",
+            "font_size": 60, "margin_v": 320, "animation": "pop_fade"
+        }]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "animated.ass"
+            write_ass_subtitles(segment, "fullscreen", 0.0, path)
+            content = path.read_text(encoding="utf-8")
+        self.assertIn(r"\fs60", content)
+        self.assertIn(r"\t(0,140,", content)
+        self.assertIn(r"\fad(90,80)", content)
+        self.assertIn("Default,,0,0,320,,", content)
+
+    def test_rejects_out_of_range_caption_safe_area(self):
+        segment = {"captions": [{
+            "start": "00:00:01.000", "end": "00:00:02.000", "text": "Unsafe",
+            "margin_v": 900
+        }]}
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(Exception):
+                write_ass_subtitles(segment, "fullscreen", 0.0, Path(directory) / "bad.ass")
+
     def test_filter_path_escapes_windows_drive_colon(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "subtitles.ass"
