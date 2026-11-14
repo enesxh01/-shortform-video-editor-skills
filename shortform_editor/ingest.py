@@ -56,6 +56,7 @@ def download_source(url: str, output_dir: Path, max_filesize_mb: int = 2048) -> 
                     raise PipelineError("Downloader completed but did not produce one unambiguous media file")
                 downloaded = candidates[0]
     except PipelineError:
+        cleanup_partial_download()
         raise
     except Exception as exc:
         cleanup_partial_download()
