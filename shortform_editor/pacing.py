@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -76,7 +77,11 @@ def analyze_pacing(analysis: dict[str, Any], candidates: dict[str, Any],
                 continue
             left_text = str(segment.get("text", "")).lower()
             right_text = str(next_segment.get("text", "")).lower()
-            meaningful = any(cue in left_text[-40:] or cue in right_text[:40] for cue in MEANINGFUL_PAUSE_CUES)
+            context_text = left_text[-40:] + " " + right_text[:40]
+            meaningful = any(
+                re.search(rf"(?<!\\w){re.escape(cue)}(?!\\w)", context_text)
+                for cue in MEANINGFUL_PAUSE_CUES
+            )
             silence_ratio = _overlap_ratio(gap_start, gap_end, silence_regions)
             if gap >= long_pause_seconds and silence_ratio >= 0.75 and not meaningful:
                 decisions.append({
