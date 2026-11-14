@@ -96,9 +96,9 @@ class RenderIntegrationTests(unittest.TestCase):
                 edl["approval"] = {
                     "status": "approved",
                     "approved_by_user": True,
-                    "approved_edl_sha256": edl_approval_hash(edl),
                     "approved_at": "2026-01-01T00:00:00+00:00"
                 }
+                edl["approval"]["approved_edl_sha256"] = edl_approval_hash(edl)
                 edl_path = root / f"{layout}.json"
                 edl_path.write_text(json.dumps(edl), encoding="utf-8")
                 if layout == "fullscreen":
