@@ -67,3 +67,8 @@ Multi-segment EDLs are concatenated in array order. Per-segment fade-to/from-bla
 ## Resumable segment rendering
 
 For long jobs, pass `--resume` on the first `shortform-editor render` invocation and on every retry. The renderer stores a hidden per-output work directory beside the final MP4. Its state is bound to the primary source SHA-256, exact EDL SHA-256, secondary split-source fingerprints, output path, preview mode and encoder/quality settings. A cached segment is reused only if its recorded SHA-256 matches, FFprobe confirms H.264 with the expected dimensions and frame rate, and FFmpeg can fully decode it. Invalid or incomplete parts are discarded and re-encoded. Final concatenation and publication are always repeated; the final MP4 is staged and atomically published only after decode validation. A successful technical QC pass removes the work directory. Keep the work directory intact between retries. Changing the EDL, source or encoding settings intentionally rejects the old cache.
+
+
+## Timestamp and audio-clock normalization
+
+Each segment is converted to the target CFR with an explicit FFmpeg `fps` filter and `-fps_mode cfr`. If the primary source has audio, the renderer applies `aresample=48000:async=1:first_pts=0` and then any configured audio fade filters before AAC encoding. This helps normalize ordinary VFR timing and audio-clock drift. It is not a universal repair for corrupt/non-monotonic PTS or a perceptual lip-sync guarantee; inspect real exports, especially phone/screen recordings with VFR sources.
