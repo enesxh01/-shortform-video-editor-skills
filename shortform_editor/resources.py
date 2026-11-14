@@ -109,4 +109,4 @@ def check_disk_space(path: str, required_bytes: int, reserve_bytes: int = 512 * 
             f"approximately {required / (1024 ** 3):.2f} GB required including safety reserve."
         )
     return result
-\n
+
