@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .cli import PipelineError, file_stat_signature, probe_media, require_tool, run_checked
-from .qc import run_qc
+from .qc import add_expected_duration_check, run_qc
 
 
 def repair_technical_export(source: Path, output: Path, width: int = 1080,
@@ -63,6 +63,8 @@ def repair_technical_export(source: Path, output: Path, width: int = 1080,
             staged.unlink(missing_ok=True)
 
     qc = run_qc(output, width, height, fps)
+    actual_duration = float(final_probe.get("format", {}).get("duration") or 0)
+    qc = add_expected_duration_check(qc, actual_duration, duration)
     return {
         "source": str(source),
         "source_fingerprint": source_probe["source"]["fingerprint"],
