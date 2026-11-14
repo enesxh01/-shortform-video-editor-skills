@@ -53,7 +53,7 @@ class PipelineOrchestrationTests(unittest.TestCase):
                  patch("shortform_editor.pipeline.generate_captions", return_value={"captions": [
                      {"start": "00:00:03.000", "end": "00:00:04.000", "text": "Test caption"}
                  ]}), \
-                 patch("shortform_editor.pipeline.analyze_visuals", return_value={"analysis": {"crop_keyframes": [
+                 patch("shortform_editor.pipeline.analyze_visuals", return_value={"source": {"fingerprint": fingerprint}, "analysis": {"crop_keyframes": [
                      {"time_seconds": 2.0, "subject_evidence": "face_detection", "confidence": 0.45,
                       "crop_9_16": {"x": 10, "y": 0, "width": 200, "height": 360}, "center": {"x": 110, "y": 180}},
                      {"time_seconds": 5.0, "subject_evidence": "center_fallback", "confidence": 0.1,
