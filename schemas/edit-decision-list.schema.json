@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/edit-decision-list.schema.json",
+  "title": "Shortform Video Edit Decision List",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "project_id", "source", "render", "segments", "approval"],
+  "properties": {
+    "schema_version": {"type": "string"},
+    "project_id": {"type": "string", "minLength": 1},
+    "source": {
+      "type": "object",
+      "required": ["fingerprint", "time_base"],
+      "properties": {
+        "fingerprint": {"type": "string"},
+        "time_base": {"type": "string"},
+        "frame_rate": {"type": ["string", "null"]},
+        "variable_frame_rate": {"type": ["boolean", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "render": {
+      "type": "object",
+      "required": ["width", "height", "fps_target", "fps_mode", "container"],
+      "properties": {
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1},
+        "fps_target": {"type": "string"},
+        "fps_mode": {"enum": ["cfr", "vfr", "preserve_native"]},
+        "fps_conversion": {"enum": ["none", "duplicate_drop", "blend", "optical_flow", "unknown"]},
+        "container": {"type": "string"},
+        "video_codec": {"type": ["string", "null"]},
+        "audio_codec": {"type": ["string", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "segments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "source_in", "source_out", "layout"],
+        "properties": {
+          "id": {"type": "string"},
+          "source_in": {"type": "string"},
+          "source_out": {"type": "string"},
+          "timeline_start": {"type": ["string", "null"]},
+          "layout": {"enum": ["fullscreen", "split_vertical", "blurred_bars_20_60_20"]},
+          "reason": {"type": ["string", "null"]},
+          "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1}
+        },
+        "additionalProperties": true
+      }
+    },
+    "approval": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {"enum": ["draft", "needs_review", "approved", "rejected"]},
+        "approved_by_user": {"type": "boolean"}
+      },
+      "additionalProperties": true
+    }
+  }
+}
