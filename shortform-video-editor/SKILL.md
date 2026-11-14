@@ -84,7 +84,7 @@ The `analyze-project` command is the preferred end-to-end entry point. After the
 - `split_vertical`: explicit top/bottom secondary sources stacked vertically; centered caption style.
 - `blurred_bars_20_60_20`: blurred 20% top, sharp 60% center, blurred 20% bottom.
 
-All three layouts support optional synchronized per-segment fade-in/fade-out effects and have initial FFmpeg code plus a synthetic integration test; the latest CI result is pending. Split mode requires fingerprinted `split_top` and `split_bottom` source specs in the EDL. Fullscreen rendering supports the face-guided crop keyframes produced by visual analysis, interpolating crop movement with FFmpeg. Face detection is limited to frontal Haar-cascade detections, so inspect framing carefully.
+All three layouts support optional synchronized per-segment fade-in/fade-out effects and have initial FFmpeg code plus a synthetic integration test; the latest CI result is pending. Split mode requires fingerprinted `split_top` and `split_bottom` source specs in the EDL. Fullscreen rendering supports the face-guided crop keyframes produced by visual analysis, interpolating crop movement with FFmpeg. Face detection is limited to frontal Haar-cascade detections; the optional OpenCV-contrib CSRT tracker can bridge missed detections between sampled frames. It is not general object/action tracking and can lose the subject during occlusion, fast motion or scene changes, so inspect framing carefully.
 
 ## Decision hierarchy
 
