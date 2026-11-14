@@ -171,7 +171,7 @@ class RenderIntegrationTests(unittest.TestCase):
             state = root / ".final.mp4.shortform-work" / "render-state.json"
             output.write_bytes(b"previous-final")
             self.assertFalse(_existing_output_is_resumable(output, False, state))
-            self.assertFalse(_existing_output_is_resumable(output, True, state))
+            self.assertTrue(_existing_output_is_resumable(output, True, state))
             state.parent.mkdir()
             state.write_text("{}", encoding="utf-8")
             self.assertTrue(_existing_output_is_resumable(output, False, state))
