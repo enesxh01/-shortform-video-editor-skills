@@ -28,10 +28,11 @@ class FakeProcess:
 
 class SubprocessCancellationTests(unittest.TestCase):
     def test_keyboard_interrupt_terminates_child_process(self):
-        with patch("shortform_editor.cli.subprocess.Popen", FakeProcess) as popen:
+        fake = FakeProcess()
+        with patch("shortform_editor.cli.subprocess.Popen", return_value=fake):
             with self.assertRaises(KeyboardInterrupt):
                 run_checked(["long-running-command"])
-            self.assertTrue(popen.return_value.terminated)
+            self.assertTrue(fake.terminated)
 
     def test_nonzero_child_exit_becomes_pipeline_error(self):
         class FailedProcess:
