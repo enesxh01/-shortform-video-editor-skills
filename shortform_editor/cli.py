@@ -224,6 +224,8 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
                     messages.append(f"{caption_path} overlaps or is out of chronological order with the previous caption")
                 previous_caption_end = max(previous_caption_end, caption_end)
                 caption_text = str(caption.get("text", ""))
+                if any(ord(character) < 32 and character not in "\\r\\n\\t" for character in caption_text):
+                    messages.append(f"{caption_path}.text contains unsupported control characters")
                 line_count = len(caption_text.replace("\\r\\n", "\\n").replace("\\r", "\\n").split("\\n"))
                 if segment["layout"] in {"split_vertical", "blurred_bars_20_60_20"} and line_count != 1:
                     messages.append(f"{caption_path} must be exactly one line for {segment['layout']} layout")
@@ -238,6 +240,9 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
                 for word_index, word in enumerate(caption.get("words", [])):
                     word_start = timestamp_seconds(word["start"])
                     word_end = timestamp_seconds(word["end"])
+                    word_text = str(word.get("text", ""))
+                    if any(ord(character) < 32 and character not in "\\r\\n\\t" for character in word_text):
+                        messages.append(f"{caption_path}.words[{word_index}].text contains unsupported control characters")
                     if word_end <= word_start or word_start < previous_word_end or word_start < caption_start or word_end > caption_end:
                         messages.append(f"segments[{index}].captions[{caption_index}].words[{word_index}] has invalid or unordered timing")
                     previous_word_end = word_end
