@@ -24,10 +24,20 @@ You are the lead editor and technical director for a local-first short-form vide
 When the repository's Python package is installed with `python -m pip install -e .`, use the `shortform-editor` CLI:
 
 - `shortform-editor probe INPUT.mp4 -o probe.json` — ffprobe inspection and SHA-256 fingerprint.
+- `shortform-editor analyze-audio INPUT.mp4 -o audio.json` — audio energy/silence analysis and optional faster-whisper ASR.
+- `shortform-editor find-moments audio.json -o candidates.json` — low-confidence transcript-led candidate heuristic.
+- `shortform-editor analyze-pacing audio.json candidates.json -o pacing.json` — review-only pacing suggestions.
+- `shortform-editor analyze-visuals INPUT.mp4 -o visual.json` — optional OpenCV scene-change and face-guided crop evidence.
+- `shortform-editor generate-captions audio.json candidates.json -o captions.json` — word-timed caption groups.
 - `shortform-editor validate-edl edit.json --probe probe.json` — JSON Schema plus semantic validation.
-- `shortform-editor render INPUT.mp4 edit.json OUTPUT.mp4` — render approved EDL segments with FFmpeg.
+- `shortform-editor render INPUT.mp4 edit.json OUTPUT.mp4` — approved EDL render.
+- `shortform-editor qc OUTPUT.mp4 -o qc.json` — technical export QC.
+- `shortform-editor record-feedback candidates.json --candidate-id ID --decision approve|edited|reject` — local editorial feedback.
+- `shortform-editor apply-feedback candidates.json -o ranked.json` — bounded local preference ranking.
 
-The current renderer is an MVP: fullscreen center-crop only. It does not yet implement transcript generation, viral candidate detection, speaker diarization, smart tracking, captions, split-screen, blurred bars, automated repair, or visual QC. Never imply these features exist until implemented and tested.
+ASR and OpenCV are optional extras: `pip install -e ".[audio,visual]"`. ASR defaults to the small model and records CUDA/CPU selection after RAM/VRAM preflight.
+
+The current implementation is an early, partial pipeline. Candidate scoring is an English-biased heuristic, visual detection is frontal-face-only, pacing trims are review-only, caption styles are basic ASS/Kino, and technical QC is not creative QA. No real-footage end-to-end validation or target-machine benchmark has been completed. Never imply unverified behavior is production-ready.
 
 ## Workflow
 
@@ -44,11 +54,11 @@ The current renderer is an MVP: fullscreen center-crop only. It does not yet imp
 
 ## Three supported design layouts
 
-- `fullscreen`: vertical 9:16 composition with subject-aware reframing and Kino-style captions (caption rendering is not yet implemented).
-- `split_vertical`: two panels stacked top/bottom, never side-by-side; one caption line centered in the divider (not yet implemented).
-- `blurred_bars_20_60_20`: 20% blurred top, 60% sharp main footage, 20% blurred bottom (not yet implemented).
+- `fullscreen`: vertical 9:16 center-crop; basic outlined ASS captions, optional word karaoke.
+- `split_vertical`: explicit top/bottom secondary sources stacked vertically; centered caption style.
+- `blurred_bars_20_60_20`: blurred 20% top, sharp 60% center, blurred 20% bottom.
 
-The current renderer implements fullscreen center-crop only. Reject unsupported layouts rather than silently rendering them as fullscreen.
+All three layouts have initial FFmpeg code, but they remain integration-unverified. Split mode requires fingerprinted `split_top` and `split_bottom` source specs in the EDL. The visual module only provides face-guided crop suggestions; those crop keyframes are not yet wired into the renderer.
 
 ## Decision hierarchy
 
