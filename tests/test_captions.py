@@ -47,5 +47,35 @@ class CaptionTests(unittest.TestCase):
             self.assertIn("subtitles=filename=", ffmpeg_subtitles_filter(path))
 
 
+    def test_karaoke_punctuation_has_no_leading_space(self):
+        segment = {"captions": [{
+            "start": "00:00:01.000", "end": "00:00:02.000",
+            "text": "Hello, world!",
+            "words": [
+                {"text": "Hello", "start": "00:00:01.000", "end": "00:00:01.300"},
+                {"text": ",", "start": "00:00:01.300", "end": "00:00:01.350"},
+                {"text": "world", "start": "00:00:01.400", "end": "00:00:01.800"},
+                {"text": "!", "start": "00:00:01.800", "end": "00:00:01.850"}
+            ]
+        }]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "captions.ass"
+            write_ass_subtitles(segment, "fullscreen", 1.0, path)
+            content = path.read_text(encoding="utf-8")
+        self.assertNotIn("Hello ,", content)
+        self.assertNotIn("world !", content)
+
+    def test_newlines_are_converted_to_ass_line_breaks(self):
+        segment = {"captions": [{
+            "start": "00:00:01.000", "end": "00:00:02.000",
+            "text": "First line\\nSecond line"
+        }]}
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "captions.ass"
+            write_ass_subtitles(segment, "fullscreen", 1.0, path)
+            content = path.read_text(encoding="utf-8")
+        self.assertIn(r"First line\\NSecond line", content)
+
+
 if __name__ == "__main__":
     unittest.main()
