@@ -56,6 +56,19 @@ class EDLValidationTests(unittest.TestCase):
         edl["segments"][0]["fade_out_seconds"] = 0.25
         self.assertEqual(validate_edl(edl), [])
 
+    def test_accepts_color_grade_and_sharpening_controls(self):
+        edl = valid_edl()
+        edl["segments"][0]["color_grade"] = {
+            "brightness": 0.02, "contrast": 1.08, "saturation": 1.12,
+            "gamma": 0.98, "sharpen": 0.45
+        }
+        self.assertEqual(validate_edl(edl), [])
+
+    def test_rejects_out_of_range_color_grade(self):
+        edl = valid_edl()
+        edl["segments"][0]["color_grade"] = {"sharpen": 1.8}
+        self.assertTrue(validate_edl(edl))
+
     def test_rejects_fades_longer_than_segment(self):
         edl = valid_edl()
         edl["segments"][0]["source_out"] = "00:00:04.500"
