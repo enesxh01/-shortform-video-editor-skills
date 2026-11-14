@@ -38,8 +38,8 @@ def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 
             actual_fps = Fraction(video.get("avg_frame_rate", "0/1"))
             target_fps = Fraction(expected_fps)
             fps_ok = actual_fps == target_fps
-        except (ValueError, ZeroDivisionError):
-            actual_fps, fps_ok = Fraction(0, 1), False
+        except (TypeError, ValueError, ZeroDivisionError):
+            actual_fps, target_fps, fps_ok = Fraction(0, 1), Fraction(0, 1), False
         checks.append({
             "name": "frame_rate",
             "status": "passed" if fps_ok else "major",
