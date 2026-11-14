@@ -167,7 +167,9 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
                 messages.append(f"segments[{index}] source_out must be greater than source_in")
             fade_in = float(segment.get("fade_in_seconds", 0.0))
             fade_out = float(segment.get("fade_out_seconds", 0.0))
-            if fade_in < 0 or fade_out < 0 or fade_in + fade_out >= max(0.0, end - start):
+            if (not math.isfinite(fade_in) or not math.isfinite(fade_out)
+                    or fade_in < 0 or fade_out < 0
+                    or fade_in + fade_out >= max(0.0, end - start)):
                 messages.append(f"segments[{index}] fade durations must be non-negative and sum to less than the segment duration")
             if source_duration is not None and end > source_duration + 0.05:
                 messages.append(f"segments[{index}] source_out exceeds source duration ({source_duration:.3f}s)")
