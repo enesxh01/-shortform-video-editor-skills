@@ -36,6 +36,8 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
         raise PipelineError("Input contains no video stream")
     width, height = int(video_stream["width"]), int(video_stream["height"])
     duration = float(report.get("format", {}).get("duration") or 0)
+    if duration <= 0:
+        raise PipelineError("Source duration is unavailable or invalid")
     if sample_rate < 0.2 or sample_rate > 5:
         raise PipelineError("Visual sample rate must be between 0.2 and 5 frames per second")
     if max_frames < 2 or max_frames > 600:
