@@ -49,3 +49,11 @@ Use gradual moves around 0.8–1.5 s and quicker punch-ins around 0.4–0.7 s on
 3. `blurred_bars_20_60_20`: blurred 20% top, sharp 60% center, blurred 20% bottom; blur from relevant footage.
 
 Run safe-area and readability checks at phone-size preview dimensions.
+
+
+## Color correction and sharpening
+
+- Apply restrained, source-aware color correction only when it improves consistency or readability. The EDL supports bounded per-segment `brightness` (-0.2 to 0.2), `contrast` (0.5–2.0), `saturation` (0–2.0), and `gamma` (0.5–2.0).
+- Sharpening is optional and bounded (0–1.5). Use a low amount (typically 0.2–0.5) only when the source is genuinely soft; do not sharpen compression noise, ringing, skin texture, or already-crisp footage.
+- Defaults are neutral and sharpening is off. Never apply a one-size-fits-all grade to every source. Avoid clipping highlights/shadows or oversaturating skin.
+- This is deterministic FFmpeg correction, not scene-referred color management, RAW grading, LUT emulation, or a calibrated display workflow. Inspect representative frames before final approval.
