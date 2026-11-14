@@ -46,7 +46,8 @@ bash scripts/install.sh
 FFmpeg and ffprobe must also be installed separately and available on PATH. Restart the terminal and OpenCode after installation so the CLI and newly installed skills are discoverable. The `audio`, `visual`, and `download` extras enable faster-whisper ASR, OpenCV analysis, and optional public-URL ingestion respectively.
 
 
-- `shortform-editor analyze-project INPUT.mp4 -o JOB_DIR` — orchestrate probe, audio/ASR, candidate ranking, pacing, optional visual analysis, caption generation and draft EDL creation. It never approves or renders automatically.\n- `shortform-editor probe INPUT.mp4 -o probe.json` — ffprobe inspection and SHA-256 fingerprint.
+- `shortform-editor analyze-project INPUT.mp4 -o JOB_DIR` — orchestrate probe, audio/ASR, candidate ranking, pacing, optional visual analysis, caption generation and draft EDL creation. It never approves or renders automatically.
+- `shortform-editor probe INPUT.mp4 -o probe.json` — ffprobe inspection and SHA-256 fingerprint.
 - `shortform-editor analyze-audio INPUT.mp4 -o audio.json` — audio energy/silence analysis and optional faster-whisper ASR.
 - `shortform-editor find-moments audio.json -o candidates.json` — low-confidence transcript-led candidate heuristic.
 - `shortform-editor analyze-pacing audio.json candidates.json -o pacing.json` — review-only pacing suggestions.
