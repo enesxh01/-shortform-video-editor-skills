@@ -112,8 +112,11 @@ def apply_feedback(candidates: dict[str, Any], records: list[dict[str, Any]],
     for candidate in candidates.get("candidates", []):
         item = dict(candidate)
         adjustment = adjustments.get(item.get("family"), 0.0)
+        base_score = float(item.get("score", 0))
+        if not 0 <= base_score <= 100:
+            raise PipelineError(f"Candidate {item.get('candidate_id')} has a base score outside 0..100")
         item["feedback_adjustment"] = round(adjustment, 2)
-        item["score_after_feedback"] = round(float(item.get("score", 0)) + adjustment, 2)
+        item["score_after_feedback"] = round(max(0.0, min(100.0, base_score + adjustment)), 2)
         ranked.append(item)
     ranked.sort(key=lambda item: item["score_after_feedback"], reverse=True)
     result = dict(candidates)
