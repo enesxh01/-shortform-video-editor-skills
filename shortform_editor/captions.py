@@ -156,6 +156,8 @@ def write_ass_subtitles(segment: dict[str, Any], layout: str, clip_start: float,
             tags.append(r"\fscx" + str(scale))
         if caption_font_size != font_size:
             tags.append(r"\fs" + str(caption_font_size))
+        if font_name != "Arial":
+            tags.append(r"\fn" + font_name)
         animation = caption.get("animation", "none")
         if animation not in {"none", "fade", "pop", "pop_fade"}:
             raise PipelineError(f"Unsupported caption animation: {animation}")
