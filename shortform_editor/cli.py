@@ -16,7 +16,7 @@ from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA_PATH = ROOT / "schemas" / "edit-decision-list.schema.json"
+SCHEMA_PATH = Path(__file__).resolve().parent / "schemas" / "edit-decision-list.schema.json"
 TIMESTAMP_RE = re.compile(r"^(?:(\d+):)?([0-5]?\d):([0-5]\d)(?:\.(\d{1,6}))?$")
 
 
