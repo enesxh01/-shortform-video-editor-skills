@@ -35,6 +35,19 @@ def analysis_report():
 
 
 class MomentDetectionTests(unittest.TestCase):
+    def test_attaches_generic_audio_event_evidence_without_changing_score(self):
+        report = analysis_report()
+        report["analysis"]["audio_metrics"]["events"] = [
+            {"type": "energy_rise", "start": 5.0, "end": 5.5, "rise_db": 12.0}
+        ]
+        without = detect_moments(analysis_report(), min_duration=12, max_duration=35, limit=5)
+        with_events = detect_moments(report, min_duration=12, max_duration=35, limit=5)
+        by_id = {item["candidate_id"]: item for item in without["candidates"]}
+        matched = [item for item in with_events["candidates"] if item["candidate_id"] in by_id]
+        self.assertTrue(any(item["audio_event_evidence"] for item in matched))
+        for item in matched:
+            self.assertEqual(item["score"], by_id[item["candidate_id"]]["score"])
+
     def test_returns_ranked_candidates_with_explainable_scores(self):
         result = detect_moments(analysis_report(), min_duration=12, max_duration=35, limit=5)
         self.assertGreaterEqual(result["candidate_count"], 1)

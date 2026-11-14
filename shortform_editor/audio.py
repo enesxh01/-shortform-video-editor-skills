@@ -27,6 +27,51 @@ def _extract_mono_wav(source: Path, destination: Path, stream_index: int) -> Non
     ])
 
 
+def _audio_event_candidates(windows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Surface generic energy changes/transients without pretending to identify emotion or event semantics."""
+    events: list[dict[str, Any]] = []
+    for index, window in enumerate(windows):
+        try:
+            start, end = float(window["start"]), float(window["end"])
+            rms_dbfs, peak_dbfs = float(window["rms_dbfs"]), float(window["peak_dbfs"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if not all(math.isfinite(value) for value in (start, end, rms_dbfs, peak_dbfs)) or end <= start:
+            continue
+        previous = []
+        for item in windows[max(0, index - 4):index]:
+            try:
+                value = float(item["rms_dbfs"])
+                if math.isfinite(value):
+                    previous.append(value)
+            except (KeyError, TypeError, ValueError):
+                continue
+        if previous:
+            ordered = sorted(previous)
+            middle = len(ordered) // 2
+            baseline = ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+            rise = min(60.0, rms_dbfs - baseline)
+            if rise >= 8.0 and rms_dbfs >= -38.0:
+                events.append({"type":"energy_rise","start":round(start,3),"end":round(end,3),
+                    "baseline_dbfs":round(baseline,2),"rise_db":round(rise,2),
+                    "rms_dbfs":round(rms_dbfs,2),"peak_dbfs":round(peak_dbfs,2)})
+        crest_db = peak_dbfs - rms_dbfs
+        if crest_db >= 12.0 and peak_dbfs >= -18.0 and rms_dbfs >= -42.0:
+            events.append({"type":"transient_energy","start":round(start,3),"end":round(end,3),
+                "crest_factor_db":round(crest_db,2),"rms_dbfs":round(rms_dbfs,2),"peak_dbfs":round(peak_dbfs,2)})
+    merged: list[dict[str, Any]] = []
+    for event in events:
+        prior = merged[-1] if merged and merged[-1]["type"] == event["type"] else None
+        if prior is not None and event["start"] - prior["end"] <= 0.05:
+            prior["end"] = event["end"]
+            for key in ("peak_dbfs", "rise_db", "crest_factor_db"):
+                if key in event:
+                    prior[key] = max(float(prior.get(key, event[key])), float(event[key]))
+        else:
+            merged.append(dict(event))
+    return merged
+
+
 def _window_metrics(wav_path: Path, window_seconds: float = 0.5, silence_dbfs: float = -38.0) -> dict[str, Any]:
     with wave.open(str(wav_path), "rb") as wav:
         if wav.getnchannels() != 1 or wav.getsampwidth() != 2:
@@ -81,6 +126,7 @@ def _window_metrics(wav_path: Path, window_seconds: float = 0.5, silence_dbfs: f
         "peak_dbfs": round(peak_dbfs, 2),
         "windows": windows,
         "silence_regions": silence_regions,
+        "events": _audio_event_candidates(windows),
         "note": "Energy-based silence candidates only; quiet speech and meaningful pauses require human/context review."
     }
 
@@ -212,7 +258,7 @@ def analyze_audio(source: Path, model_size: str = "small", device: str = "auto",
         item["start"] = round(item["start"] + stream_offset, 3)
         item["end"] = round(item["end"] + stream_offset, 3)
 
-    for item in metrics["windows"] + metrics["silence_regions"]:
+    for item in metrics["windows"] + metrics["silence_regions"] + metrics.get("events", []):
         shift_time(item)
     if transcription["status"] == "completed":
         for segment in transcription["segments"]:

@@ -10,7 +10,7 @@ description: Analyze source audio for transcription, word timing, speech regions
 The repository CLI now provides `shortform-editor analyze-audio SOURCE -o audio-analysis.json`.
 Install ASR support with `python -m pip install -e ".[audio]"`. The default is the small faster-whisper model, with automatic CUDA int8_float16 attempt and CPU int8 fallback. Use `--no-transcribe` for deterministic energy/silence analysis without model downloads. Model weights are downloaded by faster-whisper on first use and are not bundled with this repository.
 
-This is a first usable audio pass, not full audio intelligence: diarization, overlap detection, laughter classification, emotion/delivery classification, multi-microphone separation, and audio/video synchronization QC remain unimplemented. Silence windows are evidence only and never create edit cuts automatically.
+This is a first usable audio pass, not full audio intelligence: diarization, overlap detection, laughter classification, emotion/delivery classification, multi-microphone separation, and audio/video synchronization QC remain unimplemented. Silence windows and generic energy-rise/transient markers are evidence only and never create edit cuts automatically. These acoustic markers do not identify laughter, emotion, speakers or semantic events.
 
 ## Pipeline
 
@@ -29,7 +29,7 @@ Return transcript segments and words with:
 - ASR confidence where available;
 - language/code-switch notes;
 - overlap and uncertainty flags;
-- VAD regions and detected audio events;
+- VAD regions and generic acoustic energy-event candidates (rise/transient), clearly distinguished from semantic event classification;
 - source stream and channel provenance.
 
 ## Accuracy rules

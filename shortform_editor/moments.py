@@ -87,7 +87,8 @@ def _segments_for_window(segments: list[dict[str, Any]], start: float, end: floa
 
 
 def _make_candidate(source_id: str, segments: list[dict[str, Any]], audio_windows: list[dict[str, Any]],
-                    start_index: int, end_index: int) -> dict[str, Any] | None:
+                    start_index: int, end_index: int,
+                    audio_events: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
     chosen = segments[start_index:end_index + 1]
     if not chosen:
         return None
@@ -207,6 +208,19 @@ def _make_candidate(source_id: str, segments: list[dict[str, Any]], audio_window
         risks.append("Low speech density; check whether pauses are meaningful or dead air.")
     if duration > 55:
         risks.append("Long candidate; confirm that the full context justifies the duration.")
+    event_evidence = []
+    for event in audio_events or []:
+        try:
+            event_start, event_end = float(event["start"]), float(event["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if event_end > start and event_start < end:
+            event_evidence.append({
+                "type": str(event.get("type", "unknown")),
+                "start": max(start, event_start),
+                "end": min(end, event_end),
+                "evidence": "Generic acoustic energy cue; not a laughter, emotion or semantic event classification."
+            })
     return {
         "candidate_id": f"moment-{identity}",
         "source_fingerprint": source_id,
@@ -218,6 +232,7 @@ def _make_candidate(source_id: str, segments: list[dict[str, Any]], audio_window
         "score": total,
         "score_breakdown": scores,
         "transcript_diagnostics": transcript_diagnostics,
+        "audio_event_evidence": event_evidence[:12],
         "confidence": 0.35,
         "confidence_note": "Low-confidence heuristic ranking; no semantic model or labeled training set is used.",
         "risks": risks,
@@ -266,7 +281,9 @@ def detect_moments(analysis: dict[str, Any], min_duration: float = 12.0,
     source_id = analysis.get("source", {}).get("fingerprint")
     if not isinstance(source_id, str) or not re.fullmatch(r"sha256:[a-f0-9]{64}", source_id):
         raise PipelineError("Audio analysis is missing a valid SHA-256 source fingerprint")
-    audio_windows = analysis.get("analysis", {}).get("audio_metrics", {}).get("windows", [])
+    audio_metrics = analysis.get("analysis", {}).get("audio_metrics", {})
+    audio_windows = audio_metrics.get("windows", [])
+    audio_events = audio_metrics.get("events", [])
     anchors = []
     for index, segment in enumerate(segments):
         text = str(segment.get("text", "")).lower()
@@ -290,7 +307,7 @@ def detect_moments(analysis: dict[str, Any], min_duration: float = 12.0,
                 end_index += 1
             else:
                 break
-        candidate = _make_candidate(source_id, segments, audio_windows, start_index, end_index)
+        candidate = _make_candidate(source_id, segments, audio_windows, start_index, end_index, audio_events)
         if candidate is None:
             continue
         start, end = candidate["source_in_seconds"], candidate["source_out_seconds"]
@@ -321,7 +338,7 @@ def detect_moments(analysis: dict[str, Any], min_duration: float = 12.0,
         "limitations": [
             "This is a transparent baseline, not a trained viral-moment model and not a probability of virality.",
             "Text cues include common English, Albanian, Spanish, French and German expressions; other languages and code-switching still need human review.",
-            "Audio energy is supporting evidence only and does not equal excitement or quality.",
+            "Audio energy is supporting evidence only and does not equal excitement or quality. Generic transient/rise markers are not laughter, emotion or semantic event classification.",
             "No candidate is approved automatically; check context, opening, payoff, rights and privacy."
         ]
     }
