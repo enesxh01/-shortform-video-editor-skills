@@ -78,13 +78,15 @@ def analyze_frame_timestamps(timestamps: list[Any], min_samples: int = 12,
                              sample_window_starts: list[int] | None = None) -> dict[str, Any]:
     """Classify local frame cadence across sampled windows; not a proof for every frame."""
     values = []
+    seen_timestamps: set[float] = set()
     for item in timestamps:
         try:
             value = float(item)
         except (TypeError, ValueError):
             continue
-        if math.isfinite(value):
+        if math.isfinite(value) and value not in seen_timestamps:
             values.append(value)
+            seen_timestamps.add(value)
     deltas = [right - left for left, right in zip(values, values[1:])]
     positive = [delta for delta in deltas if delta > 0]
     non_monotonic = sum(delta < 0 for delta in deltas)
