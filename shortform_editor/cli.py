@@ -1183,6 +1183,8 @@ def command_doctor(args: argparse.Namespace) -> int:
     ]
     if not report["accelerators"]["libx264"]["available"] and not nvenc_available:
         required_missing.append("ffmpeg_h264_encoder")
+    if not report["accelerators"]["subtitles_filter"]["available"]:
+        required_missing.append("ffmpeg_subtitles_filter")
     report["missing_required"] = required_missing
     report["missing_optional"] = [
         name for name in ("faster_whisper", "cv2", "yt_dlp")
