@@ -54,7 +54,7 @@ class FrameTimingDiagnosticsTests(unittest.TestCase):
         self.assertEqual(report["status"], "likely_cfr")
         self.assertEqual(report["sample_windows"], 4)
         args = runner.call_args.args[0]
-        self.assertIn("0.0%+#10,33.0%+#10,66.0%+#10,99.0%+#10", args)
+        self.assertIn("0.0%+#10,33.222%+#10,66.444%+#10,99.667%+#10", args)
         self.assertIn("best_effort_timestamp_time", args)
         self.assertEqual(args[-1], str(source))
 
