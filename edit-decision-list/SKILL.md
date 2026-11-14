@@ -28,3 +28,6 @@ The current EDL is intentionally a minimal first contract. Captions, crop keyfra
 
 
 The optional `pacing_review` segment field stores ordered, source-bounded `keep`, `trim`, and `preserve_pause` evidence plus repeated-word flags. It is review metadata only and must not be interpreted as an instruction to cut automatically.
+
+
+The current FFmpeg renderer concatenates EDL segments sequentially. When `timeline_start` is supplied, it must equal the cumulative duration of prior segments. Timeline gaps, overlaps, transitions and layered composition are not supported by this renderer and are rejected rather than silently ignored.
