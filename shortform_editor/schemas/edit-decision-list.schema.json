@@ -25,6 +25,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "path",
         "fingerprint",
         "time_base"
       ],
@@ -85,9 +86,7 @@
         },
         "fps_mode": {
           "enum": [
-            "cfr",
-            "vfr",
-            "preserve_native"
+            "cfr"
           ]
         },
         "fps_conversion": {
