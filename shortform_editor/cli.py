@@ -292,6 +292,7 @@ def command_render(args: argparse.Namespace) -> int:
         raise PipelineError("The current renderer supports AAC audio only")
 
     probe = probe_media(source)
+    source_signature = file_stat_signature(source)
     raw_duration = probe.get("format", {}).get("duration")
     duration = float(raw_duration) if raw_duration is not None else None
     errors = validate_edl(edl, duration, probe.get("source", {}).get("fingerprint"))
@@ -318,6 +319,7 @@ def command_render(args: argparse.Namespace) -> int:
     # Validate and fingerprint both secondary sources before any render work begins.
     split_paths: dict[tuple[int, str], Path] = {}
     split_fingerprints: dict[tuple[int, str], str] = {}
+    split_signatures: dict[tuple[int, str], tuple[int, int, int, int]] = {}
     for index, segment in enumerate(edl["segments"]):
         if segment["layout"] != "split_vertical":
             continue
@@ -334,6 +336,7 @@ def command_render(args: argparse.Namespace) -> int:
                 raise PipelineError(f"segments[{index}].{key} source_out exceeds secondary source duration")
             split_paths[(index, key)] = path
             split_fingerprints[(index, key)] = spec["fingerprint"]
+            split_signatures[(index, key)] = file_stat_signature(path)
 
     from .captions import ffmpeg_subtitles_filter, write_ass_subtitles
     from .visual import build_ffmpeg_crop_filter
@@ -431,12 +434,10 @@ def command_render(args: argparse.Namespace) -> int:
                 staged_output = Path(handle.name)
             shutil.copy2(assembled, staged_output)
             final_probe = probe_media(staged_output)
-            source_after_render = probe_media(source)
-            if source_after_render["source"]["fingerprint"] != probe["source"]["fingerprint"]:
+            if file_stat_signature(source) != source_signature:
                 raise PipelineError("Primary source changed during rendering; refusing to publish an output from an unstable source")
             for split_key, split_path in split_paths.items():
-                split_after_render = probe_media(split_path)
-                if split_after_render["source"]["fingerprint"] != split_fingerprints[split_key]:
+                if file_stat_signature(split_path) != split_signatures[split_key]:
                     raise PipelineError(f"{split_key[1]} source changed during rendering; refusing to publish an output from an unstable source")
             os.replace(staged_output, output)
         except Exception:
