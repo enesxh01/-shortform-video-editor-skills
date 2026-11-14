@@ -11,7 +11,7 @@ from array import array
 from pathlib import Path
 from typing import Any
 
-from .cli import PipelineError, probe_media, require_tool, run_checked, sha256_file
+from .cli import PipelineError, file_stat_signature, probe_media, require_tool, run_checked, sha256_file
 
 
 def _audio_stream(report: dict[str, Any]) -> dict[str, Any]:
@@ -190,6 +190,7 @@ def analyze_audio(source: Path, model_size: str = "small", device: str = "auto",
     if not source.is_file():
         raise PipelineError(f"Source is not a regular file: {source}")
     report = probe_media(source)
+    source_signature = file_stat_signature(source)
     audio_stream = _audio_stream(report)
     stream_index = int(audio_stream["index"])
     try:
@@ -218,8 +219,7 @@ def analyze_audio(source: Path, model_size: str = "small", device: str = "auto",
             for word in segment["words"]:
                 shift_time(word)
 
-    final_source_probe = probe_media(source)
-    if final_source_probe["source"]["fingerprint"] != report["source"]["fingerprint"]:
+    if file_stat_signature(source) != source_signature:
         raise PipelineError("Source media changed during audio analysis; discard this analysis and restart from the new source version")
 
     return {
