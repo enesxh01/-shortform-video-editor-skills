@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from shortform_editor.feedback import apply_feedback, record_feedback
+from shortform_editor.feedback import apply_feedback, load_feedback, record_feedback
 from shortform_editor.cli import PipelineError
 
 
@@ -68,6 +68,14 @@ class FeedbackTests(unittest.TestCase):
         result = apply_feedback(candidates, records)
         self.assertEqual(result["candidates"][0]["feedback_adjustment"], 3.0)
         self.assertEqual(result["candidates"][0]["score_after_feedback"], 100.0)
+
+
+    def test_malformed_feedback_file_returns_actionable_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "feedback.jsonl"
+            path.write_text("{not-json}\\n", encoding="utf-8")
+            with self.assertRaises(PipelineError):
+                load_feedback(path)
 
 
 if __name__ == "__main__":
