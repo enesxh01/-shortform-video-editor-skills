@@ -19,6 +19,7 @@ class SetupScriptTests(unittest.TestCase):
         bash = shutil.which("bash")
         if bash:
             subprocess.run([bash, "-n", str(ROOT / "scripts" / "setup.sh")], check=True)
+            subprocess.run([bash, "-n", str(ROOT / "scripts" / "install.sh")], check=True)
 
     def test_windows_setup_installs_extras_skills_and_runs_doctor(self):
         script = (ROOT / "scripts" / "setup.ps1").read_text(encoding="utf-8")
