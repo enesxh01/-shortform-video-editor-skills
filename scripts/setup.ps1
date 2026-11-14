@@ -5,20 +5,31 @@ param(
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 
-$Launcher = Get-Command py -ErrorAction SilentlyContinue
-if ($Launcher) {
-    $PythonCommand = "py"
-    $PythonPrefix = @("-3")
-} else {
-    $PythonCommand = "python"
-    $PythonPrefix = @()
+$PythonCommand = $null
+$PythonPrefix = @()
+$PythonVersionText = $null
+$PythonCandidates = @()
+if (Get-Command python -ErrorAction SilentlyContinue) {
+    $PythonCandidates += @{ Executable = "python"; Prefix = @() }
+}
+if (Get-Command py -ErrorAction SilentlyContinue) {
+    $PythonCandidates += @{ Executable = "py"; Prefix = @("-3") }
 }
 
-$PythonVersionText = & $PythonCommand @PythonPrefix -c "import sys; print('.'.join(map(str, sys.version_info[:3])))"
-if ($LASTEXITCODE -ne 0) { throw "Could not determine the selected Python version." }
-$PythonVersion = [version]$PythonVersionText
-if ($PythonVersion -lt [version]"3.10") {
-    throw "Python 3.10 or newer is required; selected version is $PythonVersionText. Install Python 3.10+ and rerun setup."
+foreach ($Candidate in $PythonCandidates) {
+    $Prefix = $Candidate.Prefix
+    $CandidateVersion = & $Candidate.Executable @Prefix -c "import sys; print('.'.join(map(str, sys.version_info[:3])))"
+    if ($LASTEXITCODE -ne 0) { continue }
+    try { $ParsedVersion = [version]$CandidateVersion } catch { continue }
+    if ($ParsedVersion -ge [version]"3.10") {
+        $PythonCommand = $Candidate.Executable
+        $PythonPrefix = $Prefix
+        $PythonVersionText = $CandidateVersion
+        break
+    }
+}
+if (-not $PythonCommand) {
+    throw "Python 3.10 or newer is required. Install Python 3.10+ and ensure python or the py launcher is available."
 }
 
 Write-Host "Installing the shortform-editor CLI and audio/visual/download extras..."
