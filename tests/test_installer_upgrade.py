@@ -31,6 +31,15 @@ class InstallerUpgradeTests(unittest.TestCase):
                 command = [shell, str(script), str(destination)]
 
             subprocess.run(command, check=True, capture_output=True, text=True)
+            expected_skills = {
+                path.name for path in ROOT.iterdir()
+                if path.is_dir() and (path / "SKILL.md").is_file()
+            }
+            installed_skills = {
+                path.name for path in destination.iterdir()
+                if path.is_dir() and (path / "SKILL.md").is_file()
+            }
+            self.assertEqual(installed_skills, expected_skills)
             self.assertTrue((destination / "shortform-video-editor" / "SKILL.md").is_file())
             self.assertTrue((destination / "shortform-video-editor" / "config" / "project-defaults.json").is_file())
             backups_root = destination / ".shortform-backups"

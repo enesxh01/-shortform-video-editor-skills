@@ -115,13 +115,12 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 
 ## Latest CI verification
 
-- Full Linux/Windows × Python 3.10/3.12 matrix passed on commit `5515b75a`, including the synthetic VFR-to-CFR/audio-duration integration test, the interrupted render-resume test, packaging and skill installation.
-- The one-command setup scripts, Python-version checks, Bash syntax validation and PowerShell parser validation are included in the passing matrix.
+- Full Linux/Windows × Python 3.10/3.12 matrix passed on commit `14db54be` ([run #43621233208](https://github.com/enesxh01/-shortform-video-editor-skills/actions/runs/43621233208)).
+- All four jobs passed 183 unit/integration tests, synthetic FFmpeg render and recovery checks, CLI verification, wheel/schema packaging, shell and PowerShell syntax checks, end-to-end setup scripts and the environment doctor. The installer-upgrade test confirms existing user skill files are preserved in timestamped backups.
+- The suite includes interrupted render recovery, synthetic VFR-to-CFR/audio-duration alignment, low-confidence transcript-span diagnostics and KLT optical-flow movement tracking. This does not verify real-footage quality, arbitrary VFR lip-sync or RTX 3060 performance.
 
 
-## Latest full CI matrix
 
-- Commit `28f4ff8a` passed all four Linux/Windows × Python 3.10/3.12 jobs. The run includes the setup-script tests, Bash syntax checks, PowerShell syntax parsing, KLT optical-flow fallback tests, synthetic VFR normalization and interrupted render-resume integration tests.
 
 
 ## Layout defaults (configured)
