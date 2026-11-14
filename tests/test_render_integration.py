@@ -3,6 +3,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from fractions import Fraction
 from pathlib import Path
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "shortform_editor" / "cli.py"
@@ -54,7 +55,7 @@ class RenderIntegrationTests(unittest.TestCase):
                 self.assertEqual(manifest["status"],"technical_qc_passed_human_visual_review_required")
                 self.assertEqual(manifest["output_probe"]["video"]["width"],360)
                 self.assertEqual(manifest["output_probe"]["video"]["height"],640)
-                self.assertEqual(manifest["output_probe"]["video"]["frame_rate"],"60/1")
+                self.assertEqual(Fraction(manifest["output_probe"]["video"]["frame_rate"]),Fraction(60,1))
                 self.assertTrue(output.with_suffix(".mp4.manifest.json").is_file())
 
 if __name__ == "__main__":
