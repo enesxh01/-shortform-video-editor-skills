@@ -607,7 +607,11 @@ def command_analyze_project(args: argparse.Namespace) -> int:
             device=args.device,
             top_candidates=args.top,
             layout=args.layout,
-            include_visuals=args.visuals
+            include_visuals=args.visuals,
+            split_top_source=Path(args.split_top_source) if args.split_top_source else None,
+            split_bottom_source=Path(args.split_bottom_source) if args.split_bottom_source else None,
+            split_top_in=args.split_top_in,
+            split_bottom_in=args.split_bottom_in
         )
     except KeyboardInterrupt:
         print("Analysis cancelled. Completed artifacts and a cancellation manifest were preserved.", file=sys.stderr)
@@ -699,7 +703,11 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--model", default="small", choices=["tiny", "base", "small", "medium", "large-v3"])
     analyze.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
     analyze.add_argument("--top", type=int, default=5)
-    analyze.add_argument("--layout", default="fullscreen", choices=["fullscreen", "blurred_bars_20_60_20"])
+    analyze.add_argument("--layout", default="fullscreen", choices=["fullscreen", "blurred_bars_20_60_20", "split_vertical"])
+    analyze.add_argument("--split-top-source", help="top panel source required for split_vertical")
+    analyze.add_argument("--split-bottom-source", help="bottom panel source required for split_vertical")
+    analyze.add_argument("--split-top-in", default="00:00:00.000")
+    analyze.add_argument("--split-bottom-in", default="00:00:00.000")
     analyze.add_argument("--visuals", action="store_true", help="run optional OpenCV visual sampling")
     analyze.set_defaults(func=command_analyze_project)
     render = sub.add_parser("render", help="render approved EDL segments into a vertical MP4")
