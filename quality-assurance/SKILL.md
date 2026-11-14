@@ -5,6 +5,12 @@ description: Run technical and visual quality checks on rendered clips, classify
 
 # Quality Assurance
 
+## Executable technical QC baseline
+
+Run `shortform-editor qc OUTPUT.mp4 -o qc-report.json` after render. The current command checks stream presence, configured dimensions, average frame rate, H.264 codec, black intervals, frozen-frame intervals and audio sample peak. A missing audio stream is a warning; major technical defects return a failing exit code.
+
+This is not complete QC. It does not validate caption spelling/timing, crop quality, safe areas, audio/video sync by listening, perceived loudness, true peak, story comprehension or visual appeal. Black/freeze detections can flag intentional creative choices and require review.
+
 ## QC departments
 
 1. Visual integrity: black/frozen/corrupt/missing frames, aspect ratio, dimensions, FPS, flicker, crop, tracking, layout, transitions.
