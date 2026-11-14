@@ -47,11 +47,12 @@ The `analyze-project` command is the preferred end-to-end entry point. After the
 3. Analyze audio and visuals only with tools actually installed; report unavailable analysis honestly.
 4. Search the full source for candidate moments. Use `references/viral-scoring.md` as an editorial rubric, never as a virality probability.
 5. Review candidate boundaries for context, setup, complete payoff, and clean ending.
-6. Author and validate the EDL. Do not render unless its approval state is explicitly approved by the user.
-7. Render from the original source. Default target is 1080x1920, 60 fps CFR, H.264 MP4, unless the user or platform specifies otherwise. See `references/export-and-fps.md`.
-8. Run the available technical checks. State which visual checks remain manual or unimplemented.
-9. Present previews, rationale, export settings, QC results and uncertainties. Require human approval.
-10. Record only explicit persistent preferences.
+6. Author and validate the draft EDL. Create a 30 fps preview with `shortform-editor render-preview INPUT.mp4 DRAFT_EDL.json preview.mp4`; previewing never changes approval.
+7. Only after explicit user approval of that exact EDL, run `shortform-editor approve-edl DRAFT_EDL.json --source INPUT.mp4 --confirm`. This re-probes and validates the source fingerprint before atomically recording approval.
+8. Render from the original source with `shortform-editor render`; it refuses unapproved EDLs and automatically runs technical QC. Default target is 1080x1920, 60 fps CFR, H.264 MP4, unless the user or platform specifies otherwise. See `references/export-and-fps.md`.
+9. Run additional standalone technical checks when needed. State which visual checks remain manual or unimplemented.
+10. Present previews, rationale, export settings, QC results and uncertainties. Require human approval.
+11. Record only explicit persistent preferences.
 
 ## Three supported design layouts
 
