@@ -53,7 +53,7 @@ def build_ffmpeg_crop_filter(keyframes: list[dict[str, Any]], clip_start: float,
         y = min(max(float(crop["y"]), 0.0), source_height - crop_height)
         frame_number = max(0, round((float(item["time_seconds"]) - clip_start) * frame_rate))
         if points and frame_number <= points[-1][0]:
-            points[-1] = (frame_number, x, y)
+            points[-1] = (frame_number, x, y, bool(item.get("scene_cut", False)))
         else:
             points.append((frame_number, x, y, bool(item.get("scene_cut", False))))
     if not points or crop_width is None or crop_height is None:
