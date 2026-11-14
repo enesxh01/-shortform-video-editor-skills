@@ -24,6 +24,7 @@ def _karaoke_text(caption: dict[str, Any]) -> str:
         return _escape_ass(caption["text"])
     pieces = []
     previous_end = timestamp_seconds(caption["start"])
+    previous_text = ""
     for word in words:
         start = timestamp_seconds(word["start"])
         end = timestamp_seconds(word["end"])
@@ -32,9 +33,11 @@ def _karaoke_text(caption: dict[str, Any]) -> str:
         if start > previous_end:
             pieces.append(f"{{\\k{max(1, round((start - previous_end) * 100))}}}")
         duration = max(1, round((end - start) * 100))
-        if pieces and not str(word["text"]).startswith(" "):
+        token = str(word["text"]).strip()
+        if _needs_space(previous_text, token):
             pieces.append(" ")
-        pieces.append(f"{{\\kf{duration}}}{_escape_ass(str(word['text']).strip())}")
+        pieces.append(f"{{\\kf{duration}}}{_escape_ass(token)}")
+        previous_text = token
         previous_end = end
     return "".join(pieces) if pieces else _escape_ass(caption["text"])
 
