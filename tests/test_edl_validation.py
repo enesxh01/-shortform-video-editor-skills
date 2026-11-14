@@ -2,7 +2,7 @@ import json
 import unittest
 from pathlib import Path
 
-from shortform_editor.cli import SCHEMA_PATH, _segment_look_filters, load_schema, validate_edl
+from shortform_editor.cli import PipelineError, SCHEMA_PATH, _segment_look_filters, load_schema, validate_edl
 
 
 def valid_edl():
@@ -77,7 +77,7 @@ class EDLValidationTests(unittest.TestCase):
         self.assertEqual(_segment_look_filters({}), [])
 
     def test_rejects_non_finite_or_excessive_sharpening(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(PipelineError):
             _segment_look_filters({"color_grade": {"sharpen": 2.0}})
 
     def test_rejects_out_of_range_color_grade(self):
