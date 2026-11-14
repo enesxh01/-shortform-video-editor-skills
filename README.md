@@ -33,7 +33,7 @@ The design supports exactly three primary layouts: fullscreen, top/bottom vertic
 - `retention-pacing` — transcript-bound pacing proposals and review-only silence trimming (baseline implementation)
 - `editing-director` — conflict resolution and EDL authoring
 - `edit-decision-list` — versioned timeline contract
-- `kino-editing` — ASS/Kino captions and layout-specific placement (partial implementation; advanced motion presets remain design-only)
+- `kino-editing` — word-timed caption grouping, ASS/Kino rendering and layout-specific placement (partial implementation; advanced motion presets remain design-only)
 - `ffmpeg-rendering` — deterministic rendering and 60 FPS policy
 - `resource-management` — RAM/VRAM preflight and ASR backend selection (partial implementation; job scheduling remains design-only)
 - `job-orchestration` — progress, cancellation, and recovery (design-only)
@@ -56,13 +56,14 @@ shortform-editor find-moments audio-analysis.json -o candidates.json
 shortform-editor analyze-pacing audio-analysis.json candidates.json -o pacing.json
 # Optional extras: python -m pip install -e '.[audio,visual]' (or install only what you need)
 shortform-editor analyze-visuals input.mp4 -o visual-analysis.json
+shortform-editor generate-captions audio-analysis.json candidates.json -o captions.json --layout fullscreen
 # Optional ASR: python -m pip install -e '.[audio]'
 shortform-editor validate-edl edit.json --probe probe.json
 shortform-editor render input.mp4 edit.json output.mp4
 python -m unittest discover -s tests -v
 ```
 
-The current CLI provides source probing and SHA-256 fingerprinting, EDL schema/semantic validation, an approved-EDL FFmpeg renderer, and an initial audio analysis command. Audio analysis extracts mono 16 kHz WAV in a temporary directory, measures half-second RMS/peak windows and sustained silence candidates, and optionally runs faster-whisper with word timestamps and VAD. Default ASR model is `small`; CUDA is attempted with int8_float16 and falls back to CPU int8. Install ASR with `python -m pip install -e '.[audio]'`; model weights download on first use. The renderer supports fullscreen center-crop, blurred 20/60/20 bars, and top/bottom split using two fingerprint-verified secondary sources; per-segment ASS captions support word-level karaoke when timings are supplied. Moment discovery currently uses a transparent English-biased cue heuristic, speech density, lexical variety, audio energy and boundary evidence; it assigns low confidence and requires human review. It is not a trained semantic model or a virality predictor. The pipeline does not yet perform diarization, speaker attribution, laughter/emotion classification, smart crop/tracking, general subject tracking, automatic repair, or visual QC. The 60 fps output policy is not a claim of native 60 fps motion from lower-frame-rate footage.
+The current CLI provides source probing and SHA-256 fingerprinting, EDL schema/semantic validation, an approved-EDL FFmpeg renderer, and an initial audio analysis command. Audio analysis extracts mono 16 kHz WAV in a temporary directory, measures half-second RMS/peak windows and sustained silence candidates, and optionally runs faster-whisper with word timestamps and VAD. Default ASR model is `small`; CUDA is attempted with int8_float16 and falls back to CPU int8. Install ASR with `python -m pip install -e '.[audio]'`; model weights download on first use. The renderer supports fullscreen center-crop, blurred 20/60/20 bars, and top/bottom split using two fingerprint-verified secondary sources; per-segment ASS captions support word-level karaoke when timings are supplied; `generate-captions` groups ASR word timestamps into caption events for manual insertion into the selected EDL segment. Moment discovery currently uses a transparent English-biased cue heuristic, speech density, lexical variety, audio energy and boundary evidence; it assigns low confidence and requires human review. It is not a trained semantic model or a virality predictor. The pipeline does not yet perform diarization, speaker attribution, laughter/emotion classification, smart crop/tracking, general subject tracking, automatic repair, or visual QC. The 60 fps output policy is not a claim of native 60 fps motion from lower-frame-rate footage.
 
 ## Install OpenCode skills
 
