@@ -98,6 +98,24 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                 warnings.append(f"No captions for {candidate['candidate_id']}: {exc}")
 
             safe_id = re.sub(r"[^a-zA-Z0-9_-]", "_", candidate["candidate_id"])
+            segment_edl = {
+                "id": candidate["candidate_id"],
+                "source_in": _timecode(candidate["source_in_seconds"]),
+                "source_out": _timecode(candidate["source_out_seconds"]),
+                "timeline_start": "00:00:00.000",
+                "layout": layout,
+                "reason": f"{candidate['family']}: {candidate['transcript_excerpt'][:180]}",
+                "confidence": candidate["confidence"],
+                "captions": captions
+            }
+            if visuals and layout == "fullscreen":
+                crop_frames = [
+                    item for item in visuals["analysis"]["crop_keyframes"]
+                    if candidate["source_in_seconds"] <= item["time_seconds"] <= candidate["source_out_seconds"]
+                ]
+                if any(item["subject_evidence"] == "face_detection" for item in crop_frames):
+                    segment_edl["crop_keyframes"] = crop_frames
+
             edl = {
                 "schema_version": "1.0",
                 "project_id": probe["source"]["sha256"][:12],
@@ -117,16 +135,7 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                     "video_codec": "h264",
                     "audio_codec": "aac"
                 },
-                "segments": [{
-                    "id": candidate["candidate_id"],
-                    "source_in": _timecode(candidate["source_in_seconds"]),
-                    "source_out": _timecode(candidate["source_out_seconds"]),
-                    "timeline_start": "00:00:00.000",
-                    "layout": layout,
-                    "reason": f"{candidate['family']}: {candidate['transcript_excerpt'][:180]}",
-                    "confidence": candidate["confidence"],
-                    "captions": captions
-                }],
+                "segments": [segment_edl],
                 "approval": {"status": "draft", "approved_by_user": False}
             }
             edl_path = output_dir / "edl" / f"{safe_id}.json"
