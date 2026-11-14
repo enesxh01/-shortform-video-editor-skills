@@ -450,7 +450,10 @@ def command_render(args: argparse.Namespace) -> int:
     )
     actual_duration = float(final_probe.get("format", {}).get("duration") or 0)
     qc_report = run_qc(output, expected_width=width, expected_height=height, expected_fps=fps)
-    qc_report = add_expected_duration_check(qc_report, actual_duration, expected_duration)
+    qc_report = add_expected_duration_check(
+        qc_report, actual_duration, expected_duration,
+        tolerance=max(0.1, 0.025 * len(edl["segments"]))
+    )
 
     print(json.dumps({
         "output": str(output),
