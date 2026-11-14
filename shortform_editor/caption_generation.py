@@ -15,6 +15,18 @@ def _timecode(seconds: float) -> str:
     return f"{hours:02d}:{minutes:02d}:{secs:02d}.{ms:03d}"
 
 
+def _join_words(words: list[dict[str, Any]]) -> str:
+    result = ""
+    for word in words:
+        token = str(word.get("text", "")).strip()
+        if not token:
+            continue
+        if result and token[0] not in ".,!?;:%)]}’'":
+            result += " "
+        result += token
+    return result
+
+
 def generate_captions(analysis: dict[str, Any], candidate: dict[str, Any],
                       layout: str = "fullscreen", max_words: int = 5,
                       max_chars: int = 28, max_duration: float = 2.2) -> dict[str, Any]:
@@ -45,7 +57,7 @@ def generate_captions(analysis: dict[str, Any], candidate: dict[str, Any],
         nonlocal group
         if not group:
             return
-        text = "".join(str(word["text"]) for word in group).strip()
+        text = _join_words(group)
         if not text:
             group = []
             return
@@ -71,9 +83,9 @@ def generate_captions(analysis: dict[str, Any], candidate: dict[str, Any],
         if end <= start:
             continue
         if group:
-            group_text = "".join(str(item["text"]) for item in group).strip()
+            group_text = _join_words(group)
             gap = start - float(group[-1]["end"])
-            proposed_text = group_text + " " + token
+            proposed_text = group_text + (" " if token and token[0] not in ".,!?;:%)]}’\'" else "") + token
             elapsed = end - float(group[0]["start"])
             sentence_end = group_text.endswith((".", "?", "!", "…", ":"))
             if (
