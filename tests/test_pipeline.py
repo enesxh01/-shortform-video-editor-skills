@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from shortform_editor.pipeline import analyze_project
+from shortform_editor.cli import PipelineError
 
 
 class PipelineOrchestrationTests(unittest.TestCase):
@@ -60,7 +61,7 @@ class PipelineOrchestrationTests(unittest.TestCase):
             root = Path(directory)
             source = root / "source.mp4"
             source.write_bytes(b"source")
-            with self.assertRaises(Exception):
+            with self.assertRaises(PipelineError):
                 analyze_project(source, root)
 
 
