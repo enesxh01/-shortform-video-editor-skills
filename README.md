@@ -37,7 +37,7 @@ The design supports exactly three primary layouts: fullscreen, top/bottom vertic
 - `ffmpeg-rendering` — deterministic rendering and 60 FPS policy
 - `resource-management` — RAM/VRAM preflight and ASR backend selection (partial implementation; job scheduling remains design-only)
 - `job-orchestration` — progress, cancellation, and recovery (design-only)
-- `quality-assurance` — technical and visual QC (partial)
+- `quality-assurance` — technical codec/dimension/FPS/black/freeze/audio-peak QC (partial; visual/story/caption review still human)
 - `preview-approval` — human review gates (design-only)
 - `video-editor-testing` — unit, integration, benchmark, and footage matrix
 - `security-provenance` — safe handling and license/provenance checks
@@ -60,10 +60,11 @@ shortform-editor generate-captions audio-analysis.json candidates.json -o captio
 # Optional ASR: python -m pip install -e '.[audio]'
 shortform-editor validate-edl edit.json --probe probe.json
 shortform-editor render input.mp4 edit.json output.mp4
+shortform-editor qc output.mp4 -o qc-report.json
 python -m unittest discover -s tests -v
 ```
 
-The current CLI provides source probing and SHA-256 fingerprinting, EDL schema/semantic validation, an approved-EDL FFmpeg renderer, and an initial audio analysis command. Audio analysis extracts mono 16 kHz WAV in a temporary directory, measures half-second RMS/peak windows and sustained silence candidates, and optionally runs faster-whisper with word timestamps and VAD. Default ASR model is `small`; CUDA is attempted with int8_float16 and falls back to CPU int8. Install ASR with `python -m pip install -e '.[audio]'`; model weights download on first use. The renderer supports fullscreen center-crop, blurred 20/60/20 bars, and top/bottom split using two fingerprint-verified secondary sources; per-segment ASS captions support word-level karaoke when timings are supplied; `generate-captions` groups ASR word timestamps into caption events for manual insertion into the selected EDL segment. Moment discovery currently uses a transparent English-biased cue heuristic, speech density, lexical variety, audio energy and boundary evidence; it assigns low confidence and requires human review. It is not a trained semantic model or a virality predictor. The pipeline does not yet perform diarization, speaker attribution, laughter/emotion classification, smart crop/tracking, general subject tracking, automatic repair, or visual QC. The 60 fps output policy is not a claim of native 60 fps motion from lower-frame-rate footage.
+The current CLI provides source probing and SHA-256 fingerprinting, EDL schema/semantic validation, an approved-EDL FFmpeg renderer, and an initial audio analysis command. Audio analysis extracts mono 16 kHz WAV in a temporary directory, measures half-second RMS/peak windows and sustained silence candidates, and optionally runs faster-whisper with word timestamps and VAD. Default ASR model is `small`; CUDA is attempted with int8_float16 and falls back to CPU int8. Install ASR with `python -m pip install -e '.[audio]'`; model weights download on first use. The renderer supports fullscreen center-crop, blurred 20/60/20 bars, and top/bottom split using two fingerprint-verified secondary sources; per-segment ASS captions support word-level karaoke when timings are supplied; `generate-captions` groups ASR word timestamps into caption events for manual insertion into the selected EDL segment. Moment discovery currently uses a transparent English-biased cue heuristic, speech density, lexical variety, audio energy and boundary evidence; it assigns low confidence and requires human review. It is not a trained semantic model or a virality predictor. The pipeline does not yet perform diarization, speaker attribution, laughter/emotion classification, smart crop/tracking, general subject tracking, automatic repair, or complete visual/story/caption QC. Technical QC checks codecs, dimensions, frame rate, black/frozen intervals and sample peak. The 60 fps output policy is not a claim of native 60 fps motion from lower-frame-rate footage.
 
 ## Install OpenCode skills
 
