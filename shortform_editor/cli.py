@@ -289,6 +289,30 @@ def command_render(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_analyze_audio(args: argparse.Namespace) -> int:
+    from .audio import analyze_audio
+
+    source = Path(args.source).expanduser().resolve(strict=True)
+    report = analyze_audio(
+        source,
+        model_size=args.model,
+        device=args.device,
+        language=args.language,
+        transcribe=not args.no_transcribe,
+        silence_dbfs=args.silence_dbfs
+    )
+    output = json.dumps(report, indent=2, ensure_ascii=False) + "\\n"
+    if args.output:
+        destination = Path(args.output).expanduser().resolve()
+        if destination == source:
+            raise PipelineError("Audio report cannot overwrite the source media")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(output, encoding="utf-8")
+    else:
+        print(output, end="")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -300,6 +324,15 @@ def build_parser() -> argparse.ArgumentParser:
     validate.add_argument("edl")
     validate.add_argument("--probe", help="optional ffprobe JSON report for duration checking")
     validate.set_defaults(func=command_validate)
+    audio = sub.add_parser("analyze-audio", help="extract audio, detect silence candidates and optionally transcribe speech")
+    audio.add_argument("source")
+    audio.add_argument("-o", "--output")
+    audio.add_argument("--model", default="small", choices=["tiny", "base", "small", "medium", "large-v3"])
+    audio.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    audio.add_argument("--language", help="optional ISO language code; omit for automatic detection")
+    audio.add_argument("--no-transcribe", action="store_true", help="run audio energy/silence analysis without loading ASR")
+    audio.add_argument("--silence-dbfs", type=float, default=-38.0)
+    audio.set_defaults(func=command_analyze_audio)
     render = sub.add_parser("render", help="render approved EDL segments into a vertical MP4")
     render.add_argument("source")
     render.add_argument("edl")
@@ -315,6 +348,8 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     try:
+        if getattr(args, "silence_dbfs", -38.0) < -80 or getattr(args, "silence_dbfs", -38.0) > -10:
+            raise PipelineError("--silence-dbfs must be between -80 and -10 dBFS")
         return args.func(args)
     except (PipelineError, OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
