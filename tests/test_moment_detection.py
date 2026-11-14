@@ -47,6 +47,8 @@ class MomentDetectionTests(unittest.TestCase):
     def test_cue_matching_uses_word_boundaries(self):
         self.assertTrue(_has_cue("But then it happened", "but"))
         self.assertFalse(_has_cue("The button was broken", "but"))
+        self.assertTrue(_has_cue("Mirëpo kjo ishte e vërteta", "mirëpo"))
+        self.assertTrue(_has_cue("Në fund kjo funksionoi", "në fund"))
 
     def test_requires_completed_transcript(self):
         report = analysis_report()
