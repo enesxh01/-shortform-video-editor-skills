@@ -74,7 +74,15 @@ python3 -m pip install --upgrade pip
 python3 -m pip install -e ".[audio,visual,download]"
 ```
 
-The extras enable faster-whisper ASR, OpenCV visual analysis, and optional public-URL ingestion. FFmpeg and ffprobe are separate system requirements; install them with your OS package manager or an official FFmpeg build and confirm both commands work on PATH.
+The extras enable faster-whisper ASR, OpenCV visual analysis, and optional authorized HTTP(S) URL ingestion. FFmpeg and ffprobe are separate system requirements; install them with your OS package manager or an official FFmpeg build and confirm both commands work on PATH.
+
+To ingest a single URL into a new, empty folder (playlists are disabled):
+
+```bash
+shortform-editor download-source 'https://example.com/video' --output-dir downloaded-source/ --max-filesize-mb 2048 --report download-report.json
+```
+
+The downloader rejects embedded URL credentials and enforces its configured size cap using yt-dlp's file-size limit, observed transfer progress, and a final on-disk check. Download only media you own or are authorized to use; this is not a DRM, private-content, or access-control bypass.
 
 Then run:
 
