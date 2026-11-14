@@ -284,6 +284,10 @@
                         "type": "string",
                         "minLength": 1
                       },
+                      "highlight_color": {
+                        "type": "string",
+                        "pattern": "^#[0-9A-Fa-f]{6}$"
+                      },
                       "start": {
                         "type": "string",
                         "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
