@@ -36,6 +36,14 @@ class ResourceSelectionTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             choose_inference_device("small", "cuda", snapshot)
 
+    def test_medium_cpu_requires_larger_ram_reserve(self):
+        snapshot = {
+            "ram_available_gb": 4.0,
+            "gpu": {"available": False}
+        }
+        with self.assertRaises(RuntimeError):
+            choose_inference_device("medium", "auto", snapshot)
+
 
 if __name__ == "__main__":
     unittest.main()
