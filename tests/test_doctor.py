@@ -26,7 +26,8 @@ class DoctorTests(unittest.TestCase):
         def which(name):
             return {"ffmpeg": "/fake/ffmpeg", "ffprobe": "/fake/ffprobe"}.get(name)
         def run(args):
-            stdout = "Encoders: h264_nvenc" if args[-1] == "-encoders" else "tool version fake"
+            stdout = ("Encoders: h264_nvenc libx264" if args[-1] == "-encoders" else
+                      ("Filters: subtitles" if args[-1] == "-filters" else "tool version fake"))
             return subprocess.CompletedProcess(args, 0, stdout, "")
         def find_spec(name):
             return object() if name in {"jsonschema", "psutil"} else None
@@ -38,6 +39,8 @@ class DoctorTests(unittest.TestCase):
         self.assertEqual(result, 0)
         self.assertEqual(report["status"], "ready_with_optional_extras_missing")
         self.assertTrue(report["accelerators"]["h264_nvenc"]["available"])
+        self.assertTrue(report["accelerators"]["libx264"]["available"])
+        self.assertTrue(report["accelerators"]["subtitles_filter"]["available"])
         self.assertEqual(set(report["missing_optional"]), {"faster_whisper", "cv2", "yt_dlp"})
 
 
