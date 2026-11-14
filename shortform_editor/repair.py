@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from .cli import PipelineError, probe_media, require_tool, run_checked
+from .cli import PipelineError, file_stat_signature, probe_media, require_tool, run_checked
 from .qc import run_qc
 
 
@@ -29,6 +29,7 @@ def repair_technical_export(source: Path, output: Path, width: int = 1080,
         raise PipelineError(f"Output already exists (use --overwrite): {output}")
 
     source_probe = probe_media(source)
+    source_signature = file_stat_signature(source)
     duration = float(source_probe.get("format", {}).get("duration") or 0)
     if duration <= 0:
         raise PipelineError("Cannot repair media with unknown duration")
@@ -53,8 +54,7 @@ def repair_technical_export(source: Path, output: Path, width: int = 1080,
         ])
         run_checked([ffmpeg, "-hide_banner", "-v", "error", "-i", str(staged), "-f", "null", "-"])
         final_probe = probe_media(staged)
-        source_after_repair = probe_media(source)
-        if source_after_repair["source"]["fingerprint"] != source_probe["source"]["fingerprint"]:
+        if file_stat_signature(source) != source_signature:
             raise PipelineError("Source media changed during repair; refusing to publish an output from an unstable source")
         os.replace(staged, output)
         staged = None
