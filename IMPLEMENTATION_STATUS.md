@@ -111,3 +111,9 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 
 - `scripts/setup.sh` and `scripts/setup.ps1` install the editable CLI package with audio, visual and download extras, install the OpenCode skills with timestamped backups, and run the environment doctor.
 - They intentionally do not silently install system FFmpeg packages or alter PATH. If FFmpeg/ffprobe are missing, setup leaves the Python package and skills installed, prints OS-specific guidance and exits non-zero until the required FFmpeg build is available.
+
+
+## Latest CI verification
+
+- Full Linux/Windows × Python 3.10/3.12 matrix passed on commit `5515b75a`, including the synthetic VFR-to-CFR/audio-duration integration test, the interrupted render-resume test, packaging and skill installation.
+- The one-command setup scripts were added after that run and are awaiting their own CI verification; the underlying CLI/package and existing skill installers are already covered by the green matrix.

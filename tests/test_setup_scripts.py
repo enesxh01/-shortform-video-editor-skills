@@ -1,3 +1,5 @@
+import shutil
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -13,12 +15,14 @@ class SetupScriptTests(unittest.TestCase):
         self.assertIn('shortform_editor.cli doctor', script)
         self.assertIn("ffmpeg", script)
         self.assertIn("ffprobe", script)
+        bash = shutil.which("bash")
+        if bash:
+            subprocess.run([bash, "-n", str(ROOT / "scripts" / "setup.sh")], check=True)
 
     def test_windows_setup_installs_extras_skills_and_runs_doctor(self):
         script = (ROOT / "scripts" / "setup.ps1").read_text(encoding="utf-8")
         self.assertIn('[audio,visual,download]', script)
         self.assertIn('install.ps1', script)
-        self.assertIn('shortform_video', script) if False else None
         self.assertIn('shortform_editor.cli doctor', script)
         self.assertIn('Get-Command ffmpeg', script)
         self.assertIn('Get-Command ffprobe', script)
