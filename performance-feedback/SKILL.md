@@ -15,6 +15,7 @@ This module learns only from explicit human editorial decisions stored locally. 
    `shortform-editor record-feedback candidates.json --candidate-id moment-... --decision approve`.
 2. Apply learned category preferences to a future candidate report:
    `shortform-editor apply-feedback candidates.json -o ranked.json`.
+3. The next `analyze-project` run automatically loads the same local feedback file and applies the bounded adjustments before ranking; a malformed feedback file is ignored with a visible warning.
 3. Inspect the adjustment and the original score before selecting a clip.
 
 ## Learning behavior
