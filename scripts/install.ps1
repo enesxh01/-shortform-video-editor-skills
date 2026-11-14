@@ -31,8 +31,8 @@ foreach ($SharedDir in @("references", "schemas", "config", "docs")) {
     $SharedSource = Join-Path $Root $SharedDir
     $SharedTarget = Join-Path $Dest $SharedDir
     if (Test-Path $SharedSource) {
-        if (Test-Path $SharedTarget) { Remove-Item -Recurse -Force $SharedTarget }
-        Copy-Item -Recurse $SharedSource $SharedTarget
+        New-Item -ItemType Directory -Force -Path $SharedTarget | Out-Null
+        Get-ChildItem -Path $SharedSource | Copy-Item -Destination $SharedTarget -Recurse -Force
         Write-Host "Installed shared $SharedDir"
     }
 }
