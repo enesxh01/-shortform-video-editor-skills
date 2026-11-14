@@ -76,6 +76,16 @@ def build_ffmpeg_crop_filter(keyframes: list[dict[str, Any]], clip_start: float,
         f"y='{expression(2)}'"
     )
 
+
+def sample_timestamps(duration: float, sample_rate: float = 1.0,
+                     max_frames: int = 120) -> list[float]:
+    if duration <= 0 or sample_rate <= 0 or max_frames < 2:
+        raise ValueError("Duration, sample rate and frame cap must be positive")
+    count = min(max_frames, max(2, int(duration * sample_rate)))
+    step = duration / count
+    return [round(index * step, 3) for index in range(count)]
+
+
 def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 120,
                     detect_faces: bool = True) -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
@@ -116,10 +126,8 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
     previous_center = (width / 2.0, height / 2.0)
     smoothed_center = previous_center
     scene_changes = []
-    frame_index = 0
-    timestamp = 0.0
-    step = 1.0 / sample_rate
-    while timestamp < duration and frame_index < max_frames:
+    timestamps = sample_timestamps(duration, sample_rate, max_frames)
+    for frame_index, timestamp in enumerate(timestamps):
         capture.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000.0)
         ok, frame = capture.read()
         if not ok:
@@ -177,8 +185,6 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             "motion_score": round(motion_score, 4)
         })
         previous_center = smoothed_center
-        frame_index += 1
-        timestamp += step
 
     capture.release()
     return {
@@ -192,7 +198,8 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             "reported_fps": fps
         },
         "analysis": {
-            "sample_rate_fps": sample_rate,
+            "requested_sample_rate_fps": sample_rate,
+            "effective_sample_rate_fps": round(len(samples) / duration, 4),
             "sampled_frames": len(samples),
             "scene_change_candidates": scene_changes,
             "crop_keyframes": samples
