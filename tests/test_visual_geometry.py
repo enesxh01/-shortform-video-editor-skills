@@ -1,6 +1,7 @@
 import unittest
 
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from shortform_editor.visual import build_ffmpeg_crop_filter, compute_crop_box, get_face_tracker_factory, sample_region_timestamps, sample_timestamps
 
@@ -95,6 +96,75 @@ class CropGeometryTests(unittest.TestCase):
         self.assertEqual(args.track_roi, [0.32, 0.18, 0.24, 0.42])
         self.assertTrue(args.no_face_detection)
         self.assertEqual(args.sample_rate, 3.0)
+
+
+
+    def test_manual_roi_seeds_and_updates_generic_csrt_tracker(self):
+        import sys
+        import tempfile
+        from pathlib import Path
+        from shortform_editor.visual import analyze_visuals
+
+        class Frame:
+            shape = (180, 320, 3)
+
+        class Gray:
+            shape = (180, 320)
+
+        class Capture:
+            def __init__(self):
+                self.frames = [Frame(), Frame()]
+            def isOpened(self):
+                return True
+            def set(self, *_args):
+                return True
+            def read(self):
+                return (True, self.frames.pop(0)) if self.frames else (False, None)
+            def release(self):
+                pass
+
+        class Tracker:
+            def __init__(self):
+                self.initial_box = None
+            def init(self, _frame, box):
+                self.initial_box = box
+                return True
+            def update(self, _frame):
+                return True, (150.0, 60.0, 20.0, 20.0)
+
+        tracker = Tracker()
+        capture = Capture()
+        cv2_stub = SimpleNamespace(
+            VideoCapture=lambda _path: capture,
+            CAP_PROP_POS_MSEC=0,
+            COLOR_BGR2GRAY=1,
+            cvtColor=lambda _frame, _code: Gray(),
+            absdiff=lambda _left, _right: SimpleNamespace(mean=lambda: 0.0),
+            TrackerCSRT_create=lambda: tracker
+        )
+        probe = {
+            "source": {"path": "", "fingerprint": "sha256:" + "a" * 64},
+            "streams": [{
+                "codec_type": "video", "width": 320, "height": 180,
+                "avg_frame_rate": "30/1", "start_time": "0.0"
+            }],
+            "format": {"duration": "2.0"}
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.mp4"
+            source.write_bytes(b"synthetic")
+            probe["source"]["path"] = str(source)
+            with patch.dict(sys.modules, {"cv2": cv2_stub}):
+                report = analyze_visuals(
+                    source, sample_rate=1.0, max_frames=2, detect_faces=False,
+                    probe_report=probe, initial_roi=(0.25, 0.25, 0.25, 0.25)
+                )
+        samples = report["analysis"]["crop_keyframes"]
+        self.assertEqual(tracker.initial_box, (80.0, 45.0, 80.0, 45.0))
+        self.assertEqual(samples[0]["subject_evidence"], "manual_roi_tracking_seed")
+        self.assertEqual(samples[1]["subject_evidence"], "manual_roi_tracking")
+        self.assertEqual(samples[1]["subject_bbox_normalized"]["x"], 150.0 / 320.0)
+        self.assertEqual(report["analysis"]["manual_tracking_roi_normalized"], [0.25, 0.25, 0.25, 0.25])
 
 
 
