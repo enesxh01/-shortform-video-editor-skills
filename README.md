@@ -13,7 +13,7 @@ A local-first OpenCode skill suite and early executable foundation for building 
 
 ## Non-goals
 
-- No YouTube Analytics, channel-performance ingestion, OAuth, views/retention dashboards, or analytics-driven optimization.
+- No YouTube Analytics, channel-performance ingestion, OAuth, views/retention dashboards, or analytics-driven optimization. Candidate ranking can learn only from explicit local human editorial feedback.
 - No automatic background music.
 - No automatic B-roll or sound effects unless explicitly requested for a particular edit.
 - No promise or guarantee of virality.
@@ -42,7 +42,7 @@ The design supports exactly three primary layouts: fullscreen, top/bottom vertic
 - `video-editor-testing` — unit, integration, benchmark, and footage matrix
 - `security-provenance` — safe handling and license/provenance checks
 - `observability` — structured logs and diagnostics
-- `project-memory` — explicit preferences only
+- `performance-feedback` — local human approval/rejection feedback and bounded category preference learning (no analytics)\n- `project-memory` — explicit preferences only
 
 ## Executable foundation (early MVP)
 
@@ -61,6 +61,8 @@ shortform-editor generate-captions audio-analysis.json candidates.json -o captio
 shortform-editor validate-edl edit.json --probe probe.json
 shortform-editor render input.mp4 edit.json output.mp4
 shortform-editor qc output.mp4 -o qc-report.json
+shortform-editor record-feedback candidates.json --candidate-id moment-... --decision approve
+shortform-editor apply-feedback candidates.json -o ranked.json
 python -m unittest discover -s tests -v
 ```
 
