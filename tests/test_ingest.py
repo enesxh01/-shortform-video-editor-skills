@@ -38,9 +38,16 @@ class URLIngestionTests(unittest.TestCase):
 
     def test_download_size_guard_aborts_as_soon_as_observed_bytes_exceed_cap(self):
         guard = _download_size_guard(100)
-        guard({"downloaded_bytes": 100})
+        guard({"filename": "video.mp4", "downloaded_bytes": 100})
         with self.assertRaisesRegex(PipelineError, "exceeded"):
-            guard({"downloaded_bytes": 101})
+            guard({"filename": "video.mp4", "downloaded_bytes": 101})
+
+    def test_download_size_guard_counts_video_and_audio_streams_together(self):
+        guard = _download_size_guard(100)
+        guard({"filename": "video.mp4", "downloaded_bytes": 60})
+        guard({"filename": "video.mp4", "downloaded_bytes": 60})
+        with self.assertRaisesRegex(PipelineError, "exceeded"):
+            guard({"filename": "audio.m4a", "downloaded_bytes": 41})
 
     def test_rejects_missing_host(self):
         with tempfile.TemporaryDirectory() as directory:
