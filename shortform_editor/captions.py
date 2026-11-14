@@ -83,16 +83,39 @@ def write_ass_subtitles(segment: dict[str, Any], layout: str, clip_start: float,
             alignment_tag = r"\an2"
         else:
             alignment_tag = r"\an5" if layout == "split_vertical" else r"\an2"
+        caption_font_size = int(caption.get("font_size", font_size))
+        if not 28 <= caption_font_size <= 100:
+            raise PipelineError("Caption font_size must be between 28 and 100")
+        caption_margin_v = int(caption.get("margin_v", margin_v))
+        if not 0 <= caption_margin_v <= 600:
+            raise PipelineError("Caption margin_v must be between 0 and 600")
         if layout in {"split_vertical", "blurred_bars_20_60_20"}:
             available_width = 940
-            scale = min(100, max(55, int(available_width / max(1, len(caption["text"])) / font_size * 100 / 0.55)))
-            override = "{" + alignment_tag + r"\q2\fscx" + str(scale) + "}"
+            scale = min(100, max(55, int(available_width / max(1, len(caption["text"])) / caption_font_size * 100 / 0.55)))
         else:
-            override = "{" + alignment_tag + "}"
+            scale = 100
+        tags = [alignment_tag]
+        if layout in {"split_vertical", "blurred_bars_20_60_20"}:
+            tags.append(r"\q2")
+            tags.append(r"\fscx" + str(scale))
+        if caption_font_size != font_size:
+            tags.append(r"\fs" + str(caption_font_size))
+        animation = caption.get("animation", "none")
+        if animation not in {"none", "fade", "pop", "pop_fade"}:
+            raise PipelineError(f"Unsupported caption animation: {animation}")
+        if animation in {"pop", "pop_fade"}:
+            tags.extend([
+                r"\fscx" + str(max(1, round(scale * 0.9))), r"\fscy90",
+                r"\t(0,140,\fscx" + str(scale) + r"\fscy100)"
+            ])
+        if animation in {"fade", "pop_fade"}:
+            tags.append(r"\fad(90,80)")
+        override = "{" + "".join(tags) + "}"
         text = _karaoke_text(caption)
         lines.append(
-            f"Dialogue: 0,{_ass_time(start)},{_ass_time(end)},Default,,0,0,0,,{override}{text}"
+            f"Dialogue: 0,{_ass_time(start)},{_ass_time(end)},Default,,0,0,{caption_margin_v},,{override}{text}"
         )
+
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return output_path
 
