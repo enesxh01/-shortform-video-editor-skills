@@ -1,6 +1,11 @@
+import json
+import tempfile
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from shortform_editor.cli import analyze_frame_timestamps
+from shortform_editor.cli import analyze_frame_timestamps, probe_frame_timing
 
 
 class FrameTimingDiagnosticsTests(unittest.TestCase):
@@ -36,6 +41,30 @@ class FrameTimingDiagnosticsTests(unittest.TestCase):
         report = analyze_frame_timestamps([index / 30 for index in range(30)])
         self.assertEqual(report["scope"], "initial_frame_sample_only")
         self.assertIn("does not normalize timestamps", report["limitation"])
+
+    def test_probe_samples_only_the_initial_video_frames(self):
+        timestamps = [{"best_effort_timestamp_time": str(index / 30)} for index in range(40)]
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.mp4"
+            source.write_bytes(b"synthetic")
+            with patch("shortform_editor.cli.run_checked", return_value=SimpleNamespace(
+                stdout=json.dumps({"frames": timestamps})
+            )) as runner:
+                report = probe_frame_timing(source, "ffprobe", sample_frames=40)
+        self.assertEqual(report["status"], "likely_cfr")
+        args = runner.call_args.args[0]
+        self.assertIn("%+#40", args)
+        self.assertIn("best_effort_timestamp_time", args)
+        self.assertEqual(args[-1], str(source))
+
+    def test_probe_malformed_json_returns_unknown_instead_of_failing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.mp4"
+            source.write_bytes(b"synthetic")
+            with patch("shortform_editor.cli.run_checked", return_value=SimpleNamespace(stdout="{")):
+                report = probe_frame_timing(source, "ffprobe")
+        self.assertEqual(report["status"], "insufficient_samples")
+        self.assertIsNone(report["variable_frame_rate"])
 
 
 if __name__ == "__main__":
