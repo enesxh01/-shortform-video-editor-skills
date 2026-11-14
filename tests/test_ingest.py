@@ -6,10 +6,26 @@ from pathlib import Path
 from unittest.mock import patch
 
 from shortform_editor.ingest import download_source
-from shortform_editor.cli import PipelineError
+from shortform_editor.cli import PipelineError, command_download_source
 
 
 class URLIngestionTests(unittest.TestCase):
+    def test_download_report_cannot_overwrite_downloaded_media(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.mp4"
+            source.write_bytes(b"keep media bytes")
+            args = types.SimpleNamespace(
+                url="https://example.com/video",
+                output_dir=str(Path(directory) / "out"),
+                max_filesize_mb=2048,
+                report=str(source)
+            )
+            report = {"source_path": str(source), "probe": {}}
+            with patch("shortform_editor.cli.download_source", return_value=report):
+                with self.assertRaisesRegex(PipelineError, "must not overwrite"):
+                    command_download_source(args)
+            self.assertEqual(source.read_bytes(), b"keep media bytes")
+
     def test_rejects_non_http_protocols(self):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(PipelineError):
