@@ -23,7 +23,7 @@ class SetupScriptTests(unittest.TestCase):
 
     def test_windows_setup_installs_extras_skills_and_runs_doctor(self):
         script = (ROOT / "scripts" / "setup.ps1").read_text(encoding="utf-8")
-        self.assertIn('[audio,visual,download]', script)
+        self.assertIn('"${Root}[audio,visual,download]"', script)
         self.assertIn('install.ps1', script)
         self.assertIn('shortform_editor.cli doctor', script)
         self.assertIn('Get-Command ffmpeg', script)
