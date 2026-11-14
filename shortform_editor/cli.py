@@ -313,8 +313,8 @@ def command_render(args: argparse.Namespace) -> int:
                     f"[0:v]split=2[bgsrc][fgsrc];"
                     f"[bgsrc]scale={width}:{height}:force_original_aspect_ratio=increase,"
                     f"crop={width}:{height},boxblur=20:10[bg];"
-                    f"[fgsrc]scale={width}:{center_height}:force_original_aspect_ratio=decrease,"
-                    f"pad={width}:{center_height}:(ow-iw)/2:(oh-ih)/2[fg];"
+                    f"[fgsrc]scale={width}:{center_height}:force_original_aspect_ratio=increase,"
+                    f"crop={width}:{center_height}[fg];"
                     f"[bg][fg]overlay=0:{bar_offset},setsar=1,fps={fps},format=yuv420p[vbase]"
                 )
                 if subtitle_filter:
