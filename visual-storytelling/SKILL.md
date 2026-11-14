@@ -45,3 +45,14 @@ Choose based on source geometry and storytelling. Do not switch layouts for arbi
 ## Testing
 
 Test single speaker, two similar-looking speakers, subject leaving/re-entering frame, moving camera, gameplay HUD, sports action, hands/objects, edge composition, low-resolution footage, occlusion, and low-confidence tracking. Record crop stability, subject visibility, tracking confidence, and failure cases.
+
+
+## Manual subject tracking
+
+When automatic face detection misses a non-face subject (for example a game character, car, ball or product), a human may seed a normalized region-of-interest box for CSRT tracking:
+
+```bash
+shortform-editor analyze-visuals gameplay.mp4 -o visual-analysis.json --no-face-detection --track-roi 0.32 0.18 0.24 0.42 --sample-rate 3 --max-frames 240
+```
+
+The four values are normalized `x y width height` fractions of the frame (0 to 1). The seed is applied at the first sampled frame of each analyzed region; CSRT follows the visible texture between samples. If tracking is unavailable or lost, the report marks the fallback and uses center framing. This is user-initialized tracking, not automatic object detection or semantic gameplay understanding. Review all crop keyframes.
