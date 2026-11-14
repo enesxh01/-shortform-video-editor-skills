@@ -62,7 +62,6 @@ Then run:
 
 ```bash
 shortform-editor analyze-project input.mp4 -o job-output/ --model small --device auto --visuals
-# For split-screen, add --layout split_vertical --split-top-source top.mp4 --split-bottom-source bottom.mp4
 # For top/bottom split: add --layout split_vertical --split-top-source top.mp4 --split-bottom-source bottom.mp4
 ```
 
@@ -75,7 +74,7 @@ This orchestrates:
 6. Kino caption generation.
 7. One unapproved EDL draft per candidate.
 
-The pipeline does **not** approve or render automatically. Review the candidate boundaries, captions, crop plans and EDL. Only after explicit human approval should the EDL be set to `approval.status="approved"` and `approval.approved_by_user=true`.
+The pipeline does **not** approve or render automatically. Review the candidate boundaries, captions, crop plans and EDL. Render a 30 fps preview first; only after you explicitly approve that exact edit should you run `approve-edl --confirm`, followed by the final render.
 
 Useful follow-up commands:
 
@@ -90,7 +89,6 @@ shortform-editor qc output.mp4 -o qc-report.json
 shortform-editor repair input.mp4 repaired.mp4
 shortform-editor record-feedback job-output/candidates.json --candidate-id moment-... --decision approve
 shortform-editor apply-feedback job-output/candidates.json -o ranked.json
-shortform-editor validate-semantic-review semantic-review.json --probe job-output/probe.json --candidates job-output/candidates.json
 ```
 
 ### Implementation limits
