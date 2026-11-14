@@ -4,34 +4,115 @@
   "title": "Shortform Video Edit Decision List",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "project_id", "source", "render", "segments", "approval"],
+  "required": [
+    "schema_version",
+    "project_id",
+    "source",
+    "render",
+    "segments",
+    "approval"
+  ],
   "properties": {
-    "schema_version": {"type": "string", "const": "1.0"},
-    "project_id": {"type": "string", "minLength": 1},
+    "schema_version": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
     "source": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["fingerprint", "time_base"],
+      "required": [
+        "fingerprint",
+        "time_base"
+      ],
       "properties": {
-        "fingerprint": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
-        "time_base": {"type": "string", "pattern": "^[1-9][0-9]*/[1-9][0-9]*$"},
-        "frame_rate": {"type": ["string", "null"], "pattern": "^[1-9][0-9]*/[1-9][0-9]*$"},
-        "variable_frame_rate": {"type": ["boolean", "null"]}
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "time_base": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*/[1-9][0-9]*$"
+        },
+        "frame_rate": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[1-9][0-9]*/[1-9][0-9]*$"
+        },
+        "variable_frame_rate": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
       }
     },
     "render": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["width", "height", "fps_target", "fps_mode", "container"],
+      "required": [
+        "width",
+        "height",
+        "fps_target",
+        "fps_mode",
+        "container"
+      ],
       "properties": {
-        "width": {"type": "integer", "minimum": 360, "maximum": 7680, "multipleOf": 2},
-        "height": {"type": "integer", "minimum": 640, "maximum": 7680, "multipleOf": 2},
-        "fps_target": {"type": "string", "pattern": "^[1-9][0-9]*/[1-9][0-9]*$"},
-        "fps_mode": {"enum": ["cfr", "vfr", "preserve_native"]},
-        "fps_conversion": {"enum": ["none", "duplicate_drop", "blend", "optical_flow", "unknown"]},
-        "container": {"type": "string", "enum": ["mp4"]},
-        "video_codec": {"type": ["string", "null"]},
-        "audio_codec": {"type": ["string", "null"]}
+        "width": {
+          "type": "integer",
+          "minimum": 360,
+          "maximum": 7680,
+          "multipleOf": 2
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 640,
+          "maximum": 7680,
+          "multipleOf": 2
+        },
+        "fps_target": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]*/[1-9][0-9]*$"
+        },
+        "fps_mode": {
+          "enum": [
+            "cfr",
+            "vfr",
+            "preserve_native"
+          ]
+        },
+        "fps_conversion": {
+          "enum": [
+            "none",
+            "duplicate_drop",
+            "blend",
+            "optical_flow",
+            "unknown"
+          ]
+        },
+        "container": {
+          "type": "string",
+          "enum": [
+            "mp4"
+          ]
+        },
+        "video_codec": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "audio_codec": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "segments": {
@@ -40,34 +121,237 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "source_in", "source_out", "layout"],
+        "required": [
+          "id",
+          "source_in",
+          "source_out",
+          "layout"
+        ],
         "properties": {
-          "id": {"type": "string", "minLength": 1},
-          "source_in": {"type": "string", "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"},
-          "source_out": {"type": "string", "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"},
-          "timeline_start": {"type": ["string", "null"], "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"},
-          "layout": {"enum": ["fullscreen", "split_vertical", "blurred_bars_20_60_20"]},
-          "reason": {"type": ["string", "null"]},
-          "confidence": {"type": ["number", "null"], "minimum": 0, "maximum": 1}
-        }
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_in": {
+            "type": "string",
+            "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
+          },
+          "source_out": {
+            "type": "string",
+            "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
+          },
+          "timeline_start": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
+          },
+          "layout": {
+            "enum": [
+              "fullscreen",
+              "split_vertical",
+              "blurred_bars_20_60_20"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "confidence": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          },
+          "split_top": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "fingerprint",
+              "source_in",
+              "source_out"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fingerprint": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "source_in": {
+                "type": "string",
+                "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
+              },
+              "source_out": {
+                "type": "string",
+                "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
+              }
+            }
+          },
+          "split_bottom": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "fingerprint",
+              "source_in",
+              "source_out"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fingerprint": {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              "source_in": {
+                "type": "string",
+                "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
+              },
+              "source_out": {
+                "type": "string",
+                "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
+              }
+            }
+          },
+          "captions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start",
+                "end",
+                "text"
+              ],
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
+                },
+                "end": {
+                  "type": "string",
+                  "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "words": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "text",
+                      "start",
+                      "end"
+                    ],
+                    "properties": {
+                      "text": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "start": {
+                        "type": "string",
+                        "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
+                      },
+                      "end": {
+                        "type": "string",
+                        "pattern": "^(?:[0-9]+:)?[0-5]?[0-9]:[0-5][0-9](?:\\.[0-9]{1,6})?$"
+                      }
+                    }
+                  }
+                },
+                "style": {
+                  "type": "string",
+                  "enum": [
+                    "kino"
+                  ]
+                },
+                "position": {
+                  "type": "string",
+                  "enum": [
+                    "auto",
+                    "center",
+                    "bottom"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "layout": {
+                  "const": "split_vertical"
+                }
+              },
+              "required": [
+                "layout"
+              ]
+            },
+            "then": {
+              "required": [
+                "split_top",
+                "split_bottom"
+              ]
+            }
+          }
+        ]
       }
     },
     "approval": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["status", "approved_by_user"],
+      "required": [
+        "status",
+        "approved_by_user"
+      ],
       "properties": {
-        "status": {"enum": ["draft", "needs_review", "approved", "rejected"]},
-        "approved_by_user": {"type": "boolean"}
+        "status": {
+          "enum": [
+            "draft",
+            "needs_review",
+            "approved",
+            "rejected"
+          ]
+        },
+        "approved_by_user": {
+          "type": "boolean"
+        }
       },
       "allOf": [
         {
           "if": {
-            "properties": {"status": {"const": "approved"}},
-            "required": ["status"]
+            "properties": {
+              "status": {
+                "const": "approved"
+              }
+            },
+            "required": [
+              "status"
+            ]
           },
           "then": {
-            "properties": {"approved_by_user": {"const": true}}
+            "properties": {
+              "approved_by_user": {
+                "const": true
+              }
+            }
           }
         }
       ]
