@@ -68,11 +68,17 @@ def write_ass_subtitles(segment: dict[str, Any], layout: str, clip_start: float,
             raise PipelineError("Caption end must be after caption start")
         position = caption.get("position", "auto")
         if position == "center":
-            override = r"{\an5}"
+            alignment_tag = r"\an5"
         elif position == "bottom":
-            override = r"{\an2}"
+            alignment_tag = r"\an2"
         else:
-            override = r"{\an5}" if layout == "split_vertical" else r"{\an2}"
+            alignment_tag = r"\an5" if layout == "split_vertical" else r"\an2"
+        if layout in {"split_vertical", "blurred_bars_20_60_20"}:
+            available_width = 940
+            scale = min(100, max(55, int(available_width / max(1, len(caption["text"])) / font_size * 100 / 0.55)))
+            override = "{" + alignment_tag + r"\q2\fscx" + str(scale) + "}"
+        else:
+            override = "{" + alignment_tag + "}"
         text = _karaoke_text(caption)
         lines.append(
             f"Dialogue: 0,{_ass_time(start)},{_ass_time(end)},Default,,0,0,0,,{override}{text}"
