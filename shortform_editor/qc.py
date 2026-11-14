@@ -11,6 +11,7 @@ from .cli import PipelineError, probe_media, require_tool, run_checked
 BLACK_RE = re.compile(r"black_start:([0-9.]+).*?black_end:([0-9.]+).*?black_duration:([0-9.]+)")
 FREEZE_START_RE = re.compile(r"freeze_start:([0-9.]+)")
 FREEZE_END_RE = re.compile(r"freeze_end:([0-9.]+)")
+FREEZE_DURATION_RE = re.compile(r"freeze_duration:([0-9.]+)")
 VOLUME_RE = re.compile(r"(mean_volume|max_volume):\s*(-?[0-9.]+) dB")
 
 
@@ -122,11 +123,24 @@ def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 
     ]
     freeze_starts = [float(match.group(1)) for match in FREEZE_START_RE.finditer(ffmpeg_log)]
     freeze_ends = [float(match.group(1)) for match in FREEZE_END_RE.finditer(ffmpeg_log)]
-    freeze_events = [
-        {"start": start, "end": end}
-        for start, end in zip(freeze_starts, freeze_ends)
-        if end >= start
-    ]
+    freeze_durations = [float(match.group(1)) for match in FREEZE_DURATION_RE.finditer(ffmpeg_log)]
+    media_duration = report.get("format", {}).get("duration")
+    try:
+        media_duration = float(media_duration) if media_duration is not None else None
+    except (TypeError, ValueError):
+        media_duration = None
+    freeze_events = []
+    for index, start in enumerate(freeze_starts):
+        if index < len(freeze_ends):
+            end = freeze_ends[index]
+        elif index < len(freeze_durations):
+            end = start + freeze_durations[index]
+        elif media_duration is not None:
+            end = media_duration
+        else:
+            continue
+        if end >= start:
+            freeze_events.append({"start": start, "end": end})
     checks.append({
         "name": "black_frames",
         "status": "major" if any(item["duration"] >= 0.5 for item in black_regions) else "passed",
