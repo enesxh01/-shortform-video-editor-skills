@@ -27,6 +27,55 @@ def compute_crop_box(width: int, height: int, center_x: float, center_y: float,
     }
 
 
+
+def build_ffmpeg_crop_filter(keyframes: list[dict[str, Any]], clip_start: float,
+                             fps: str, source_width: int, source_height: int) -> str | None:
+    if not keyframes:
+        return None
+    from fractions import Fraction
+
+    frame_rate = float(Fraction(fps))
+    if frame_rate <= 0:
+        raise ValueError("Frame rate must be positive")
+    points = []
+    crop_width = crop_height = None
+    for item in sorted(keyframes, key=lambda entry: float(entry["time_seconds"])):
+        crop = item["crop_9_16"]
+        width = int(crop["width"]) // 2 * 2
+        height = int(crop["height"]) // 2 * 2
+        if width <= 0 or height <= 0 or width > source_width or height > source_height:
+            continue
+        if crop_width is None:
+            crop_width, crop_height = width, height
+        if width != crop_width or height != crop_height:
+            continue
+        x = min(max(float(crop["x"]), 0.0), source_width - crop_width)
+        y = min(max(float(crop["y"]), 0.0), source_height - crop_height)
+        frame_number = max(0, round((float(item["time_seconds"]) - clip_start) * frame_rate))
+        if points and frame_number <= points[-1][0]:
+            points[-1] = (frame_number, x, y)
+        else:
+            points.append((frame_number, x, y))
+    if not points or crop_width is None or crop_height is None:
+        return None
+
+    def expression(axis: int) -> str:
+        values = [(frame, point[axis]) for point in points]
+        expr = f"{values[-1][1]:.2f}"
+        for index in range(len(values) - 2, -1, -1):
+            n1, v1 = values[index]
+            n2, v2 = values[index + 1]
+            span = max(1, n2 - n1)
+            interp = f"({v1:.2f}+({v2-v1:.2f})*(n-{n1})/{span})"
+            expr = f"if(lt(n,{n2}),{interp},{expr})"
+        first_n, first_value = values[0]
+        return f"if(lt(n,{first_n}),{first_value:.2f},{expr})"
+
+    return (
+        f"crop={crop_width}:{crop_height}:x='{expression(1)}':"
+        f"y='{expression(2)}',scale={source_width if False else 1080}:1920"
+    )
+
 def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 120,
                     detect_faces: bool = True) -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
