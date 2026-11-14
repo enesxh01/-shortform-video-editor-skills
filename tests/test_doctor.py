@@ -9,11 +9,35 @@ from unittest.mock import patch
 from shortform_editor.cli import command_doctor
 
 
+FILTERS = "\\n".join([
+    " T.. subtitles", " T.. fps", " T.. scale", " T.. crop", " T.. setpts",
+    " T.. setsar", " T.. format", " T.. aresample", " T.. blackdetect",
+    " T.. freezedetect", " T.. volumedetect", " T.. ebur128"
+])
+
+
 class DoctorTests(unittest.TestCase):
+    def _mock_environment(self, filters=FILTERS):
+        def which(name):
+            return {"ffmpeg": "/fake/ffmpeg", "ffprobe": "/fake/ffprobe"}.get(name)
+
+        def run(args):
+            if args[-1] == "-encoders":
+                stdout = "Encoders: h264_nvenc libx264"
+            elif args[-1] == "-filters":
+                stdout = filters
+            else:
+                stdout = "tool version fake"
+            return subprocess.CompletedProcess(args, 0, stdout, "")
+
+        def find_spec(name):
+            return object() if name in {"jsonschema", "psutil"} else None
+
+        return which, run, find_spec
+
     def test_reports_missing_required_tools_and_optional_extras(self):
         output = StringIO()
-        with patch("shortform_editor.cli.shutil.which", return_value=None), \
-             patch("importlib.util.find_spec", return_value=None), redirect_stdout(output):
+        with patch("shortform_editor.cli.shutil.which", return_value=None), patch("importlib.util.find_spec", return_value=None), redirect_stdout(output):
             result = command_doctor(Namespace())
         report = json.loads(output.getvalue())
         self.assertEqual(result, 2)
@@ -23,17 +47,8 @@ class DoctorTests(unittest.TestCase):
 
     def test_reports_ready_core_with_missing_optional_extras_and_nvenc(self):
         output = StringIO()
-        def which(name):
-            return {"ffmpeg": "/fake/ffmpeg", "ffprobe": "/fake/ffprobe"}.get(name)
-        def run(args):
-            stdout = ("Encoders: h264_nvenc libx264" if args[-1] == "-encoders" else
-                      (" T.. subtitles\n T.. fps\n T.. scale\n T.. crop\n T.. setpts\n T.. setsar\n T.. format\n T.. aresample\n T.. blackdetect\n T.. freezedetect\n T.. volumedetect\n T.. ebur128" if args[-1] == "-filters" else "tool version fake"))
-            return subprocess.CompletedProcess(args, 0, stdout, "")
-        def find_spec(name):
-            return object() if name in {"jsonschema", "psutil"} else None
-        with patch("shortform_editor.cli.shutil.which", side_effect=which), \
-             patch("shortform_editor.cli.run_checked", side_effect=run), \
-             patch("importlib.util.find_spec", side_effect=find_spec), redirect_stdout(output):
+        which, run, find_spec = self._mock_environment()
+        with patch("shortform_editor.cli.shutil.which", side_effect=which), patch("shortform_editor.cli.run_checked", side_effect=run), patch("importlib.util.find_spec", side_effect=find_spec), redirect_stdout(output):
             result = command_doctor(Namespace())
         report = json.loads(output.getvalue())
         self.assertEqual(result, 0)
@@ -41,24 +56,14 @@ class DoctorTests(unittest.TestCase):
         self.assertTrue(report["accelerators"]["h264_nvenc"]["available"])
         self.assertTrue(report["accelerators"]["libx264"]["available"])
         self.assertTrue(report["accelerators"]["subtitles_filter"]["available"])
+        self.assertTrue(report["accelerators"]["filters"]["ebur128"]["available"])
         self.assertEqual(set(report["missing_optional"]), {"faster_whisper", "cv2", "yt_dlp"})
-
 
     def test_reports_missing_required_filter_instead_of_false_ready(self):
         output = StringIO()
-        def which(name):
-            return {"ffmpeg": "/fake/ffmpeg", "ffprobe": "/fake/ffprobe"}.get(name)
-        required = "subtitles fps scale crop setpts setsar format aresample blackdetect freezedetect volumedetect".split()
-        filters = "\\n".join(f" T.. {name}" for name in required)
-        def run(args):
-            stdout = ("Encoders: libx264" if args[-1] == "-encoders" else
-                      (filters if args[-1] == "-filters" else "tool version fake"))
-            return subprocess.CompletedProcess(args, 0, stdout, "")
-        def find_spec(name):
-            return object() if name in {"jsonschema", "psutil"} else None
-        with patch("shortform_editor.cli.shutil.which", side_effect=which), \\
-             patch("shortform_editor.cli.run_checked", side_effect=run), \\
-             patch("importlib.util.find_spec", side_effect=find_spec), redirect_stdout(output):
+        filters = "\\n".join(line for line in FILTERS.splitlines() if "ebur128" not in line)
+        which, run, find_spec = self._mock_environment(filters)
+        with patch("shortform_editor.cli.shutil.which", side_effect=which), patch("shortform_editor.cli.run_checked", side_effect=run), patch("importlib.util.find_spec", side_effect=find_spec), redirect_stdout(output):
             result = command_doctor(Namespace())
         report = json.loads(output.getvalue())
         self.assertEqual(result, 2)
