@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from shortform_editor.cli import validate_edl
 
@@ -37,6 +38,11 @@ def valid_edl():
 
 
 class EDLValidationTests(unittest.TestCase):
+    def test_packaged_schema_matches_repository_schema(self):
+        repository_schema = Path(__file__).resolve().parents[1] / "schemas" / "edit-decision-list.schema.json"
+        packaged_schema = Path(__file__).resolve().parents[1] / "shortform_editor" / "schemas" / "edit-decision-list.schema.json"
+        self.assertEqual(repository_schema.read_bytes(), packaged_schema.read_bytes())
+
     def test_accepts_valid_draft(self):
         self.assertEqual(validate_edl(valid_edl()), [])
 
