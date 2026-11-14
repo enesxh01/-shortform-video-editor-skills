@@ -185,6 +185,31 @@ def _make_candidate(source_id: str, segments: list[dict[str, Any]], audio_window
     }
 
 
+def select_diverse_candidates(candidates: list[dict[str, Any]], limit: int,
+                             max_per_family: int = 3) -> list[dict[str, Any]]:
+    """Keep strong candidates while avoiding a shortlist dominated by one content family."""
+    if limit < 1 or max_per_family < 1:
+        raise ValueError("Candidate limit and family cap must be positive")
+    ranked = sorted(
+        candidates,
+        key=lambda item: (float(item.get("score", 0)), float(item.get("confidence", 0))),
+        reverse=True
+    )
+    selected: list[dict[str, Any]] = []
+    deferred: list[dict[str, Any]] = []
+    family_counts: dict[str, int] = {}
+    for candidate in ranked:
+        family = str(candidate.get("family") or "unclassified")
+        if family_counts.get(family, 0) < max_per_family and len(selected) < limit:
+            selected.append(candidate)
+            family_counts[family] = family_counts.get(family, 0) + 1
+        else:
+            deferred.append(candidate)
+    if len(selected) < limit:
+        selected.extend(deferred[:limit - len(selected)])
+    return selected
+
+
 def detect_moments(analysis: dict[str, Any], min_duration: float = 12.0,
                    max_duration: float = 55.0, limit: int = 10) -> dict[str, Any]:
     transcription = analysis.get("analysis", {}).get("transcription", {})
@@ -240,13 +265,19 @@ def detect_moments(analysis: dict[str, Any], min_duration: float = 12.0,
         seen_ranges.append((start, end))
         candidates.append(candidate)
 
-    candidates.sort(key=lambda item: (item["score"], item["confidence"]), reverse=True)
+    ranked_candidates = sorted(candidates, key=lambda item: (item["score"], item["confidence"]), reverse=True)
+    selected_candidates = select_diverse_candidates(ranked_candidates, limit, max_per_family=3)
     return {
         "schema_version": "1.0",
         "source_fingerprint": source_id,
         "method": "transparent_rules_and_audio_energy",
-        "candidate_count": min(limit, len(candidates)),
-        "candidates": candidates[:limit],
+        "candidate_count": len(selected_candidates),
+        "selection_policy": {
+            "primary_order": "heuristic_score_then_confidence",
+            "family_diversity_cap": 3,
+            "note": "Up to three candidates per content family are selected before filling remaining slots by score; scores are unchanged."
+        },
+        "candidates": selected_candidates,
         "limitations": [
             "This is a transparent baseline, not a trained viral-moment model and not a probability of virality.",
             "Text cues include common English, Albanian, Spanish, French and German expressions; other languages and code-switching still need human review.",
