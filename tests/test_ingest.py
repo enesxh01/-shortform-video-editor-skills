@@ -119,6 +119,31 @@ class URLIngestionTests(unittest.TestCase):
                     download_source("https://example.com/video", output)
             self.assertEqual(list(output.iterdir()), [])
 
+    def test_live_size_guard_aborts_and_cleans_partial_download(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "out"
+            output.mkdir()
+
+            class OversizeYoutubeDL:
+                def __init__(self, options):
+                    self.options = options
+                def __enter__(self): return self
+                def __exit__(self, *args): return False
+                def extract_info(self, url, download):
+                    (output / "source.mp4.part").write_bytes(b"partial")
+                    self.options["progress_hooks"][0]({
+                        "downloaded_bytes": 2048 * 1024 * 1024 + 1
+                    })
+                def prepare_filename(self, info):
+                    return str(output / "source.mp4")
+
+            fake = types.ModuleType("yt_dlp")
+            fake.YoutubeDL = OversizeYoutubeDL
+            with patch.dict(sys.modules, {"yt_dlp": fake}):
+                with self.assertRaisesRegex(PipelineError, "exceeded"):
+                    download_source("https://example.com/video", output)
+            self.assertEqual(list(output.iterdir()), [])
+
     def test_cleans_partial_files_after_downloader_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "out"
