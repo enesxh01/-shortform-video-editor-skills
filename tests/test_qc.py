@@ -81,5 +81,13 @@ class QCTests(unittest.TestCase):
         self.assertEqual(result, 0)
 
 
+    def test_flags_freeze_that_continues_to_end_of_file(self):
+        report = probe()
+        report["format"] = {"duration": "10.0"}
+        result = assess_probe(report, "freeze_start:8.0\\nfreeze_duration:2.0")
+        self.assertEqual(result["freeze_regions"], [{"start": 8.0, "end": 10.0}])
+        self.assertEqual(result["status"], "fail")
+
+
 if __name__ == "__main__":
     unittest.main()
