@@ -7,6 +7,7 @@ from argparse import Namespace
 from pathlib import Path
 
 from shortform_editor.cli import command_render, probe_media
+from shortform_editor.repair import repair_technical_export
 
 
 @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg integration tools unavailable")
@@ -100,6 +101,15 @@ class RenderIntegrationTests(unittest.TestCase):
                 self.assertEqual(video["codec_name"], "h264")
                 self.assertEqual(video["avg_frame_rate"], "30/1")
                 self.assertTrue(any(s["codec_type"] == "audio" for s in rendered["streams"]))
+
+            repaired = root / "repaired.mp4"
+            repair_report = repair_technical_export(
+                source, repaired, width=1080, height=1920, fps="30/1",
+                crf=30, preset="ultrafast"
+            )
+            self.assertTrue(repaired.exists())
+            self.assertEqual(repair_report["output"], str(repaired.resolve()))
+            self.assertEqual(repair_report["qc_after_repair"]["status"], "passed")
 
 
 if __name__ == "__main__":
