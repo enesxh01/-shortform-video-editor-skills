@@ -481,6 +481,8 @@ def _render_part_is_reusable(part: Path, record: Any, ffmpeg: str, ffprobe: str,
     expected_digest = record.get("sha256")
     if not isinstance(expected_digest, str) or len(expected_digest) != 64:
         return False
+    if record.get("encoder") not in {"h264_nvenc", "libx264"}:
+        return False
     try:
         if sha256_file(part) != expected_digest or part.stat().st_size <= 0:
             return False
@@ -588,6 +590,7 @@ def command_render(args: argparse.Namespace) -> int:
     render_state_path = render_workdir / "render-state.json"
     render_state: dict[str, Any] | None = None
     reused_segments: list[int] = []
+    segment_encoders: dict[int, str] = {}
     if resume_enabled:
         split_fingerprints = [
             {"segment": index, "source": key, "fingerprint": edl["segments"][index][key]["fingerprint"]}
@@ -641,6 +644,8 @@ def command_render(args: argparse.Namespace) -> int:
                 if _render_part_is_reusable(part, record, ffmpeg, require_tool("ffprobe"), width, height, fps):
                     parts.append(part)
                     reused_segments.append(index)
+                    segment_encoders[index] = record["encoder"]
+                    args._selected_encoder = record["encoder"]
                     continue
                 part.unlink(missing_ok=True)
                 render_state["parts"].pop(str(index), None)
@@ -764,8 +769,10 @@ def command_render(args: argparse.Namespace) -> int:
                 args._selected_encoder = "libx264"
                 args._encoder_fallback = "NVENC failed; CPU libx264 fallback used"
             parts.append(part)
+            actual_encoder = getattr(args, "_selected_encoder", encoder)
+            segment_encoders[index] = actual_encoder
             if resume_enabled and render_state is not None:
-                render_state["parts"][str(index)] = {"sha256": sha256_file(part), "size_bytes": part.stat().st_size}
+                render_state["parts"][str(index)] = {"sha256": sha256_file(part), "size_bytes": part.stat().st_size, "encoder": actual_encoder}
                 _write_render_state(render_state_path, render_state)
 
         concat_file = tmpdir / "concat.txt"
@@ -817,6 +824,7 @@ def command_render(args: argparse.Namespace) -> int:
         "render": render,
         "segments": len(edl["segments"]),
         "resumed_segments": reused_segments,
+        "video_encoders_used": sorted(set(segment_encoders.values())),
         "layouts": sorted({segment["layout"] for segment in edl["segments"]}),
         "captions": sum(len(segment.get("captions", [])) for segment in edl["segments"]),
         "status": "preview_rendered_and_decode_checked" if preview_mode else "rendered_and_decode_checked",
@@ -826,7 +834,7 @@ def command_render(args: argparse.Namespace) -> int:
             "Split layout uses explicit top and bottom secondary video sources; primary source audio is retained.",
             "Blurred-bars layout uses a blurred full-frame background and sharp 60% center panel.",
             "Kino captions use ASS/libass; word karaoke requires word timings in the EDL.",
-            f"Video encoder used: {getattr(args, '_selected_encoder', 'libx264')}. Auto mode prefers NVIDIA NVENC when available and falls back to CPU libx264 if NVENC cannot initialize.",
+            f"Video encoder(s) used: {', '.join(sorted(set(segment_encoders.values())))}. Auto mode prefers NVIDIA NVENC when available and falls back to CPU libx264 if NVENC cannot initialize.",
             *([getattr(args, "_encoder_fallback")] if getattr(args, "_encoder_fallback", None) else []),
             "60 fps CFR conversion does not create native 60 fps motion from lower-frame-rate footage.",
             "Decode success is not a substitute for human visual and audio review."
