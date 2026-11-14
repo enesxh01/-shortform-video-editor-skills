@@ -192,6 +192,22 @@ def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 
     }
 
 
+
+def add_expected_duration_check(report: dict[str, Any], actual_duration: float,
+                                expected_duration: float, tolerance: float = 0.1) -> dict[str, Any]:
+    delta = abs(float(actual_duration) - float(expected_duration))
+    passed = delta <= tolerance
+    report.setdefault("checks", []).append({
+        "name": "rendered_duration",
+        "status": "passed" if passed else "major",
+        "detail": f"Actual {actual_duration:.3f}s; expected {expected_duration:.3f}s; delta {delta:.3f}s; tolerance {tolerance:.3f}s"
+    })
+    if not passed:
+        report.setdefault("failures", []).append("Rendered duration does not match the EDL timeline")
+        report["status"] = "fail"
+    return report
+
+
 def run_qc(source: Path, expected_width: int = 1080, expected_height: int = 1920,
            expected_fps: str = "60/1") -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
