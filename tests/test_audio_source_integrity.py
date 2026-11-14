@@ -14,11 +14,6 @@ class AudioSourceIntegrityTests(unittest.TestCase):
             "source": {"fingerprint": "sha256:" + "a" * 64},
             "streams": [{"codec_type": "audio", "index": 1, "start_time": "0.0"}]
         }
-        second = {
-            "source": {"fingerprint": "sha256:" + "b" * 64},
-            "streams": [{"codec_type": "audio", "index": 1, "start_time": "0.0"}]
-        }
-
         def write_wav(source, destination, stream_index):
             with wave.open(str(destination), "wb") as wav:
                 wav.setnchannels(1)
