@@ -98,6 +98,7 @@ def sample_region_timestamps(regions: list[tuple[float, float]], duration: float
             intervals.append((local_start, local_end, index))
     if not intervals:
         return []
+    intervals.sort(key=lambda item: item[0])
     total = sum(end - start for start, end, _ in intervals)
     count = min(max_frames, max(len(intervals), int(total * sample_rate)))
     step = total / count
