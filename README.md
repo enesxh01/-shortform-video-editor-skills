@@ -32,6 +32,16 @@ This uses CSRT when the installed OpenCV-contrib build exposes it. It is user-se
 - No automatic B-roll or sound effects unless requested for a specific edit.
 - No virality guarantees.
 
+
+
+For a full analysis job with the same human-selected subject box applied to each candidate window, use:
+
+```bash
+shortform-editor analyze-project input.mp4 -o job-output/ --visuals --visual-roi 0.32 0.18 0.24 0.42
+```
+
+The ROI is included in the analysis-job settings fingerprint, so a resume must use the same coordinates.
+
 ## Visual layouts
 
 The renderer has initial code for exactly three layouts:
