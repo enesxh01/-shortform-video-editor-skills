@@ -92,3 +92,9 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 
 - The FFmpeg integration suite now simulates interruption after the first of two segment encodes, verifies the completed segment checkpoint is persisted, restarts the same render, confirms the first segment is reused and the final output is decoded/probed at 60 fps CFR.
 - This exercises the recovery path on synthetic media in CI; real-footage interruption behavior and target-desktop NVENC performance remain unverified.
+
+
+## Synthetic VFR normalization test
+
+- The FFmpeg integration suite now creates a deliberately irregular-frame-cadence H.264 source with continuous AAC audio, verifies the bounded probe identifies likely VFR, renders it through the timestamp-rebase/CFR/audio-resample path, then verifies a 60/1 CFR output and video/audio stream durations aligned within 100 ms.
+- This is a synthetic regression test for ordinary VFR cadence gaps; it does not establish perceptual lip-sync for arbitrary damaged timestamps or prove all real-world VFR files are safe.

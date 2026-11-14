@@ -274,5 +274,69 @@ class RenderIntegrationTests(unittest.TestCase):
 
 
 
+    def test_vfr_source_is_rebased_to_60fps_cfr_with_audio_timing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "variable-rate.mp4"
+            subprocess.run([
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=60:duration=3",
+                "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=3",
+                "-vf", "select='not(eq(mod(n,13),0))'",
+                "-fps_mode", "vfr", "-c:v", "libx264", "-preset", "ultrafast",
+                "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(source)
+            ], check=True, capture_output=True)
+            source_probe = probe_media(source)
+            self.assertEqual(source_probe["frame_timing"]["status"], "likely_vfr")
+            video_stream = next(item for item in source_probe["streams"] if item["codec_type"] == "video")
+            edl = {
+                "schema_version": "1.0",
+                "project_id": "vfr-normalization-integration",
+                "source": {
+                    "fingerprint": source_probe["source"]["fingerprint"],
+                    "time_base": video_stream["time_base"],
+                    "frame_rate": video_stream.get("r_frame_rate", "60/1"),
+                    "variable_frame_rate": True
+                },
+                "render": {
+                    "width": 1080, "height": 1920, "fps_target": "60/1",
+                    "fps_mode": "cfr", "fps_conversion": "duplicate_drop",
+                    "container": "mp4", "video_codec": "h264", "audio_codec": "aac"
+                },
+                "segments": [{
+                    "id": "vfr-segment", "source_in": "00:00:00.000",
+                    "source_out": "00:00:02.900", "timeline_start": "00:00:00.000",
+                    "layout": "fullscreen", "reason": "VFR normalization integration test",
+                    "confidence": 0.8, "captions": []
+                }],
+                "approval": {
+                    "status": "approved", "approved_by_user": True,
+                    "approved_at": "2026-01-01T00:00:00+00:00"
+                }
+            }
+            edl["approval"]["approved_edl_sha256"] = edl_approval_hash(edl)
+            edl_path = root / "approved-vfr.json"
+            edl_path.write_text(json.dumps(edl), encoding="utf-8")
+            output = root / "normalized.mp4"
+            args = Namespace(
+                source=str(source), edl=str(edl_path), output=str(output),
+                crf=30, preset="ultrafast", overwrite=False, encoder="libx264",
+                nvenc_preset="p5", nvenc_cq=19
+            )
+            captured = io.StringIO()
+            with redirect_stdout(captured):
+                result = command_render(args)
+            self.assertEqual(result, 0)
+            report = json.loads(captured.getvalue())
+            self.assertEqual(report["status"], "rendered_and_decode_checked")
+            rendered = probe_media(output)
+            self.assertEqual(rendered["frame_timing"]["status"], "likely_cfr")
+            video = next(item for item in rendered["streams"] if item["codec_type"] == "video")
+            audio = next(item for item in rendered["streams"] if item["codec_type"] == "audio")
+            self.assertEqual(video["avg_frame_rate"], "60/1")
+            self.assertLess(abs(float(video["duration"]) - float(audio["duration"])), 0.1)
+
+
+
 if __name__ == "__main__":
     unittest.main()
