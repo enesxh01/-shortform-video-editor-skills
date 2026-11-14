@@ -61,11 +61,12 @@ class FeedbackTests(unittest.TestCase):
 
     def test_feedback_adjusted_score_is_clamped_to_0_through_100(self):
         candidates = {"candidates": [{"candidate_id": "perfect", "family": "comedy", "score": 100}]}
-        records = [
-            {"candidate_id": f"c{i}", "source_fingerprint": "s", "family": "comedy", "decision": "approve"}
-            for i in range(3)
-        ]
+        records = (
+            [{"candidate_id": f"c{i}", "source_fingerprint": "s", "family": "comedy", "decision": "approve"} for i in range(3)] +
+            [{"candidate_id": f"r{i}", "source_fingerprint": "s", "family": "conflict", "decision": "reject"} for i in range(3)]
+        )
         result = apply_feedback(candidates, records)
+        self.assertEqual(result["candidates"][0]["feedback_adjustment"], 3.0)
         self.assertEqual(result["candidates"][0]["score_after_feedback"], 100.0)
 
 
