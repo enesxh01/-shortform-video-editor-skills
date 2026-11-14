@@ -16,7 +16,7 @@ For a non-face subject such as a gameplay character, car or ball, you can manual
 shortform-editor analyze-visuals gameplay.mp4 -o visual-analysis.json --no-face-detection --track-roi 0.32 0.18 0.24 0.42 --sample-rate 3 --max-frames 240
 ```
 
-This uses CSRT when the installed OpenCV-contrib build exposes it. It is user-seeded tracking, not automatic object detection; if tracking is lost, the report marks the fallback. Review the resulting crop keyframes.
+This prefers CSRT when the installed OpenCV-contrib build exposes it and falls back to built-in KLT optical flow otherwise. It is user-seeded tracking, not automatic object detection; if tracking is lost, the report marks the fallback. Review the resulting crop keyframes.
 
 ## Goals
 
@@ -49,7 +49,7 @@ The renderer has initial code for exactly three layouts:
 - `split_vertical`: top/bottom panels from two explicit secondary sources, with centered captions.
 - `blurred_bars_20_60_20`: blurred top 20%, sharp center 60%, blurred bottom 20%.
 
-All three layouts and ASS captions have synthetic FFmpeg integration coverage. The last completed full GitHub Actions matrix passed on Ubuntu and Windows with Python 3.10 and 3.12 ([run #43618792418](https://github.com/enesxh01/-shortform-video-editor-skills/actions/runs/43618792418)). Newer commits are being validated separately. Split mode requires two secondary video files; provide them with `--split-top-source` and `--split-bottom-source`, plus optional source offsets.
+All three layouts and ASS captions have synthetic FFmpeg integration coverage. The last completed full GitHub Actions matrix passed on Ubuntu and Windows with Python 3.10 and 3.12 ([run #43620015459](https://github.com/enesxh01/-shortform-video-editor-skills/actions/runs/43620015459)). Newer commits are being validated separately. Split mode requires two secondary video files; provide them with `--split-top-source` and `--split-bottom-source`, plus optional source offsets.
 
 ## Skill suite
 

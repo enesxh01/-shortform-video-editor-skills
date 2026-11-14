@@ -107,7 +107,7 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 - The heuristic does not change the candidate's ranking score; it surfaces where a human should verify spelling/names against the original audio. ASR probabilities are model estimates, not calibrated truth.
 
 
-## One-command setup (implemented; CI pending)
+## One-command setup (implemented; CI matrix passing)
 
 - `scripts/setup.sh` and `scripts/setup.ps1` install the editable CLI package with audio, visual and download extras, install the OpenCode skills with timestamped backups, and run the environment doctor.
 - They intentionally do not silently install system FFmpeg packages or alter PATH. If FFmpeg/ffprobe are missing, setup leaves the Python package and skills installed, prints OS-specific guidance and exits non-zero until the required FFmpeg build is available.
@@ -116,4 +116,9 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 ## Latest CI verification
 
 - Full Linux/Windows × Python 3.10/3.12 matrix passed on commit `5515b75a`, including the synthetic VFR-to-CFR/audio-duration integration test, the interrupted render-resume test, packaging and skill installation.
-- The one-command setup scripts were added after that run and are awaiting their own CI verification; the underlying CLI/package and existing skill installers are already covered by the green matrix.
+- The one-command setup scripts, Python-version checks, Bash syntax validation and PowerShell parser validation are included in the passing matrix.
+
+
+## Latest full CI matrix
+
+- Commit `28f4ff8a` passed all four Linux/Windows × Python 3.10/3.12 jobs. The run includes the setup-script tests, Bash syntax checks, PowerShell syntax parsing, KLT optical-flow fallback tests, synthetic VFR normalization and interrupted render-resume integration tests.
