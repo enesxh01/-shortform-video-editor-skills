@@ -7,6 +7,12 @@ description: Tighten selected clips by improving pacing while preserving compreh
 
 This module edits the pacing of already-selected candidates. It does not decide whether a moment is intrinsically compelling; that belongs to viral-moment detection.
 
+## Executable baseline
+
+Run `shortform-editor analyze-pacing audio-analysis.json candidates.json -o pacing.json` after candidate discovery. The first implementation preserves ASR utterance ranges, identifies long energy-silence gaps, proposes only reviewable trims, preserves pauses near delivery/reaction cues, and flags adjacent repeated words. It is advisory only: no EDL is modified and no trim is rendered automatically. Source fingerprints must match.
+
+ASR utterance boundaries are not guaranteed sentence boundaries. Review all suggested cuts against the actual audio/video, especially non-English speech, jokes, reactions and turn-taking.
+
 ## Understand before tightening
 
 Use transcript, audio, visual events, speaker turns, joke/story structure, and action continuity. Identify:
