@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0",
+  "project_id": "replace-with-project-id",
+  "source": {
+    "path": "ABSOLUTE_PATH_TO_SOURCE_VIDEO",
+    "fingerprint": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "time_base": "1/90000",
+    "frame_rate": "30000/1001",
+    "variable_frame_rate": false
+  },
+  "render": {
+    "width": 1080,
+    "height": 1920,
+    "fps_target": "60/1",
+    "fps_mode": "cfr",
+    "fps_conversion": "duplicate_drop",
+    "container": "mp4",
+    "video_codec": "h264",
+    "audio_codec": "aac"
+  },
+  "segments": [
+    {
+      "id": "clip-001",
+      "source_in": "00:12:04.200",
+      "source_out": "00:12:29.800",
+      "layout": "fullscreen",
+      "reason": "A complete, context-preserving story beat with a clear hook and payoff.",
+      "confidence": 0.86,
+      "captions": [
+        {
+          "start": "00:00:00.400",
+          "end": "00:00:02.100",
+          "text": "This is the key reveal.",
+          "style": "kino",
+          "position": "bottom",
+          "words": [
+            {"text": "This", "start": "00:00:00.400", "end": "00:00:00.650"},
+            {"text": "is", "start": "00:00:00.650", "end": "00:00:00.800"},
+            {"text": "the", "start": "00:00:00.800", "end": "00:00:01.000"},
+            {"text": "key", "start": "00:00:01.000", "end": "00:00:01.350"},
+            {"text": "reveal.", "start": "00:00:01.350", "end": "00:00:02.100"}
+          ]
+        }
+      ]
+    }
+  ],
+  "approval": {
+    "status": "needs_review",
+    "approved_by_user": false
+  }
+}
