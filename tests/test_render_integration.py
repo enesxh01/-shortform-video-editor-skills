@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from argparse import Namespace
 from pathlib import Path
+from unittest.mock import patch
 
 from shortform_editor.approval import edl_approval_hash
 from shortform_editor.cli import command_render, command_render_preview, probe_media
