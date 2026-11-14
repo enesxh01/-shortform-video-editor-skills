@@ -179,5 +179,24 @@ class PipelineOrchestrationTests(unittest.TestCase):
             self.assertEqual(manifest["feedback_learning"]["records_used"], 6)
 
 
+    def test_aborts_when_source_changes_between_probe_and_audio_analysis(self):
+        original = "sha256:" + ("a" * 64)
+        changed = "sha256:" + ("b" * 64)
+        probe = {
+            "source": {"path": "source.mp4", "sha256": "a" * 64, "fingerprint": original},
+            "format": {"duration": "30.0"},
+            "streams": [{"codec_type": "video", "time_base": "1/90000", "avg_frame_rate": "30/1"}]
+        }
+        audio = {"source": {"fingerprint": changed}, "analysis": {"transcription": {"status": "completed"}}}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.mp4"
+            source.write_bytes(b"placeholder")
+            with patch("shortform_editor.pipeline.probe_media", return_value=probe), \
+                 patch("shortform_editor.pipeline.analyze_audio", return_value=audio):
+                with self.assertRaisesRegex(PipelineError, "changed between initial probe and audio analysis"):
+                    analyze_project(source, root / "job")
+
+
 if __name__ == "__main__":
     unittest.main()
