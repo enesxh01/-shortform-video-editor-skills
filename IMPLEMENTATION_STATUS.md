@@ -60,7 +60,15 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 5. **Creative finishing:** cross-dissolves, richer motion/keyframe effects, audio mixing/ducking and rendered-pixel caption/visual QA remain outside the current supported EDL/render contract. Existing fades, crop keyframes, captions, color correction, sharpening and technical QC are implemented.
 6. **Release/legal choices:** the repository has no root project license. The owner must choose one; exact transitive dependency, FFmpeg build and downloaded model-weight terms must be reviewed before redistribution.
 
-The latest four-platform CI matrix is green, resumable analysis/rendering is implemented, and final MP4 publication is gated by technical QC. These remaining gates depend on the target machine/footage, require owner licensing decisions, or are explicitly future capabilities—not hidden claims of readiness.\n\n## Disk-space preflight (implemented)\n\n- Added `check_disk_space` with an explicit safety reserve and actionable insufficient-space error.\n- Render preflight checks both output and system temporary volumes before expensive encoding.\n- Uses a conservative duration-based working-set estimate; it is not an exact output-size prediction.\n- Unit tests cover adequate and inadequate free-space cases.\n
+The latest four-platform CI matrix is green, resumable analysis/rendering is implemented, and final MP4 publication is gated by technical QC. These remaining gates depend on the target machine/footage, require owner licensing decisions, or are explicitly future capabilities—not hidden claims of readiness.
+
+## Disk-space preflight (implemented)
+
+- Added `check_disk_space` with an explicit safety reserve and actionable insufficient-space error.
+- Render preflight checks both output and system temporary volumes before expensive encoding.
+- Uses a conservative duration-based working-set estimate; it is not an exact output-size prediction.
+- Unit tests cover adequate and inadequate free-space cases.
+
 
 ## Editorial quality advisory (implemented; heuristic)
 
