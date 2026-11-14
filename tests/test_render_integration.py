@@ -59,6 +59,11 @@ class RenderIntegrationTests(unittest.TestCase):
                         ]
                     }]
                 }
+                if layout == "fullscreen":
+                    segment["crop_keyframes"] = [
+                        {"time_seconds": 0.0, "crop_9_16": {"x": 20, "y": 0, "width": 202.5, "height": 360}},
+                        {"time_seconds": 1.0, "crop_9_16": {"x": 100, "y": 0, "width": 202.5, "height": 360}}
+                    ]
                 if layout == "split_vertical":
                     segment["split_top"] = {
                         "path": str(top), "fingerprint": top_probe["source"]["fingerprint"],
