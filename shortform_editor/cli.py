@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
+import math
 import re
 import shutil
 import subprocess
@@ -98,8 +98,7 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None) -> l
     except ImportError as exc:
         raise PipelineError("Install project dependencies first: pip install -e .") from exc
 
-    schema = load_schema()
-    errors = sorted(Draft202012Validator(schema).iter_errors(edl), key=lambda e: list(e.absolute_path))
+    errors = sorted(Draft202012Validator(load_schema()).iter_errors(edl), key=lambda e: list(e.absolute_path))
     messages = [
         f"{'.'.join(map(str, err.absolute_path)) or '<root>'}: {err.message}"
         for err in errors
@@ -112,10 +111,13 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None) -> l
     if abs(ratio - (9 / 16)) > 0.002:
         messages.append("render dimensions must be portrait 9:16 (within 0.2% tolerance)")
     try:
-        Fraction(render["fps_target"])
-        Fraction(edl["source"]["time_base"])
+        fps = Fraction(render["fps_target"])
+        time_base = Fraction(edl["source"]["time_base"])
+        if fps <= 0 or time_base <= 0:
+            raise ValueError("rational values must be positive")
         if edl["source"].get("frame_rate"):
-            Fraction(edl["source"]["frame_rate"])
+            if Fraction(edl["source"]["frame_rate"]) <= 0:
+                raise ValueError("frame rate must be positive")
     except (ValueError, ZeroDivisionError):
         messages.append("frame rate and time_base values must be valid positive rational numbers")
 
@@ -147,12 +149,17 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None) -> l
 
 
 def command_probe(args: argparse.Namespace) -> int:
-    report = probe_media(Path(args.source))
-    output = json.dumps(report, indent=2)
+    source = Path(args.source).expanduser().resolve(strict=True)
+    report = probe_media(source)
+    output = json.dumps(report, indent=2) + "\n"
     if args.output:
-        Path(args.output).expanduser().write_text(output + "\n", encoding="utf-8")
+        destination = Path(args.output).expanduser().resolve()
+        if destination == source:
+            raise PipelineError("Probe report cannot overwrite the source media")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(output, encoding="utf-8")
     else:
-        print(output)
+        print(output, end="")
     return 0
 
 
@@ -161,7 +168,11 @@ def command_validate(args: argparse.Namespace) -> int:
     duration = None
     if args.probe:
         probe = json.loads(Path(args.probe).read_text(encoding="utf-8"))
-        duration = float(probe.get("format", {}).get("duration"))
+        raw_duration = probe.get("format", {}).get("duration")
+        if raw_duration is not None:
+            duration = float(raw_duration)
+            if not math.isfinite(duration) or duration <= 0:
+                raise PipelineError("Probe report contains an invalid source duration")
     errors = validate_edl(edl, duration)
     if errors:
         print("EDL INVALID:")
@@ -176,8 +187,17 @@ def command_render(args: argparse.Namespace) -> int:
     edl_path = Path(args.edl).expanduser().resolve(strict=True)
     edl = json.loads(edl_path.read_text(encoding="utf-8"))
     source = Path(args.source).expanduser().resolve(strict=True)
+    output = Path(args.output).expanduser().resolve()
+    if output in {source, edl_path}:
+        raise PipelineError("Output must not overwrite the source media or EDL")
+    if not 0 <= args.crf <= 51:
+        raise PipelineError("--crf must be between 0 and 51")
+    if any(segment.get("layout") != "fullscreen" for segment in edl.get("segments", [])):
+        raise PipelineError("This MVP renderer supports fullscreen only; split_vertical and blurred_bars_20_60_20 are not implemented")
+
     probe = probe_media(source)
-    duration = float(probe.get("format", {}).get("duration", 0))
+    raw_duration = probe.get("format", {}).get("duration")
+    duration = float(raw_duration) if raw_duration is not None else None
     errors = validate_edl(edl, duration)
     if errors:
         raise PipelineError("Refusing to render invalid EDL:\n- " + "\n- ".join(errors))
@@ -186,7 +206,6 @@ def command_render(args: argparse.Namespace) -> int:
 
     ffmpeg = require_tool("ffmpeg")
     render = edl["render"]
-    output = Path(args.output).expanduser().resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists() and not args.overwrite:
         raise PipelineError(f"Output already exists (use --overwrite): {output}")
@@ -224,7 +243,6 @@ def command_render(args: argparse.Namespace) -> int:
             "-f", "concat", "-safe", "1", "-i", str(concat_file),
             "-c", "copy", "-movflags", "+faststart", str(assembled)
         ])
-        # Decode the complete output before publishing it.
         run_checked([ffmpeg, "-hide_banner", "-v", "error", "-i", str(assembled), "-f", "null", "-"])
         if output.exists():
             output.unlink()
