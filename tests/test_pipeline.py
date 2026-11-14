@@ -279,7 +279,7 @@ class PipelineOrchestrationTests(unittest.TestCase):
                 with self.assertRaisesRegex(PipelineError, "source/options do not match"):
                     analyze_project(source, output, top_candidates=2, resume=True)
                 with self.assertRaisesRegex(PipelineError, "source/options do not match"):
-                    analyze_project(source, output, top_candidates=1, resume=True, visual_roi=(0.1, 0.1, 0.2, 0.2))
+                    analyze_project(source, output, top_candidates=1, resume=True, include_visuals=True, visual_roi=(0.1, 0.1, 0.2, 0.2))
                 changed_probe = dict(probe)
                 changed_probe["source"] = dict(probe["source"], fingerprint="sha256:" + ("e" * 64), sha256="e" * 64)
                 with patch("shortform_editor.pipeline.probe_media", return_value=changed_probe):
