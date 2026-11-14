@@ -30,7 +30,7 @@ The design supports exactly three primary layouts: fullscreen, top/bottom vertic
 - `audio-intelligence` — FFmpeg audio extraction, energy/silence evidence, optional faster-whisper ASR with word timestamps (partial implementation)
 - `viral-moment-detection` — transcript-aligned candidate discovery and explainable heuristic ranking (baseline implementation; low confidence)
 - `visual-storytelling` — subject/action analysis and framing (design-only)
-- `retention-pacing` — context-safe tightening (design-only)
+- `retention-pacing` — transcript-bound pacing proposals and review-only silence trimming (baseline implementation)
 - `editing-director` — conflict resolution and EDL authoring
 - `edit-decision-list` — versioned timeline contract
 - `kino-editing` — captions, motion, and the three approved layouts (design-only)
@@ -53,6 +53,7 @@ python -m pip install -e .
 shortform-editor probe input.mp4 -o probe.json
 shortform-editor analyze-audio input.mp4 -o audio-analysis.json
 shortform-editor find-moments audio-analysis.json -o candidates.json
+shortform-editor analyze-pacing audio-analysis.json candidates.json -o pacing.json
 # Optional ASR: python -m pip install -e '.[audio]'
 shortform-editor validate-edl edit.json --probe probe.json
 shortform-editor render input.mp4 edit.json output.mp4
