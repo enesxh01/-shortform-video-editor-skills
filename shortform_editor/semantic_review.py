@@ -82,6 +82,8 @@ def validate_semantic_review(review: dict[str, Any], probe: dict[str, Any] | Non
         if candidate_id in rejected_ids:
             messages.append(f"rejected_candidates[{index}].candidate_id is duplicated")
         rejected_ids.add(candidate_id)
+        if candidate_id not in baseline_ids and candidate_id not in semantic_ids:
+            messages.append(f"rejected_candidates[{index}] references an unknown candidate ID")
         if candidate_id in semantic_ids:
             messages.append(f"Candidate {candidate_id!r} cannot be both semantically selected and rejected")
         start, end = float(candidate["source_in_seconds"]), float(candidate["source_out_seconds"])
@@ -92,6 +94,7 @@ def validate_semantic_review(review: dict[str, Any], probe: dict[str, Any] | Non
 
     known_ids = baseline_ids | semantic_ids
     ranked_ids = set()
+    previous_rank_score = 101
     for index, candidate in enumerate(review["final_ranked_candidates"]):
         candidate_id = candidate["candidate_id"]
         if candidate_id in ranked_ids:
@@ -103,6 +106,9 @@ def validate_semantic_review(review: dict[str, Any], probe: dict[str, Any] | Non
             messages.append(f"final_ranked_candidates[{index}] score differs from semantic candidate score")
         if candidate_id in rejected_ids:
             messages.append(f"Rejected candidate {candidate_id!r} cannot appear in final ranking")
+        if candidate["score"] > previous_rank_score:
+            messages.append(f"final_ranked_candidates[{index}] is not ordered by descending score")
+        previous_rank_score = candidate["score"]
     return messages
 
 
