@@ -150,7 +150,7 @@ class RenderIntegrationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             part = Path(directory) / "part.mp4"
             part.write_bytes(b"encoded-segment")
-            record = {"sha256": sha256_file(part)}
+            record = {"sha256": sha256_file(part), "encoder": "libx264"}
             with patch("shortform_editor.cli.run_checked") as run:
                 run.return_value.stdout = json.dumps({"streams": [{
                     "codec_type": "video", "codec_name": "h264", "width": 1080,
