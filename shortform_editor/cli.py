@@ -68,11 +68,19 @@ def validate(edl, source_info=None):
     for k in ("schema_version","project_id","source","render","segments","approval"):
         if k not in edl: errors.append(f"Missing top-level field: {k}")
     if errors: return errors
-    src=edl["source"]; rnd=edl["render"]; segs=edl["segments"]
+    src=edl["source"]; rnd=edl["render"]; segs=edl["segments"]; approval=edl["approval"]
+    if not isinstance(edl["project_id"],str) or not edl["project_id"].strip():
+        errors.append("project_id must be a non-empty string")
     if not src.get("path"): errors.append("source.path is required for rendering")
-    if source_info and src.get("fingerprint") and src["fingerprint"] != source_info["fingerprint"]:
+    if not re.fullmatch(r"sha256:[a-f0-9]{64}",str(src.get("fingerprint",""))):
+        errors.append("source.fingerprint must be a sha256 digest")
+    if not re.fullmatch(r"[1-9][0-9]*/[1-9][0-9]*",str(src.get("time_base",""))):
+        errors.append("source.time_base must be a positive rational")
+    if source_info and src.get("fingerprint") != source_info["fingerprint"]:
         errors.append("Source fingerprint mismatch: EDL does not match the supplied media file")
-    if not isinstance(segs,list) or not segs: errors.append("segments must be a non-empty array")
+    if not isinstance(segs,list) or not segs:
+        errors.append("segments must be a non-empty array")
+        segs=[]
     if rnd.get("container")!="mp4": errors.append("Only MP4 output is currently supported")
     if rnd.get("fps_mode") != "cfr": errors.append("This runtime currently renders CFR only; set fps_mode=cfr")
     try:
@@ -81,27 +89,51 @@ def validate(edl, source_info=None):
     except Exception: errors.append("render.width/height must be valid integers")
     try:
         rate=Fraction(str(rnd.get("fps_target","")))
-        if rate<=0: errors.append("fps_target must be greater than zero")
+        if rate<=0 or rate>240: errors.append("fps_target must be greater than zero and no more than 240")
     except (ValueError,ZeroDivisionError): errors.append("fps_target must be a positive rational such as 60/1")
-    if edl["approval"].get("status")=="approved" and edl["approval"].get("approved_by_user") is not True:
+    if approval.get("status") not in ("draft","needs_review","approved","rejected"):
+        errors.append("Invalid approval.status")
+    if approval.get("status")=="approved" and approval.get("approved_by_user") is not True:
         errors.append("Approved EDL must have approved_by_user=true")
+    ids=set()
     for i,s in enumerate(segs):
         label=f"segments[{i}]"
+        if not isinstance(s,dict):
+            errors.append(f"{label} must be an object"); continue
+        sid=s.get("id")
+        if not isinstance(sid,str) or not sid.strip(): errors.append(f"{label}.id must be non-empty")
+        elif sid in ids: errors.append(f"{label}: duplicate segment id {sid}")
+        else: ids.add(sid)
         try:
             a,b=seconds(s["source_in"]),seconds(s["source_out"])
-            if b<=a: errors.append(f"{label}: source_out must be after source_in")
+            if a<0 or b<=a: errors.append(f"{label}: source_out must be after source_in and source_in non-negative")
             if source_info and b>source_info["duration"]+0.05: errors.append(f"{label}: source_out exceeds source duration")
-        except Exception as e: errors.append(f"{label}: {e}")
+        except Exception as e:
+            errors.append(f"{label}: {e}"); a,b=0,0
         if s.get("layout") not in LAYOUTS: errors.append(f"{label}: unsupported layout")
         if s.get("crop_keyframes"): errors.append(f"{label}: crop_keyframes are not yet supported by the renderer; do not assume subject tracking or animated reframing")
         if s.get("layout")=="split_vertical":
             for key in ("split_top","split_bottom"):
-                if not isinstance(s.get(key),dict) or not s[key].get("path"):
+                part=s.get(key)
+                if not isinstance(part,dict) or not part.get("path"):
                     errors.append(f"{label}: split_vertical requires {key}.path")
-        for c in s.get("captions",[]):
+                elif not re.fullmatch(r"sha256:[a-f0-9]{64}",str(part.get("fingerprint",""))):
+                    errors.append(f"{label}: {key}.fingerprint must be a sha256 digest")
+        for j,cap in enumerate(s.get("captions",[])):
             try:
-                if seconds(c["end"])<=seconds(c["start"]): errors.append(f"{label}: caption end must follow start")
-            except Exception as e: errors.append(f"{label}: invalid caption: {e}")
+                ca,cb=seconds(cap["start"]),seconds(cap["end"])
+                if ca<0 or cb<=ca or cb>(b-a)+0.05:
+                    errors.append(f"{label}.captions[{j}]: timing must be positive and inside the segment")
+                if not isinstance(cap.get("text"),str) or not cap["text"].strip() or len(cap["text"])>500:
+                    errors.append(f"{label}.captions[{j}]: text must contain 1-500 characters")
+                if cap.get("style","kino")!="kino": errors.append(f"{label}.captions[{j}]: only kino caption style is supported")
+                if cap.get("position") not in (None,"auto","center","bottom"):
+                    errors.append(f"{label}.captions[{j}]: invalid position")
+                for word in cap.get("words",[]):
+                    wa,wb=seconds(word["start"]),seconds(word["end"])
+                    if wa<ca-0.05 or wb<=wa or wb>cb+0.05:
+                        errors.append(f"{label}.captions[{j}]: word timing must be inside its caption")
+            except Exception as e: errors.append(f"{label}.captions[{j}]: invalid caption: {e}")
     return errors
 
 def ass_time(t):
