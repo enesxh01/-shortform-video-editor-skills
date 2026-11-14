@@ -50,6 +50,30 @@ class MomentDetectionTests(unittest.TestCase):
         self.assertTrue(_has_cue("Mirëpo kjo ishte e vërteta", "mirëpo"))
         self.assertTrue(_has_cue("Në fund kjo funksionoi", "në fund"))
 
+    def test_flags_weak_asr_evidence_without_changing_heuristic_score(self):
+        report = analysis_report()
+        for segment in report["analysis"]["transcription"]["segments"]:
+            segment["avg_logprob"] = -1.0
+            segment["no_speech_prob"] = 0.5
+            for word in segment["words"]:
+                word["probability"] = 0.4
+        result = detect_moments(report, min_duration=12, max_duration=35, limit=5)
+        candidate = result["candidates"][0]
+        self.assertEqual(candidate["transcript_diagnostics"]["quality_flag"], "review_transcript")
+        self.assertLess(candidate["transcript_diagnostics"]["mean_word_probability"], 0.55)
+        self.assertTrue(any("ASR confidence indicators are weak" in risk for risk in candidate["risks"]))
+        self.assertEqual(sum(candidate["score_breakdown"].values()), candidate["score"])
+
+    def test_marks_missing_asr_confidence_as_unassessed(self):
+        candidate = detect_moments(analysis_report(), min_duration=12, max_duration=35, limit=5)["candidates"][0]
+        self.assertEqual(candidate["transcript_diagnostics"]["quality_flag"], "insufficient_asr_evidence")
+        self.assertTrue(any("metadata is unavailable" in risk for risk in candidate["risks"]))
+
+    def test_adds_kosovar_albanian_hook_and_payoff_cues(self):
+        self.assertTrue(_has_cue("Ja pse kjo ndodhi papritur", "ja pse"))
+        self.assertTrue(_has_cue("Kështu që gjithçka funksionoi", "kështu që"))
+        self.assertTrue(_has_cue("A e din çfarë ndodhi", "a e din"))
+
     def test_requires_completed_transcript(self):
         report = analysis_report()
         report["analysis"]["transcription"]["status"] = "skipped"
