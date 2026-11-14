@@ -42,6 +42,9 @@ class EDLValidationTests(unittest.TestCase):
         repository_schema = Path(__file__).resolve().parents[1] / "schemas" / "edit-decision-list.schema.json"
         packaged_schema = Path(__file__).resolve().parents[1] / "shortform_editor" / "schemas" / "edit-decision-list.schema.json"
         self.assertEqual(repository_schema.read_bytes(), packaged_schema.read_bytes())
+        semantic_repository = repository_schema.with_name("semantic-review.schema.json")
+        semantic_packaged = packaged_schema.with_name("semantic-review.schema.json")
+        self.assertEqual(semantic_repository.read_bytes(), semantic_packaged.read_bytes())
 
     def test_accepts_valid_draft(self):
         self.assertEqual(validate_edl(valid_edl()), [])
