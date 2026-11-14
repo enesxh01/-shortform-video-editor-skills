@@ -64,6 +64,53 @@ class PipelineOrchestrationTests(unittest.TestCase):
             self.assertEqual(set(edl["segments"][0]["crop_keyframes"][0]), {"time_seconds", "crop_9_16"})
             self.assertEqual(validate_edl(edl), [])
 
+
+    def test_split_project_creates_fingerprinted_top_and_bottom_specs(self):
+        primary_fp = "sha256:" + ("1" * 64)
+        top_fp = "sha256:" + ("2" * 64)
+        bottom_fp = "sha256:" + ("3" * 64)
+        candidate = {
+            "candidate_id": "moment-split",
+            "source_fingerprint": primary_fp,
+            "source_in_seconds": 2.0,
+            "source_out_seconds": 18.0,
+            "family": "story_or_commentary",
+            "transcript_excerpt": "Split test",
+            "confidence": 0.35
+        }
+        def fake_probe(path):
+            path = Path(path)
+            fingerprint = primary_fp if path.name == "source.mp4" else (top_fp if path.name == "top.mp4" else bottom_fp)
+            return {
+                "source": {"path": str(path), "sha256": fingerprint.split(":")[1], "fingerprint": fingerprint},
+                "format": {"duration": "30.0"},
+                "streams": [{"codec_type": "video", "time_base": "1/90000", "avg_frame_rate": "30/1"}]
+            }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source, top, bottom = root / "source.mp4", root / "top.mp4", root / "bottom.mp4"
+            for path in (source, top, bottom):
+                path.write_bytes(b"placeholder")
+            output = root / "split-job"
+            audio = {"source": {"fingerprint": primary_fp}, "analysis": {"transcription": {"status": "completed"}}}
+            with patch("shortform_editor.pipeline.probe_media", side_effect=fake_probe), \
+                 patch("shortform_editor.pipeline.analyze_audio", return_value=audio), \
+                 patch("shortform_editor.pipeline.detect_moments", return_value={"candidates": [candidate]}), \
+                 patch("shortform_editor.pipeline.analyze_pacing", return_value={"candidates": []}), \
+                 patch("shortform_editor.pipeline.generate_captions", return_value={"captions": []}):
+                manifest = analyze_project(
+                    source, output, top_candidates=1, layout="split_vertical",
+                    split_top_source=top, split_bottom_source=bottom,
+                    split_top_in="00:00:02.000", split_bottom_in="00:00:00.000"
+                )
+            edl = json.loads(Path(manifest["draft_edls"][0]["edl"]).read_text(encoding="utf-8"))
+            segment = edl["segments"][0]
+            self.assertEqual(segment["split_top"]["fingerprint"], top_fp)
+            self.assertEqual(segment["split_top"]["source_in"], "00:00:02.000")
+            self.assertEqual(segment["split_top"]["source_out"], "00:00:18.000")
+            self.assertEqual(segment["split_bottom"]["fingerprint"], bottom_fp)
+            self.assertEqual(validate_edl(edl), [])
+
     def test_refuses_output_directory_containing_source(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
