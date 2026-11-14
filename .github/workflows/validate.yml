@@ -1,0 +1,44 @@
+name: Validate project
+
+on:
+  push:
+    branches: [main, "implementation/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-and-installer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install package and test dependencies
+        run: python -m pip install -e .
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Verify CLI entry point
+        run: shortform-editor --help
+      - name: Install skills to isolated directory (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          bash scripts/install.sh "$RUNNER_TEMP/opencode-skills"
+          test -f "$RUNNER_TEMP/opencode-skills/shortform-video-editor/references/viral-scoring.md"
+          test -f "$RUNNER_TEMP/opencode-skills/shortform-video-editor/references/export-and-fps.md"
+          test -f "$RUNNER_TEMP/opencode-skills/edit-decision-list/schemas/edit-decision-list.schema.json"
+      - name: Install skills to isolated directory (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $destination = Join-Path $env:RUNNER_TEMP "opencode-skills"
+          & ./scripts/install.ps1 $destination
+          if (-not (Test-Path (Join-Path $destination "shortform-video-editor/references/viral-scoring.md"))) { throw "Missing viral scoring reference" }
+          if (-not (Test-Path (Join-Path $destination "shortform-video-editor/references/export-and-fps.md"))) { throw "Missing FPS reference" }
+          if (-not (Test-Path (Join-Path $destination "edit-decision-list/schemas/edit-decision-list.schema.json"))) { throw "Missing EDL schema" }
