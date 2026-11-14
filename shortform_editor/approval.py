@@ -25,19 +25,19 @@ def approve_edl_file(edl_path: Path, source_path: Path, confirm: bool = False) -
     duration = float(probe.get("format", {}).get("duration") or 0)
     errors = validate_edl(edl, duration, probe["source"]["fingerprint"])
     if errors:
-        raise PipelineError("Cannot approve invalid EDL:\\n- " + "\\n- ".join(errors))
+        raise PipelineError("Cannot approve invalid EDL:\n- " + "\n- ".join(errors))
 
     edl["approval"] = {"status": "approved", "approved_by_user": True}
     errors = validate_edl(edl, duration, probe["source"]["fingerprint"])
     if errors:
-        raise PipelineError("Approved EDL failed validation:\\n- " + "\\n- ".join(errors))
+        raise PipelineError("Approved EDL failed validation:\n- " + "\n- ".join(errors))
 
     staged = None
     try:
         with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix=".shortform-approval-",
                                          suffix=".tmp", dir=edl_path.parent, delete=False) as handle:
             staged = Path(handle.name)
-            handle.write(json.dumps(edl, indent=2, ensure_ascii=False) + "\\n")
+            handle.write(json.dumps(edl, indent=2, ensure_ascii=False) + "\n")
             handle.flush()
             os.fsync(handle.fileno())
         os.replace(staged, edl_path)
