@@ -47,6 +47,18 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
     stages = []
     warnings = []
 
+    def save_progress(status: str, error: str | None = None) -> None:
+        _write_json(output_dir / "manifest.json", {
+            "schema_version": "1.0",
+            "status": status,
+            "source": str(source),
+            "completed_stages": stages,
+            "warnings": warnings,
+            "error": error
+        })
+
+    save_progress("running")
+
     def stage(name: str, function):
         started = time.perf_counter()
         result = function()
@@ -55,6 +67,7 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
             "status": "completed",
             "duration_seconds": round(time.perf_counter() - started, 3)
         })
+        save_progress("running")
         return result
 
     try:
@@ -171,13 +184,8 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
         _write_json(output_dir / "manifest.json", manifest)
         return manifest
     except KeyboardInterrupt:
-        manifest = {
-            "schema_version": "1.0",
-            "status": "cancelled",
-            "source": str(source),
-            "completed_stages": stages,
-            "warnings": warnings,
-            "note": "Interrupted by user. Completed stage artifacts are preserved; rerun the command to continue from scratch."
-        }
-        _write_json(output_dir / "manifest.json", manifest)
+        save_progress("cancelled", "Interrupted by user. Completed stage artifacts are preserved; rerun into a new empty job directory.")
+        raise
+    except Exception as exc:
+        save_progress("failed", f"{type(exc).__name__}: {exc}")
         raise
