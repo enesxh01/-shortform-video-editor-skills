@@ -7,9 +7,9 @@ description: Run technical and visual quality checks on rendered clips, classify
 
 ## Executable technical QC baseline
 
-Run `shortform-editor qc OUTPUT.mp4 -o qc-report.json` after render. The current command checks stream presence, configured dimensions, average frame rate, H.264 codec, black intervals, frozen-frame intervals and audio sample peak. A missing audio stream is a warning; major technical defects return a failing exit code.
+Run `shortform-editor qc OUTPUT.mp4 -o qc-report.json` after render. The current command checks stream presence, configured dimensions, average frame rate, H.264 codec, black intervals, frozen-frame intervals, audio sample peak, and audio/video stream start/duration metadata alignment. A missing audio stream is a warning; major technical defects return a failing exit code.
 
-This is not complete QC. It does not validate caption spelling/timing, crop quality, safe areas, audio/video sync by listening, perceived loudness, true peak, story comprehension or visual appeal. Black/freeze detections can flag intentional creative choices and require review.
+Stream timing is metadata-only and cannot prove lip-sync or perceptual synchronization. This is not complete QC. It does not validate caption spelling/timing, crop quality, safe areas, audio/video sync by listening, perceived loudness, true peak, story comprehension or visual appeal. Black/freeze detections can flag intentional creative choices and require review.
 
 ## Bounded technical repair
 
