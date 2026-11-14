@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from pathlib import Path
 from typing import Any
@@ -119,19 +120,27 @@ def _make_candidate(source_id: str, segments: list[dict[str, Any]], audio_window
     total = sum(scores.values())
     identity = hashlib.sha1(f"{source_id}:{start:.3f}:{end:.3f}".encode()).hexdigest()[:12]
     family = _candidate_family(text)
-    segment_logprobs = [
-        float(item["avg_logprob"]) for item in chosen
-        if item.get("avg_logprob") is not None
-    ]
-    segment_no_speech = [
-        float(item["no_speech_prob"]) for item in chosen
-        if item.get("no_speech_prob") is not None
-    ]
-    word_probabilities = [
-        float(word["probability"])
-        for item in chosen for word in item.get("words", [])
-        if word.get("probability") is not None
-    ]
+    def finite_values(values: list[Any], minimum: float, maximum: float) -> list[float]:
+        accepted = []
+        for value in values:
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                continue
+            if math.isfinite(number) and minimum <= number <= maximum:
+                accepted.append(number)
+        return accepted
+
+    segment_logprobs = finite_values(
+        [item.get("avg_logprob") for item in chosen], -20.0, 0.0
+    )
+    segment_no_speech = finite_values(
+        [item.get("no_speech_prob") for item in chosen], 0.0, 1.0
+    )
+    word_probabilities = finite_values(
+        [word.get("probability") for item in chosen for word in item.get("words", [])],
+        0.0, 1.0
+    )
     transcript_diagnostics = {
         "mean_segment_logprob": round(sum(segment_logprobs) / len(segment_logprobs), 4) if segment_logprobs else None,
         "mean_no_speech_probability": round(sum(segment_no_speech) / len(segment_no_speech), 4) if segment_no_speech else None,
