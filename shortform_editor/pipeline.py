@@ -107,6 +107,8 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                 split_probes[key] = probe_media(path)
 
         audio = stage("audio", lambda: analyze_audio(source, model_size=model, device=device))
+        if audio.get("source", {}).get("fingerprint") != probe["source"]["fingerprint"]:
+            raise PipelineError("Source media changed between initial probe and audio analysis; restart the project")
         _write_json(output_dir / "audio-analysis.json", audio)
 
         candidates = stage("moment_detection", lambda: detect_moments(audio, limit=top_candidates))
@@ -142,9 +144,19 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                     "visual_analysis",
                     lambda: analyze_visuals(source, regions=candidate_regions)
                 )
+                if visuals.get("source", {}).get("fingerprint") != probe["source"]["fingerprint"]:
+                    raise PipelineError("Source media changed between initial probe and visual analysis; restart the project")
                 _write_json(output_dir / "visual-analysis.json", visuals)
             except PipelineError as exc:
                 warnings.append(f"Visual analysis unavailable: {exc}")
+
+        final_source_probe = stage("source_integrity_check", lambda: probe_media(source))
+        if final_source_probe["source"]["fingerprint"] != probe["source"]["fingerprint"]:
+            raise PipelineError("Source media changed during project analysis; discard this job and restart from the new source version")
+        for key, path in split_paths.items():
+            final_split_probe = probe_media(path)
+            if final_split_probe["source"]["fingerprint"] != split_probes[key]["source"]["fingerprint"]:
+                raise PipelineError(f"{key} media changed during project analysis; restart with stable split sources")
 
         video_stream = next(s for s in probe["streams"] if s.get("codec_type") == "video")
         time_base = video_stream.get("time_base") or "1/90000"
