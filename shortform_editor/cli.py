@@ -280,7 +280,8 @@ def command_render(args: argparse.Namespace) -> int:
     errors = validate_edl(edl, duration, probe.get("source", {}).get("fingerprint"))
     if errors:
         raise PipelineError("Refusing to render invalid EDL:\n- " + "\n- ".join(errors))
-    if edl["approval"]["status"] != "approved" or not edl["approval"]["approved_by_user"]:
+    preview_mode = bool(getattr(args, "preview", False))
+    if not preview_mode and (edl["approval"]["status"] != "approved" or not edl["approval"]["approved_by_user"]):
         raise PipelineError("Rendering final output requires explicit user approval in the EDL")
 
     ffmpeg = require_tool("ffmpeg")
@@ -420,7 +421,8 @@ def command_render(args: argparse.Namespace) -> int:
         "segments": len(edl["segments"]),
         "layouts": sorted({segment["layout"] for segment in edl["segments"]}),
         "captions": sum(len(segment.get("captions", [])) for segment in edl["segments"]),
-        "status": "rendered_and_decode_checked",
+        "status": "preview_rendered_and_decode_checked" if preview_mode else "rendered_and_decode_checked",
+        "preview_only": preview_mode,
         "limitations": [
             "Split layout uses explicit top and bottom secondary video sources; primary source audio is retained.",
             "Blurred-bars layout uses a blurred full-frame background and sharp 60% center panel.",
@@ -642,6 +644,28 @@ def command_validate_semantic_review(args: argparse.Namespace) -> int:
     return 0 if report["status"] == "valid" else 2
 
 
+def command_render_preview(args: argparse.Namespace) -> int:
+    source = Path(args.source).expanduser().resolve(strict=True)
+    edl_path = Path(args.edl).expanduser().resolve(strict=True)
+    output = Path(args.output).expanduser().resolve()
+    if output in {source, edl_path}:
+        raise PipelineError("Preview output must be a separate file")
+    try:
+        edl = json.loads(edl_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PipelineError(f"Cannot read EDL: {exc}") from exc
+    edl["render"]["fps_target"] = "30/1"
+    edl["render"]["fps_mode"] = "cfr"
+    edl["render"]["fps_conversion"] = "duplicate_drop"
+    with tempfile.TemporaryDirectory(prefix="shortform-preview-") as temporary:
+        preview_edl = Path(temporary) / "preview-edl.json"
+        preview_edl.write_text(json.dumps(edl, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        return command_render(Namespace(
+            source=str(source), edl=str(preview_edl), output=str(output),
+            preset="ultrafast", crf=26, overwrite=args.overwrite, preview=True
+        ))
+
+
 def command_approve_edl(args: argparse.Namespace) -> int:
     from .approval import approve_edl_file
 
@@ -749,6 +773,12 @@ def build_parser() -> argparse.ArgumentParser:
     semantic.add_argument("--probe")
     semantic.add_argument("--candidates")
     semantic.set_defaults(func=command_validate_semantic_review)
+    preview = sub.add_parser("render-preview", help="render a fast 30 fps preview without approving or modifying the EDL")
+    preview.add_argument("source")
+    preview.add_argument("edl")
+    preview.add_argument("output")
+    preview.add_argument("--overwrite", action="store_true")
+    preview.set_defaults(func=command_render_preview)
     approve = sub.add_parser("approve-edl", help="mark an EDL approved after explicit human confirmation")
     approve.add_argument("edl")
     approve.add_argument("--source", required=True, help="primary source media used for fingerprint and duration validation")
