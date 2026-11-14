@@ -1051,7 +1051,8 @@ def command_analyze_project(args: argparse.Namespace) -> int:
             split_bottom_source=Path(args.split_bottom_source) if args.split_bottom_source else None,
             split_top_in=args.split_top_in,
             split_bottom_in=args.split_bottom_in,
-            resume=args.resume
+            resume=args.resume,
+            visual_roi=tuple(args.visual_roi) if args.visual_roi is not None else None
         )
     except KeyboardInterrupt:
         print("Analysis cancelled. Completed artifacts and a cancellation manifest were preserved.", file=sys.stderr)
@@ -1314,6 +1315,7 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--split-top-in", default="00:00:00.000")
     analyze.add_argument("--split-bottom-in", default="00:00:00.000")
     analyze.add_argument("--visuals", action="store_true", help="run optional OpenCV visual sampling")
+    analyze.add_argument("--visual-roi", nargs=4, type=float, metavar=("X", "Y", "WIDTH", "HEIGHT"), help="seed CSRT subject tracking with a normalized 0..1 box; requires --visuals")
     analyze.add_argument("--resume", action="store_true", help="resume an interrupted job using matching, fingerprint-validated checkpoints")
     analyze.set_defaults(func=command_analyze_project)
     semantic = sub.add_parser("validate-semantic-review", help="validate OpenCode semantic review JSON against source and baseline candidates")
