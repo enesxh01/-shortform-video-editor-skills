@@ -79,6 +79,20 @@ class EDLValidationTests(unittest.TestCase):
             valid_edl(), source_fingerprint="sha256:" + ("b" * 64)
         )))
 
+    def test_split_layout_requires_two_source_specs(self):
+        edl = valid_edl()
+        edl["segments"][0]["layout"] = "split_vertical"
+        self.assertTrue(validate_edl(edl))
+
+    def test_rejects_caption_outside_segment(self):
+        edl = valid_edl()
+        edl["segments"][0]["captions"] = [{
+            "start": "00:00:01.000",
+            "end": "00:00:03.000",
+            "text": "Caption outside segment"
+        }]
+        self.assertTrue(any("must fit inside" in e for e in validate_edl(edl)))
+
 
 if __name__ == "__main__":
     unittest.main()
