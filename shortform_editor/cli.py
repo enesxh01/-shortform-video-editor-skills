@@ -69,6 +69,9 @@ def validate(edl, source_info=None):
         if k not in edl: errors.append(f"Missing top-level field: {k}")
     if errors: return errors
     src=edl["source"]; rnd=edl["render"]; segs=edl["segments"]
+    if not src.get("path"): errors.append("source.path is required for rendering")
+    if source_info and src.get("fingerprint") and src["fingerprint"] != source_info["fingerprint"]:
+        errors.append("Source fingerprint mismatch: EDL does not match the supplied media file")
     if not isinstance(segs,list) or not segs: errors.append("segments must be a non-empty array")
     if rnd.get("container")!="mp4": errors.append("Only MP4 output is currently supported")
     if rnd.get("fps_mode") not in ("cfr","vfr","preserve_native"): errors.append("Invalid fps_mode")
