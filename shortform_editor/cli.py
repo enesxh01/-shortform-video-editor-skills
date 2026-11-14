@@ -82,25 +82,28 @@ def analyze_frame_timestamps(timestamps: list[Any], min_samples: int = 12) -> di
             continue
         if math.isfinite(value):
             values.append(value)
-    values = sorted(set(values))
-    intervals = [right - left for left, right in zip(values, values[1:]) if right > left]
+
+    deltas = [right - left for left, right in zip(values, values[1:])]
+    intervals = [delta for delta in deltas if delta > 0]
+    non_monotonic = sum(delta < 0 for delta in deltas)
     if len(intervals) < min_samples - 1:
         return {"status": "insufficient_samples", "variable_frame_rate": None,
                 "sampled_frames": len(values), "sampled_intervals": len(intervals),
+                "non_monotonic_intervals": non_monotonic,
                 "irregular_interval_ratio": None, "median_interval_seconds": None,
                 "scope": "initial_frame_sample_only"}
     median_interval = statistics.median(intervals)
     tolerance = max(0.002, median_interval * 0.03)
     irregular = sum(abs(interval - median_interval) > tolerance for interval in intervals)
-    ratio = irregular / len(intervals)
+    ratio = (irregular + non_monotonic) / max(1, len(deltas))
     is_vfr = ratio > 0.05
     return {"status": "likely_vfr" if is_vfr else "likely_cfr",
             "variable_frame_rate": is_vfr, "sampled_frames": len(values),
-            "sampled_intervals": len(intervals), "irregular_interval_ratio": round(ratio, 4),
+            "sampled_intervals": len(intervals), "non_monotonic_intervals": non_monotonic,
+            "irregular_interval_ratio": round(ratio, 4),
             "median_interval_seconds": round(median_interval, 6),
             "tolerance_seconds": round(tolerance, 6), "scope": "initial_frame_sample_only",
             "limitation": "A short initial sample can miss later cadence changes; this is advisory and does not normalize timestamps."}
-
 def probe_frame_timing(source: Path, ffprobe: str, sample_frames: int = 240) -> dict[str, Any]:
     """Sample initial decoded frame timestamps to flag probable variable cadence."""
     result = run_checked([
