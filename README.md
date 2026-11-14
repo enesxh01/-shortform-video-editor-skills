@@ -23,7 +23,7 @@ The renderer has initial code for exactly three layouts:
 - `split_vertical`: top/bottom panels from two explicit secondary sources, with centered captions.
 - `blurred_bars_20_60_20`: blurred top 20%, sharp center 60%, blurred bottom 20%.
 
-All three layouts and ASS captions have synthetic FFmpeg integration coverage configured, but the latest branch's CI result is still pending. Split mode requires fingerprinted `split_top` and `split_bottom` source specs in the EDL.
+All three layouts and ASS captions have synthetic FFmpeg integration coverage configured, but the latest branch's CI result is still pending. Split mode requires two secondary video files; provide them with `--split-top-source` and `--split-bottom-source`, plus optional source offsets.
 
 ## Skill suite
 
@@ -62,6 +62,7 @@ Then run:
 
 ```bash
 shortform-editor analyze-project input.mp4 -o job-output/ --model small --device auto --visuals
+# For top/bottom split: add --layout split_vertical --split-top-source top.mp4 --split-bottom-source bottom.mp4
 ```
 
 This orchestrates:
