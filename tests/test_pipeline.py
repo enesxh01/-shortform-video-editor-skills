@@ -278,11 +278,26 @@ class PipelineOrchestrationTests(unittest.TestCase):
                 analyze_project(source, output, top_candidates=1)
                 with self.assertRaisesRegex(PipelineError, "source/options do not match"):
                     analyze_project(source, output, top_candidates=2, resume=True)
+                with self.assertRaisesRegex(PipelineError, "source/options do not match"):
+                    analyze_project(source, output, top_candidates=1, resume=True, visual_roi=(0.1, 0.1, 0.2, 0.2))
                 changed_probe = dict(probe)
                 changed_probe["source"] = dict(probe["source"], fingerprint="sha256:" + ("e" * 64), sha256="e" * 64)
                 with patch("shortform_editor.pipeline.probe_media", return_value=changed_probe):
                     with self.assertRaisesRegex(PipelineError, "source fingerprint changed"):
                         analyze_project(source, output, top_candidates=1, resume=True)
+
+
+    def test_manual_visual_roi_requires_visuals_and_valid_normalized_bounds(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.mp4"
+            source.write_bytes(b"input")
+            with self.assertRaisesRegex(PipelineError, "--visual-roi requires --visuals"):
+                analyze_project(source, root / "no-visuals", visual_roi=(0.1, 0.1, 0.2, 0.2))
+            with self.assertRaisesRegex(PipelineError, "Invalid visual ROI"):
+                analyze_project(source, root / "bad-roi", include_visuals=True,
+                                visual_roi=(0.9, 0.9, 0.3, 0.3))
+
 
 
 if __name__ == "__main__":
