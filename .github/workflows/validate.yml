@@ -34,7 +34,7 @@ jobs:
       - name: Build wheel and verify packaged schema
         run: |
           python -m pip wheel . --no-deps -w dist
-          python -c "import glob,zipfile; z=zipfile.ZipFile(glob.glob('dist/*.whl')[0]); assert 'shortform_editor/schemas/edit-decision-list.schema.json' in z.namelist() and 'shortform_editor/schemas/semantic-review.schema.json' in z.namelist()"
+          python -c "import glob,zipfile; z=zipfile.ZipFile(glob.glob('dist/*.whl')[0]); assert 'shortform_editor/schemas/edl.schema.json' in z.namelist() and 'shortform_editor/schemas/semantic-review.schema.json' in z.namelist()"
       - name: Run unit and FFmpeg integration tests
         run: python -m unittest discover -s tests -v
       - name: Verify CLI entry point
