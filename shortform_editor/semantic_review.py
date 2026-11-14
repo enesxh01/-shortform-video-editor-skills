@@ -27,26 +27,37 @@ def validate_semantic_review(review: dict[str, Any], probe: dict[str, Any] | Non
         return messages
 
     fingerprint = review["source_fingerprint"]
-    baseline_ids = set(review["baseline_candidate_ids"])
+    declared_baseline_ids = set(review["baseline_candidate_ids"])
+    baseline_by_id: dict[str, dict[str, Any]] = {}
     if candidates is not None:
-        candidate_fingerprint = candidates.get("source_fingerprint")
-        if candidate_fingerprint != fingerprint:
+        if candidates.get("source_fingerprint") != fingerprint:
             messages.append("Semantic review source fingerprint does not match baseline candidate report")
-        actual_baseline_ids = {item.get("candidate_id") for item in candidates.get("candidates", [])}
-        unknown_baseline_ids = baseline_ids - actual_baseline_ids
-        if unknown_baseline_ids:
-            messages.append("baseline_candidate_ids contains IDs absent from the supplied candidate report")
+        for index, item in enumerate(candidates.get("candidates", [])):
+            candidate_id = item.get("candidate_id")
+            if not candidate_id:
+                messages.append(f"baseline candidates[{index}] has no candidate_id")
+            elif candidate_id in baseline_by_id:
+                messages.append(f"baseline candidate ID {candidate_id!r} is duplicated")
+            else:
+                baseline_by_id[candidate_id] = item
+        actual_baseline_ids = set(baseline_by_id)
+        if declared_baseline_ids != actual_baseline_ids:
+            missing = sorted(actual_baseline_ids - declared_baseline_ids)
+            unknown = sorted(declared_baseline_ids - actual_baseline_ids)
+            messages.append(
+                f"baseline_candidate_ids do not match the candidate report (missing={missing}, unknown={unknown})"
+            )
+
     if probe is not None:
-        probe_fingerprint = probe.get("source", {}).get("fingerprint")
-        if probe_fingerprint != fingerprint:
+        if probe.get("source", {}).get("fingerprint") != fingerprint:
             messages.append("Semantic review source fingerprint does not match probe report")
         raw_duration = probe.get("format", {}).get("duration")
         duration = float(raw_duration) if raw_duration is not None else None
     else:
         duration = None
 
-    semantic_ids = set()
-    semantic_scores = {}
+    semantic_ids: set[str] = set()
+    semantic_scores: dict[str, int] = {}
     for index, candidate in enumerate(review["semantic_candidates"]):
         candidate_id = candidate["candidate_id"]
         if candidate_id in semantic_ids:
@@ -65,7 +76,10 @@ def validate_semantic_review(review: dict[str, Any], probe: dict[str, Any] | Non
         for evidence_index, evidence in enumerate(candidate["evidence"]):
             evidence_start = float(evidence["start_seconds"])
             evidence_end = float(evidence["end_seconds"])
-            if evidence_end <= evidence_start or evidence_start < start or evidence_end > end or evidence_start < previous_evidence_end:
+            if (
+                evidence_end <= evidence_start or evidence_start < start
+                or evidence_end > end or evidence_start < previous_evidence_end
+            ):
                 messages.append(f"semantic_candidates[{index}].evidence[{evidence_index}] has invalid or unordered bounds")
             previous_evidence_end = evidence_end
         for alternative_index, alternative in enumerate(candidate.get("alternatives", [])):
@@ -75,31 +89,29 @@ def validate_semantic_review(review: dict[str, Any], probe: dict[str, Any] | Non
                 messages.append(f"semantic_candidates[{index}].alternatives[{alternative_index}] has invalid bounds")
             if duration is not None and alternative_end > duration + 0.05:
                 messages.append(f"semantic_candidates[{index}].alternatives[{alternative_index}] exceeds source duration")
-            if duration is not None and alternative_end > duration + 0.05:
-                messages.append(f"semantic_candidates[{index}].alternatives[{alternative_index}] exceeds source duration")
 
-    if set(review["baseline_candidate_ids"]) & semantic_ids:
+    if declared_baseline_ids & semantic_ids:
         messages.append("A candidate ID cannot be both baseline and semantic")
 
-    known_ids = (set(baseline_by_id) if candidates is not None else set(review["baseline_candidate_ids"])) | semantic_ids
-    rejected_ids = set()
+    known_ids = (set(baseline_by_id) if candidates is not None else declared_baseline_ids) | semantic_ids
+    rejected_ids: set[str] = set()
     for index, candidate in enumerate(review["rejected_candidates"]):
         candidate_id = candidate["candidate_id"]
         if candidate_id in rejected_ids:
             messages.append(f"rejected_candidates[{index}].candidate_id is duplicated")
         rejected_ids.add(candidate_id)
-        if candidate_id not in baseline_ids and candidate_id not in semantic_ids:
+        if candidate_id not in known_ids:
             messages.append(f"rejected_candidates[{index}] references an unknown candidate ID")
         if candidate_id in semantic_ids:
             messages.append(f"Candidate {candidate_id!r} cannot be both semantically selected and rejected")
-        start, end = float(candidate["source_in_seconds"]), float(candidate["source_out_seconds"])
+        start = float(candidate["source_in_seconds"])
+        end = float(candidate["source_out_seconds"])
         if end <= start:
             messages.append(f"rejected_candidates[{index}] has invalid source bounds")
         if duration is not None and end > duration + 0.05:
             messages.append(f"rejected_candidates[{index}] exceeds source duration")
 
-    known_ids = baseline_ids | semantic_ids
-    ranked_ids = set()
+    ranked_ids: set[str] = set()
     previous_rank_score = 101
     for index, candidate in enumerate(review["final_ranked_candidates"]):
         candidate_id = candidate["candidate_id"]
