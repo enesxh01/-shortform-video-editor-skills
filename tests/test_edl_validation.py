@@ -100,5 +100,19 @@ class EDLValidationTests(unittest.TestCase):
         self.assertTrue(any("must fit inside" in e for e in validate_edl(edl)))
 
 
+    def test_rejects_pacing_decision_outside_segment(self):
+        edl = valid_edl()
+        edl["segments"][0]["pacing_review"] = {
+            "decisions": [{
+                "decision": "trim", "source_in": "00:00:01.000",
+                "source_out": "00:00:02.000", "rationale": "Outside",
+                "confidence": 0.5, "context_risk": "medium"
+            }],
+            "repeated_word_flags": [],
+            "note": "Advisory only"
+        }
+        self.assertTrue(any("fit inside the segment source range" in e for e in validate_edl(edl)))
+
+
 if __name__ == "__main__":
     unittest.main()
