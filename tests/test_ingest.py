@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from shortform_editor.ingest import download_source
+from shortform_editor.ingest import download_source, _download_size_guard
 from shortform_editor.cli import PipelineError, command_download_source
 
 
@@ -30,6 +30,17 @@ class URLIngestionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(PipelineError):
                 download_source("file:///etc/passwd", Path(directory) / "out")
+
+    def test_rejects_embedded_url_credentials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(PipelineError, "embedded credentials"):
+                download_source("https://user:secret@example.com/video", Path(directory) / "out")
+
+    def test_download_size_guard_aborts_as_soon_as_observed_bytes_exceed_cap(self):
+        guard = _download_size_guard(100)
+        guard({"downloaded_bytes": 100})
+        with self.assertRaisesRegex(PipelineError, "exceeded"):
+            guard({"downloaded_bytes": 101})
 
     def test_rejects_missing_host(self):
         with tempfile.TemporaryDirectory() as directory:
