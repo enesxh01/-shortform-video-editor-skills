@@ -480,9 +480,13 @@ def command_render(args: argparse.Namespace) -> int:
                     f"[top][bottom]vstack=inputs=2,setsar=1,fps={fps},format=yuv420p[vbase]"
                 )
                 fade_video_filters, fade_audio_filters = _segment_fade_filters(segment, clip_duration)
+                look_filters = _segment_look_filters(segment)
                 graph_input = "vbase"
+                if look_filters:
+                    graph += f";[vbase]{','.join(look_filters)}[vlook]"
+                    graph_input = "vlook"
                 if subtitle_filter:
-                    graph += f";[vbase]{subtitle_filter}[vcap]"
+                    graph += f";[{graph_input}]{subtitle_filter}[vcap]"
                     graph_input = "vcap"
                 if fade_video_filters:
                     graph += f";[{graph_input}]{','.join(fade_video_filters)}[vfade]"
