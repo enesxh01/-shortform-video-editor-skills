@@ -290,6 +290,15 @@ def choose_video_encoder(ffmpeg: str, requested: str = "auto") -> str:
     return "h264_nvenc" if has_nvenc else "libx264"
 
 
+def _concat_demuxer_entry(path: Path) -> str:
+    """Return one safely quoted FFmpeg concat-demuxer file entry."""
+    value = path.expanduser().resolve().as_posix()
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise PipelineError("Media paths used by the concat renderer cannot contain control characters")
+    # FFmpeg's concat demuxer uses its own token parser, not shell quoting.
+    escaped = value.replace("\\\\", "\\\\\\\\").replace("'", "\\\\'")
+    return f"file '{escaped}'\\n"
+
 def _segment_fade_filters(segment: dict[str, Any], duration: float) -> tuple[list[str], list[str]]:
     fade_in = float(segment.get("fade_in_seconds", 0.0))
     fade_out = float(segment.get("fade_out_seconds", 0.0))
@@ -532,7 +541,7 @@ def command_render(args: argparse.Namespace) -> int:
             parts.append(part)
 
         concat_file = tmpdir / "concat.txt"
-        concat_file.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
+        concat_file.write_text("".join(_concat_demuxer_entry(p) for p in parts), encoding="utf-8")
         assembled = tmpdir / "assembled.mp4"
         run_checked([
             ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
