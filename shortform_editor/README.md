@@ -29,18 +29,20 @@ render accepts only an explicitly user-approved EDL. It creates a vertical MP4, 
 
 qc probes and fully decodes an existing export.
 
+See [the example EDL](../examples/edit-decision-list.example.json) for a complete template. Replace its placeholder source path, fingerprint, timestamps, and editorial rationale before use.
+
 ## EDL conventions
 
 - source.path is the absolute path to the original source file.
 - source.fingerprint must be the sha256 value from inspect.
 - source.time_base and source.frame_rate are rational strings (for example 1/90000, 30000/1001).
 - Segment source_in and source_out are source timestamps.
-- Caption start and end are relative to the beginning of their segment.
+- Caption start and end are relative to the beginning of their segment. Optional word entries use the same segment-relative timestamps and render as karaoke-style word highlighting.
 - split_vertical requires split_top and split_bottom objects, each with path, source_in, and source_out.
 - approval.status must be approved and approved_by_user must be true before rendering.
 
 ## Important limitations
 
-The runtime does not itself perform semantic ASR, diarization, object tracking, face tracking, or viral judgment. Those are analysis/editorial tasks performed by the orchestrating AI and optional local model adapters. It does not claim that 60 fps output contains 60 unique captured frames per second. Visual inspection remains mandatory: technical QC cannot detect every crop, subtitle, interpolation, or storytelling defect.
+The runtime provides optional local word-timestamp ASR through faster-whisper, but it does not perform semantic diarization, object/face tracking, or viral judgment. The orchestrating AI must inspect the transcript and visual evidence. Those are analysis/editorial tasks performed by the orchestrating AI and optional local model adapters. It does not claim that 60 fps output contains 60 unique captured frames per second. The current renderer uses a centered crop for fullscreen, does not yet apply crop_keyframes or subject tracking, and renders CFR only. If a centered crop would hide important action, choose blurred-bars or split_vertical instead. Visual inspection remains mandatory: technical QC cannot detect every crop, subtitle, interpolation, or storytelling defect.
 
 GPU encoding is intentionally not enabled by default; software x264 is the reproducible quality baseline. Optional acceleration should be added only after hardware-specific quality and compatibility tests.
