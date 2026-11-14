@@ -135,6 +135,8 @@ def probe_frame_timing(source: Path, ffprobe: str, duration_seconds: float | Non
     timestamps = [frame.get("best_effort_timestamp_time")
                   for frame in payload.get("frames", []) if isinstance(frame, dict)]
     return analyze_frame_timestamps(timestamps, sample_window_starts=list(range(len(starts))))
+
+
 def probe_media(source: Path) -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
     if not source.is_file():
