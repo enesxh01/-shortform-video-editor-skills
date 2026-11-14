@@ -185,11 +185,15 @@ def _transcribe(wav_path: Path, model_size: str, device: str, language: str | No
 
 def analyze_audio(source: Path, model_size: str = "small", device: str = "auto",
                   language: str | None = None, transcribe: bool = True,
-                  silence_dbfs: float = -38.0) -> dict[str, Any]:
+                  silence_dbfs: float = -38.0,
+                  probe_report: dict[str, Any] | None = None) -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
     if not source.is_file():
         raise PipelineError(f"Source is not a regular file: {source}")
-    report = probe_media(source)
+    report = probe_report or probe_media(source)
+    reported_path = Path(report.get("source", {}).get("path", source)).expanduser().resolve()
+    if reported_path != source:
+        raise PipelineError("Supplied probe report belongs to a different source path")
     source_signature = file_stat_signature(source)
     audio_stream = _audio_stream(report)
     stream_index = int(audio_stream["index"])
