@@ -13,6 +13,15 @@ for skill_dir in "$ROOT"/*; do
   echo "Installed $skill_name"
 done
 
+EXAMPLE_SOURCE="$ROOT/examples"
+EXAMPLE_TARGET="$DEST/shortform-video-editor/examples"
+if [[ -d "$EXAMPLE_SOURCE" ]]; then
+  rm -rf "$EXAMPLE_TARGET"
+  mkdir -p "$(dirname "$EXAMPLE_TARGET")"
+  cp -R "$EXAMPLE_SOURCE" "$EXAMPLE_TARGET"
+  echo "Installed EDL examples"
+fi
+
 RUNTIME_SOURCE="$ROOT/shortform_editor"
 SKILL_RUNTIME="$DEST/shortform-video-editor/runtime"
 if [[ -d "$RUNTIME_SOURCE" ]]; then
