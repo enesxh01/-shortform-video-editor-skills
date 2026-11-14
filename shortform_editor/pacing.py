@@ -77,7 +77,7 @@ def analyze_pacing(analysis: dict[str, Any], candidates: dict[str, Any],
                 continue
             left_text = str(segment.get("text", "")).lower()
             right_text = str(next_segment.get("text", "")).lower()
-            context_text = left_text[-40:] + " " + right_text[:40]
+            context_text = left_text[-40:]
             meaningful = any(
                 re.search(rf"(?<!\\w){re.escape(cue)}(?!\\w)", context_text)
                 for cue in MEANINGFUL_PAUSE_CUES
