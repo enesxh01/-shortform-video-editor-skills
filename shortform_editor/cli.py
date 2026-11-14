@@ -927,7 +927,8 @@ def command_analyze_visuals(args: argparse.Namespace) -> int:
         source,
         sample_rate=args.sample_rate,
         max_frames=args.max_frames,
-        detect_faces=not args.no_face_detection
+        detect_faces=not args.no_face_detection,
+        initial_roi=tuple(args.track_roi) if args.track_roi is not None else None
     )
     output = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
     if args.output:
@@ -1253,6 +1254,7 @@ def build_parser() -> argparse.ArgumentParser:
     visuals.add_argument("--sample-rate", type=float, default=1.0)
     visuals.add_argument("--max-frames", type=int, default=120)
     visuals.add_argument("--no-face-detection", action="store_true")
+    visuals.add_argument("--track-roi", nargs=4, type=float, metavar=("X", "Y", "WIDTH", "HEIGHT"), help="seed CSRT tracking with a normalized 0..1 box; increase --sample-rate to follow fast motion")
     visuals.set_defaults(func=command_analyze_visuals)
     captions = sub.add_parser("generate-captions", help="group ASR word timings into Kino caption events")
     captions.add_argument("analysis", help="audio-analysis JSON")
