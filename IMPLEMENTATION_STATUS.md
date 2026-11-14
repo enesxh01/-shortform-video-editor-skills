@@ -115,8 +115,8 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 
 ## Latest CI verification
 
-- Full Linux/Windows × Python 3.10/3.12 matrix passed on commit `14db54be` ([run #43621233208](https://github.com/enesxh01/-shortform-video-editor-skills/actions/runs/43621233208)).
-- All four jobs passed 183 unit/integration tests, synthetic FFmpeg render and recovery checks, CLI verification, wheel/schema packaging, shell and PowerShell syntax checks, end-to-end setup scripts and the environment doctor. The installer-upgrade test confirms existing user skill files are preserved in timestamped backups.
+- Full Linux/Windows × Python 3.10/3.12 matrix passed on commit `d0260766` ([run #43622463389](https://github.com/enesxh01/-shortform-video-editor-skills/actions/runs/43622463389)).
+- All four jobs passed 187 unit/integration tests, synthetic FFmpeg render and recovery checks, CLI verification, wheel/schema packaging, shell and PowerShell syntax checks, end-to-end setup scripts and the environment doctor. The installer-upgrade test confirms existing user skill files are preserved in timestamped backups.
 - The suite includes interrupted render recovery, synthetic VFR-to-CFR/audio-duration alignment, low-confidence transcript-span diagnostics and KLT optical-flow movement tracking. This does not verify real-footage quality, arbitrary VFR lip-sync or RTX 3060 performance.
 
 
@@ -132,7 +132,7 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 
 ## Environment doctor filter checks
 
-- `shortform-editor doctor` parses FFmpeg's advertised filter list and now blocks a ready status when core rendering/QC filters are absent (`subtitles`, `fps`, `scale`, `crop`, `setpts`, `setsar`, `format`, `aresample`, `blackdetect`, `freezedetect`, `volumedetect`, `ebur128`).
+- `shortform-editor doctor` parses FFmpeg's advertised filter list and now blocks a ready status when core rendering/QC filters are absent (`subtitles`, `fps`, `scale`, `crop`, `setpts`, `setsar`, `format`, `aresample`, `blackdetect`, `freezedetect`, `volumedetect`, `ebur128`, `split`, `overlay`, `vstack`, `boxblur`, `fade`, `eq`, `unsharp`, `null`) and the AAC encoder.
 - This catches incomplete FFmpeg builds before a long render. Advertised filter presence does not prove optional library integration (for example, libass initialization) or NVENC driver initialization; those are runtime checks.
 
 
@@ -141,3 +141,10 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 - Audio analysis reports timestamped energy-rise and transient-energy cues using rolling RMS baselines and peak-to-RMS crest factor.
 - Candidate reports attach overlapping cues as evidence without changing candidate ranking scores. Labels are intentionally acoustic, not claims of laughter, excitement, emotion, speaker identity or semantic events.
 - Unit tests cover energy rise, transient detection and score invariance. Human review remains required.
+
+
+## QC-gated publication (implemented; CI verified)
+
+- Final render assembly is copied to a same-volume staged MP4, fully decoded, probed and passed through technical QC plus EDL-duration comparison before `os.replace` publishes it.
+- A critical/failing QC result leaves the destination untouched, writes a hidden `.qc-failed.json` diagnostic beside it when possible, and preserves resumable segment work for a retry. Warning-only results may be published with the QC report included in CLI output.
+- Synthetic integration coverage verifies a failed QC report prevents publication. Real footage may produce false-positive black/freeze detections; review the diagnostic before changing source material or rerendering.
