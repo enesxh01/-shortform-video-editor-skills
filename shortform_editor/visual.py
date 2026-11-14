@@ -132,7 +132,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
                     regions: list[tuple[float, float]] | None = None,
                     probe_report: dict[str, Any] | None = None) -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
-    report = probe_report or probe_media(source)
+    report = probe_report if probe_report is not None else probe_media(source)
     reported_path = Path(report.get("source", {}).get("path", source)).expanduser().resolve()
     if reported_path != source:
         raise PipelineError("Supplied probe report belongs to a different source path")
