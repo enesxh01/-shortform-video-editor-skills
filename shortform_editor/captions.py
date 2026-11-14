@@ -23,7 +23,6 @@ def _karaoke_text(caption: dict[str, Any]) -> str:
     if not words:
         return _escape_ass(caption["text"])
     pieces = []
-    previous_end = None
     for word in words:
         start = timestamp_seconds(word["start"])
         end = timestamp_seconds(word["end"])
@@ -33,8 +32,7 @@ def _karaoke_text(caption: dict[str, Any]) -> str:
         if pieces and not str(word["text"]).startswith(" "):
             pieces.append(" ")
         pieces.append(f"{{\\kf{duration}}}{_escape_ass(str(word['text']).strip())}")
-        previous_end = end
-    return " ".join(pieces) if pieces else _escape_ass(caption["text"])
+    return "".join(pieces) if pieces else _escape_ass(caption["text"])
 
 
 def write_ass_subtitles(segment: dict[str, Any], layout: str, clip_start: float,
