@@ -184,6 +184,29 @@ class EDLValidationTests(unittest.TestCase):
         self.assertIn("properties", load_schema())
 
 
+    def test_accepts_safe_font_and_word_highlight_edl_fields(self):
+        edl = valid_edl()
+        edl["segments"][0]["captions"] = [{
+            "start": "00:00:02.500", "end": "00:00:04.000",
+            "text": "Important detail", "font_name": "Montserrat SemiBold",
+            "words": [
+                {"text": "Important", "start": "00:00:02.500", "end": "00:00:03.200", "highlight_color": "#FFCC00"},
+                {"text": "detail", "start": "00:00:03.200", "end": "00:00:04.000"}
+            ]
+        }]
+        self.assertEqual(validate_edl(edl), [])
+
+    def test_rejects_invalid_word_highlight_color_in_edl(self):
+        edl = valid_edl()
+        edl["segments"][0]["captions"] = [{
+            "start": "00:00:02.500", "end": "00:00:04.000",
+            "text": "Important", "words": [{
+                "text": "Important", "start": "00:00:02.500", "end": "00:00:04.000",
+                "highlight_color": "yellow"
+            }]
+        }]
+        self.assertTrue(any("highlight_color" in error for error in validate_edl(edl)))
+
     def test_split_captions_must_be_one_line(self):
         edl = valid_edl()
         edl["segments"][0]["layout"] = "split_vertical"
