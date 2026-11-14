@@ -1,12 +1,22 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from .cli import PipelineError, probe_media, validate_edl
+
+
+
+def edl_approval_hash(edl: dict[str, Any]) -> str:
+    payload = {key: value for key, value in edl.items() if key != "approval"}
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return f"sha256:{digest}"
 
 
 def approve_edl_file(edl_path: Path, source_path: Path, confirm: bool = False) -> dict[str, Any]:
@@ -27,7 +37,12 @@ def approve_edl_file(edl_path: Path, source_path: Path, confirm: bool = False) -
     if errors:
         raise PipelineError("Cannot approve invalid EDL:\n- " + "\n- ".join(errors))
 
-    edl["approval"] = {"status": "approved", "approved_by_user": True}
+    edl["approval"] = {
+        "status": "approved",
+        "approved_by_user": True,
+        "approved_edl_sha256": edl_approval_hash(edl),
+        "approved_at": datetime.now(timezone.utc).isoformat()
+    }
     errors = validate_edl(edl, duration, probe["source"]["fingerprint"])
     if errors:
         raise PipelineError("Approved EDL failed validation:\n- " + "\n- ".join(errors))
