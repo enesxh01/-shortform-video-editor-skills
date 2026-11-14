@@ -15,7 +15,11 @@ def _ass_time(seconds: float) -> str:
 
 
 def _escape_ass(text: str) -> str:
-    return text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
+    return text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}").replace("\r\n", "\\N").replace("\n", "\\N")
+
+
+def _needs_space(previous: str, current: str) -> bool:
+    return bool(previous and current and current[0] not in ".,!?;:%)]}”")
 
 
 def _karaoke_text(caption: dict[str, Any]) -> str:
