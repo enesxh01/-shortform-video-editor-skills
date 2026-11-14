@@ -80,6 +80,7 @@ Useful follow-up commands:
 
 ```bash
 shortform-editor validate-edl job-output/edl/moment-....json --probe job-output/probe.json
+shortform-editor validate-semantic-review review.json --probe job-output/probe.json --candidates job-output/candidates.json
 shortform-editor render input.mp4 approved-edl.json output.mp4
 shortform-editor qc output.mp4 -o qc-report.json
 shortform-editor repair input.mp4 repaired.mp4
