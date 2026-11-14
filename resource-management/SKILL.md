@@ -7,7 +7,7 @@ description: Schedule local analysis and rendering jobs safely across CPU, GPU, 
 
 ## Executable baseline
 
-The `shortform_editor.resources` module uses psutil for available system RAM and `nvidia-smi` for NVIDIA GPU/VRAM telemetry. Audio ASR preflight selects CUDA only when the model-specific VRAM reserve is met; otherwise it uses CPU int8, and it refuses to start when available RAM is below 2.5 GB. The default ASR model is `small`. The selected device, compute type and resource snapshot are written to the audio-analysis report.
+The `shortform_editor.resources` module uses psutil for available system RAM and `nvidia-smi` for NVIDIA GPU/VRAM telemetry. The render command also performs a conservative free-disk preflight on both the output volume and system temporary volume before encoding; it includes a 512 MiB safety reserve and estimates temporary segment plus assembly space from requested clip duration. This estimate is intentionally conservative and cannot guarantee final encoded size. Audio ASR preflight selects CUDA only when the model-specific VRAM reserve is met; otherwise it uses CPU int8, and it refuses to start when available RAM is below 2.5 GB. The default ASR model is `small`. The selected device, compute type and resource snapshot are written to the audio-analysis report.
 
 This is preflight selection, not a complete scheduler. There is no job queue, concurrent-job coordinator, disk reservation, live peak VRAM/RAM sampler or automatic OOM retry yet.
 
