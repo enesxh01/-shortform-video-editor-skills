@@ -34,11 +34,11 @@ Do not call the score a probability of views or virality. Do not invent audience
 
 ## Output
 
-Write a review JSON beside the baseline report with:
+Write a review JSON beside the baseline report using `schemas/semantic-review.schema.json` and with:
 - `source_fingerprint`;
 - `baseline_candidate_ids`;
 - `semantic_candidates`;
 - `rejected_candidates` with concise reasons;
 - `final_ranked_candidates` with score breakdown and confidence label.
 
-If the transcript is too long for the available model context, process more chunks; do not silently skip the end of the recording. If no strong moments exist, say so.
+Validate the completed file with `shortform-editor validate-semantic-review review.json --probe probe.json --candidates candidates.json`. The validator checks schema, source fingerprint, timestamp bounds, score totals and ranking references. If invalid, correct the JSON rather than bypassing validation. If the transcript is too long for the available model context, process more chunks; do not silently skip the end of the recording. If no strong moments exist, say so.
