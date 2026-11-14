@@ -1107,9 +1107,89 @@ def command_download_source(args: argparse.Namespace) -> int:
     return 0
 
 
+
+
+def command_doctor(args: argparse.Namespace) -> int:
+    """Inspect required executables, Python extras and optional hardware acceleration."""
+    import importlib.util
+    import platform
+
+    report: dict[str, Any] = {
+        "status": "checking",
+        "python": {"version": platform.python_version(), "executable": sys.executable},
+        "platform": platform.platform(),
+        "executables": {},
+        "python_modules": {},
+        "accelerators": {}
+    }
+    for name in ("ffmpeg", "ffprobe", "nvidia-smi"):
+        executable = shutil.which(name)
+        item: dict[str, Any] = {"available": executable is not None, "path": executable}
+        if executable:
+            try:
+                result = run_checked([executable, "-version"] if name != "nvidia-smi" else [
+                    executable, "--query-gpu=name,memory.total", "--format=csv,noheader"
+                ])
+                item["version_or_device"] = (result.stdout or result.stderr).splitlines()[0]
+            except PipelineError as exc:
+                item["diagnostic"] = str(exc)
+        report["executables"][name] = item
+
+    modules = {
+        "jsonschema": "core",
+        "psutil": "core",
+        "faster_whisper": "audio extra",
+        "cv2": "visual extra",
+        "yt_dlp": "download extra"
+    }
+    for module, purpose in modules.items():
+        try:
+            available = importlib.util.find_spec(module) is not None
+        except (ImportError, ValueError):
+            available = False
+        report["python_modules"][module] = {"available": available, "purpose": purpose}
+
+    ffmpeg_path = report["executables"]["ffmpeg"]["path"]
+    nvenc_available = False
+    if ffmpeg_path:
+        try:
+            encoders = run_checked([ffmpeg_path, "-hide_banner", "-encoders"]).stdout
+            nvenc_available = "h264_nvenc" in encoders
+        except PipelineError as exc:
+            report["accelerators"]["ffmpeg_encoder_check"] = str(exc)
+    report["accelerators"]["h264_nvenc"] = {
+        "available": nvenc_available,
+        "note": "FFmpeg build advertises NVENC; actual driver/device initialization is only confirmed during a render."
+    }
+    required_missing = [
+        name for name in ("ffmpeg", "ffprobe")
+        if not report["executables"][name]["available"]
+    ] + [
+        name for name in ("jsonschema", "psutil")
+        if not report["python_modules"][name]["available"]
+    ]
+    report["missing_required"] = required_missing
+    report["missing_optional"] = [
+        name for name in ("faster_whisper", "cv2", "yt_dlp")
+        if not report["python_modules"][name]["available"]
+    ]
+    report["status"] = "needs_attention" if required_missing else (
+        "ready_with_optional_extras_missing" if report["missing_optional"] else "ready"
+    )
+    report["install_hint"] = {
+        "core": "python -m pip install -e .",
+        "all_extras": "python -m pip install -e \".[audio,visual,download]\"",
+        "ffmpeg": "Install FFmpeg and ensure both ffmpeg and ffprobe are available on PATH."
+    }
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    return 2 if required_missing else 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
     sub = parser.add_subparsers(dest="command", required=True)
+    doctor = sub.add_parser("doctor", help="check required tools, optional extras and encoder availability")
+    doctor.set_defaults(func=command_doctor)
     probe = sub.add_parser("probe", help="inspect a video with ffprobe and fingerprint the source")
     probe.add_argument("source")
     probe.add_argument("-o", "--output")
