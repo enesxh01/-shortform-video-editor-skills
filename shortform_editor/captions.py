@@ -18,7 +18,7 @@ def _escape_ass(text: str) -> str:
     return text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
 
 
-def _karaoke_text(caption: dict[str, Any], clip_start: float) -> str:
+def _karaoke_text(caption: dict[str, Any]) -> str:
     words = caption.get("words") or []
     if not words:
         return _escape_ass(caption["text"])
@@ -30,9 +30,9 @@ def _karaoke_text(caption: dict[str, Any], clip_start: float) -> str:
         if end <= start:
             continue
         duration = max(1, round((end - start) * 100))
-        if previous_end is not None and start > previous_end:
+        if pieces and not str(word["text"]).startswith(" "):
             pieces.append(" ")
-        pieces.append(f"{{\\kf{duration}}}{_escape_ass(word['text'])}")
+        pieces.append(f"{{\\kf{duration}}}{_escape_ass(str(word['text']).strip())}")
         previous_end = end
     return " ".join(pieces) if pieces else _escape_ass(caption["text"])
 
@@ -71,7 +71,7 @@ def write_ass_subtitles(segment: dict[str, Any], layout: str, clip_start: float,
             override = r"{\an2}"
         else:
             override = r"{\an5}" if layout == "split_vertical" else r"{\an2}"
-        text = _karaoke_text(caption, clip_start)
+        text = _karaoke_text(caption)
         lines.append(
             f"Dialogue: 0,{_ass_time(start)},{_ass_time(end)},Default,,0,0,0,,{override}{text}"
         )
