@@ -25,7 +25,7 @@ For every kept candidate, record:
 - source fingerprint, start/end time and exact transcript excerpt;
 - candidate family;
 - hook, setup, progression, payoff and ending;
-- evidence-backed rubric score with a short reason for each category;
+- evidence-backed rubric score with a short reason for each category; use the five 0–20 categories in the schema and make their sum equal the candidate score;
 - confidence label: high / medium / low, with uncertainty;
 - risk flags: missing context, ambiguous speaker, privacy, unclear audio, weak payoff, misleading framing;
 - alternative start/end boundaries when uncertain.
@@ -41,4 +41,4 @@ Write a review JSON beside the baseline report using `schemas/semantic-review.sc
 - `rejected_candidates` with concise reasons;
 - `final_ranked_candidates` with score breakdown and confidence label.
 
-Validate the completed file with `shortform-editor validate-semantic-review review.json --probe probe.json --candidates candidates.json`. The validator checks schema, source fingerprint, timestamp bounds, score totals and ranking references. If invalid, correct the JSON rather than bypassing validation. For a semantic-only candidate selected for editing, create a candidate JSON record using its exact `candidate_id`, `source_fingerprint`, `source_in_seconds` and `source_out_seconds`, run `shortform-editor generate-captions audio-analysis.json semantic-candidate.json -o semantic-captions.json`, then create an EDL draft with the matching source fingerprint and `approval.status=draft`; validate it before human review. Never auto-approve. If the transcript is too long for the available model context, process more chunks; do not silently skip the end of the recording. If no strong moments exist, say so.
+Validate the completed file with `shortform-editor validate-semantic-review review.json --probe probe.json --candidates candidates.json`. The validator checks schema, source fingerprint, timestamp bounds, score totals and ranking references. If invalid, correct the JSON rather than bypassing validation. Final ranking must be in descending score order, reference only baseline or semantic candidate IDs, and exclude rejected candidates; evidence timestamps must be ordered and remain inside the candidate window. For a semantic-only candidate selected for editing, create a candidate JSON record using its exact `candidate_id`, `source_fingerprint`, `source_in_seconds` and `source_out_seconds`, run `shortform-editor generate-captions audio-analysis.json semantic-candidate.json -o semantic-captions.json`, then create an EDL draft with the matching source fingerprint and `approval.status=draft`; validate it before human review. Never auto-approve. If the transcript is too long for the available model context, process more chunks; do not silently skip the end of the recording. If no strong moments exist, say so.
