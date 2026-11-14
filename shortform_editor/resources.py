@@ -14,6 +14,13 @@ MODEL_VRAM_GB = {
     "medium": 6.0,
     "large-v3": 9.0
 }
+MODEL_RAM_GB = {
+    "tiny": 1.5,
+    "base": 2.0,
+    "small": 2.5,
+    "medium": 5.0,
+    "large-v3": 8.0
+}
 
 
 def resource_snapshot() -> dict[str, Any]:
@@ -50,17 +57,15 @@ def choose_inference_device(model_size: str, requested: str = "auto",
     resources = snapshot or resource_snapshot()
     notes = []
     available_ram = float(resources.get("ram_available_gb", 0))
-    if available_ram < 2.5:
-        raise RuntimeError(
-            f"Only {available_ram:.1f} GB RAM is available; close other applications before inference."
-        )
-
     gpu = resources.get("gpu", {})
     gpu_free_gb = float(gpu.get("memory_free_mb") or 0) / 1024
     required_vram = MODEL_VRAM_GB[model_size]
     cuda_ready = bool(gpu.get("available")) and gpu_free_gb >= required_vram
+    required_ram = MODEL_RAM_GB[model_size]
 
     if requested == "cpu":
+        if available_ram < required_ram:
+            raise RuntimeError(f"Only {available_ram:.1f} GB RAM is available; {required_ram:.1f} GB is recommended for {model_size} on CPU.")
         return "cpu", "int8", notes
     if requested == "cuda":
         if not cuda_ready:
@@ -77,4 +82,8 @@ def choose_inference_device(model_size: str, requested: str = "auto",
         )
     else:
         notes.append("NVIDIA GPU telemetry unavailable; using CPU int8.")
+    if available_ram < required_ram:
+        raise RuntimeError(
+            f"Only {available_ram:.1f} GB RAM is available; {required_ram:.1f} GB is recommended for {model_size} on CPU."
+        )
     return "cpu", "int8", notes
