@@ -1,4 +1,6 @@
+import json
 import unittest
+from pathlib import Path
 from pathlib import Path
 
 from shortform_editor.cli import validate_edl
@@ -115,6 +117,13 @@ class EDLValidationTests(unittest.TestCase):
             "note": "Advisory only"
         }
         self.assertTrue(any("fit inside the segment source range" in e for e in validate_edl(edl)))
+
+
+    def test_packaged_edl_schema_matches_repository_schema(self):
+        root = Path(__file__).resolve().parents[1]
+        repository_schema = json.loads((root / "schemas" / "edit-decision-list.schema.json").read_text(encoding="utf-8"))
+        package_schema = json.loads((root / "shortform_editor" / "schemas" / "edit-decision-list.schema.json").read_text(encoding="utf-8"))
+        self.assertEqual(repository_schema, package_schema)
 
 
 if __name__ == "__main__":
