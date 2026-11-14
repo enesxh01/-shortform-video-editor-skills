@@ -95,6 +95,10 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
         raise PipelineError("Input contains no video stream")
     width, height = int(video_stream["width"]), int(video_stream["height"])
     duration = float(report.get("format", {}).get("duration") or 0)
+    try:
+        video_time_offset = float(video_stream.get("start_time") or 0.0)
+    except (TypeError, ValueError):
+        video_time_offset = 0.0
     if duration <= 0:
         raise PipelineError("Source duration is unavailable or invalid")
     if sample_rate < 0.2 or sample_rate > 5:
@@ -143,7 +147,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             motion_score = float(diff.mean()) / 255.0
             if motion_score >= 0.22:
                 scene_changes.append({
-                    "time_seconds": round(timestamp, 3),
+                    "time_seconds": round(timestamp + video_time_offset, 3),
                     "change_score": round(motion_score, 4)
                 })
         previous_gray = gray
@@ -177,7 +181,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
         )
         crop = compute_crop_box(width, height, smoothed_center[0], smoothed_center[1])
         samples.append({
-            "time_seconds": round(timestamp, 3),
+            "time_seconds": round(timestamp + video_time_offset, 3),
             "subject_evidence": subject,
             "confidence": confidence,
             "center": {"x": round(smoothed_center[0], 2), "y": round(smoothed_center[1], 2)},
@@ -195,7 +199,8 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             "width": width,
             "height": height,
             "duration_seconds": duration,
-            "reported_fps": fps
+            "reported_fps": fps,
+            "source_time_offset_seconds": video_time_offset
         },
         "analysis": {
             "requested_sample_rate_fps": sample_rate,
