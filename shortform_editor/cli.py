@@ -408,13 +408,41 @@ def command_render(args: argparse.Namespace) -> int:
             else:
                 raise PipelineError(f"Unsupported layout: {layout}")
 
-            cmd += [
-                "-c:v", "libx264", "-preset", args.preset, "-crf", str(args.crf),
-                "-pix_fmt", "yuv420p", "-r", fps, "-fps_mode", "cfr",
-                "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
-                "-movflags", "+faststart", str(part)
-            ]
-            run_checked(cmd)
+            encoder = getattr(args, "_selected_encoder", None)
+            if encoder is None:
+                requested_encoder = getattr(args, "encoder", "auto")
+                encoder_listing = run_checked([ffmpeg, "-hide_banner", "-encoders"]).stdout
+                has_nvenc = "h264_nvenc" in encoder_listing
+                if requested_encoder == "h264_nvenc" and not has_nvenc:
+                    raise PipelineError("h264_nvenc was requested but this FFmpeg build does not list the encoder")
+                encoder = "h264_nvenc" if requested_encoder in {"auto", "h264_nvenc"} and has_nvenc else "libx264"
+                args._selected_encoder = encoder
+
+            def encode_with(codec: str) -> None:
+                encode_cmd = list(cmd)
+                if codec == "h264_nvenc":
+                    encode_cmd += [
+                        "-c:v", "h264_nvenc", "-preset", getattr(args, "nvenc_preset", "p5"),
+                        "-rc", "vbr", "-cq", str(getattr(args, "nvenc_cq", 19)), "-b:v", "0"
+                    ]
+                else:
+                    encode_cmd += ["-c:v", "libx264", "-preset", args.preset, "-crf", str(args.crf)]
+                encode_cmd += [
+                    "-pix_fmt", "yuv420p", "-r", fps, "-fps_mode", "cfr",
+                    "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+                    "-movflags", "+faststart", str(part)
+                ]
+                run_checked(encode_cmd)
+
+            try:
+                encode_with(encoder)
+            except PipelineError:
+                if encoder != "h264_nvenc" or getattr(args, "encoder", "auto") != "auto":
+                    raise
+                part.unlink(missing_ok=True)
+                encode_with("libx264")
+                args._selected_encoder = "libx264"
+                args._encoder_fallback = "NVENC failed; CPU libx264 fallback used"
             parts.append(part)
 
         concat_file = tmpdir / "concat.txt"
@@ -469,7 +497,8 @@ def command_render(args: argparse.Namespace) -> int:
             "Split layout uses explicit top and bottom secondary video sources; primary source audio is retained.",
             "Blurred-bars layout uses a blurred full-frame background and sharp 60% center panel.",
             "Kino captions use ASS/libass; word karaoke requires word timings in the EDL.",
-            "CPU libx264 is used; CUDA/NVENC encoding is not implemented.",
+            f"Video encoder used: {getattr(args, '_selected_encoder', 'libx264')}. Auto mode prefers NVIDIA NVENC when available and falls back to CPU libx264 if NVENC cannot initialize.",
+            *([getattr(args, "_encoder_fallback")] if getattr(args, "_encoder_fallback", None) else []),
             "60 fps CFR conversion does not create native 60 fps motion from lower-frame-rate footage.",
             "Decode success is not a substitute for human visual and audio review."
         ]
@@ -852,6 +881,10 @@ def build_parser() -> argparse.ArgumentParser:
     render.add_argument("--preset", default="medium", choices=["ultrafast", "fast", "medium", "slow", "veryslow"])
     render.add_argument("--crf", type=int, default=18)
     render.add_argument("--overwrite", action="store_true")
+    render.add_argument("--encoder", choices=["auto", "libx264", "h264_nvenc"], default="auto",
+                        help="auto prefers NVIDIA NVENC when available, then safely falls back to CPU libx264")
+    render.add_argument("--nvenc-preset", default="p5", choices=["p1", "p2", "p3", "p4", "p5", "p6", "p7"])
+    render.add_argument("--nvenc-cq", type=int, default=19)
     render.set_defaults(func=command_render)
     return parser
 
