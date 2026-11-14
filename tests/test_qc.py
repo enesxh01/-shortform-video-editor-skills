@@ -20,7 +20,7 @@ def probe():
 
 class QCTests(unittest.TestCase):
     def test_passes_expected_stream_metadata_and_clean_logs(self):
-        result = assess_probe(probe(), "mean_volume: -18.0 dB\nmax_volume: -2.0 dB")
+        result = assess_probe(probe(), "mean_volume: -18.0 dB\nmax_volume: -2.0 dB\nI: -14.0 LUFS\nLRA: 4.0 LU\nPeak: -2.0 dBFS")
         self.assertEqual(result["status"], "passed")
         self.assertFalse(result["failures"])
 
