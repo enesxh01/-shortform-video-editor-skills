@@ -29,7 +29,7 @@ The design supports exactly three primary layouts: fullscreen, top/bottom vertic
 - `media-ingestion` — safe source inspection and staging
 - `audio-intelligence` — FFmpeg audio extraction, energy/silence evidence, optional faster-whisper ASR with word timestamps (partial implementation)
 - `viral-moment-detection` — transcript-aligned candidate discovery and explainable heuristic ranking (baseline implementation; low confidence)
-- `visual-storytelling` — subject/action analysis and framing (design-only)
+- `visual-storytelling` — sampled scene-change evidence and conservative face-guided 9:16 crop plans (partial implementation)
 - `retention-pacing` — transcript-bound pacing proposals and review-only silence trimming (baseline implementation)
 - `editing-director` — conflict resolution and EDL authoring
 - `edit-decision-list` — versioned timeline contract
@@ -54,6 +54,8 @@ shortform-editor probe input.mp4 -o probe.json
 shortform-editor analyze-audio input.mp4 -o audio-analysis.json
 shortform-editor find-moments audio-analysis.json -o candidates.json
 shortform-editor analyze-pacing audio-analysis.json candidates.json -o pacing.json
+# Optional OpenCV: python -m pip install -e '.[visual]'
+shortform-editor analyze-visuals input.mp4 -o visual-analysis.json
 # Optional ASR: python -m pip install -e '.[audio]'
 shortform-editor validate-edl edit.json --probe probe.json
 shortform-editor render input.mp4 edit.json output.mp4
