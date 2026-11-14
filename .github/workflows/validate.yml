@@ -1,5 +1,10 @@
 name: Validate project
 
+# New pushes supersede stale branch validation runs instead of building a long queue.
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   push:
