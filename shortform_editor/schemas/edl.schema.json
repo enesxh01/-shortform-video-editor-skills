@@ -454,6 +454,14 @@
         },
         "approved_by_user": {
           "type": "boolean"
+        },
+        "approved_edl_sha256": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "approved_at": {
+          "type": "string",
+          "format": "date-time"
         }
       },
       "allOf": [
@@ -473,7 +481,12 @@
               "approved_by_user": {
                 "const": true
               }
-            }
+            },
+            "required": [
+              "approved_by_user",
+              "approved_edl_sha256",
+              "approved_at"
+            ]
           }
         }
       ]
