@@ -288,6 +288,10 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
                         messages.append(f"segments[{index}].{split_key}.source_out must be greater than source_in")
                     if abs((split_end - split_start) - (end - start)) > 0.1:
                         messages.append(f"segments[{index}].{split_key} duration must match the primary segment within 100 ms")
+            if segment["layout"] == "split_vertical":
+                for split_key in ("split_top", "split_bottom"):
+                    if not segment.get(split_key):
+                        messages.append(f"segments[{index}].{split_key} is required for split_vertical layout")
             crop_keyframes = segment.get("crop_keyframes", [])
             if crop_keyframes and segment["layout"] != "fullscreen":
                 messages.append(f"segments[{index}].crop_keyframes are currently supported only for fullscreen layout")
@@ -321,7 +325,7 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
                     messages.append(f"{caption_path} overlaps or is out of chronological order with the previous caption")
                 previous_caption_end = max(previous_caption_end, caption_end)
                 caption_text = str(caption.get("text", ""))
-                if any(ord(character) < 32 and character not in "\\r\\n\\t" for character in caption_text):
+                if any(ord(character) < 32 and character not in "\r\n\t" for character in caption_text):
                     messages.append(f"{caption_path}.text contains unsupported control characters")
                 line_count = len(caption_text.replace("\r\n", "\n").replace("\r", "\n").split("\n"))
                 if segment["layout"] in {"split_vertical", "blurred_bars_20_60_20"} and line_count != 1:
