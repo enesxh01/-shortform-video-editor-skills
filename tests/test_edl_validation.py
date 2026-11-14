@@ -2,7 +2,7 @@ import json
 import unittest
 from pathlib import Path
 
-from shortform_editor.cli import validate_edl
+from shortform_editor.cli import SCHEMA_PATH, load_schema, validate_edl
 
 
 def valid_edl():
@@ -49,6 +49,18 @@ class EDLValidationTests(unittest.TestCase):
 
     def test_accepts_valid_draft(self):
         self.assertEqual(validate_edl(valid_edl()), [])
+
+    def test_accepts_optional_fades(self):
+        edl = valid_edl()
+        edl["segments"][0]["fade_in_seconds"] = 0.25
+        edl["segments"][0]["fade_out_seconds"] = 0.25
+        self.assertEqual(validate_edl(edl), [])
+
+    def test_rejects_fades_longer_than_segment(self):
+        edl = valid_edl()
+        edl["segments"][0]["fade_in_seconds"] = 4.0
+        edl["segments"][0]["fade_out_seconds"] = 3.0
+        self.assertTrue(any("fade durations" in error for error in validate_edl(edl)))
 
     def test_rejects_out_before_in(self):
         edl = valid_edl()
