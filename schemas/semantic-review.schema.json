@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/enesxh01/-shortform-video-editor-skills/blob/main/schemas/semantic-review.schema.json",
+  "title": "OpenCode Semantic Moment Review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_fingerprint",
+    "baseline_candidate_ids",
+    "semantic_candidates",
+    "rejected_candidates",
+    "final_ranked_candidates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "source_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "baseline_candidate_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "semantic_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "source_in_seconds",
+          "source_out_seconds",
+          "family",
+          "transcript_excerpt",
+          "hook",
+          "setup",
+          "progression",
+          "payoff",
+          "ending",
+          "score",
+          "score_breakdown",
+          "confidence",
+          "risks",
+          "evidence"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{3,80}$"
+          },
+          "source_in_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "source_out_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "family": {
+            "enum": [
+              "curiosity_or_surprise",
+              "emotion_or_connection",
+              "comedy",
+              "conflict_or_debate",
+              "useful_knowledge",
+              "story_or_transformation",
+              "visual_action_or_demonstration",
+              "other"
+            ]
+          },
+          "transcript_excerpt": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 3000
+          },
+          "hook": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "setup": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "progression": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "payoff": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "ending": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "score_breakdown": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "hook",
+              "context",
+              "payoff",
+              "clarity",
+              "emotional_or_utility_value"
+            ],
+            "properties": {
+              "hook": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 20
+              },
+              "context": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 20
+              },
+              "payoff": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 20
+              },
+              "clarity": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 20
+              },
+              "emotional_or_utility_value": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 20
+              }
+            }
+          },
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "risks": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 300
+            }
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start_seconds",
+                "end_seconds",
+                "text"
+              ],
+              "properties": {
+                "start_seconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "end_seconds": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1000
+                }
+              }
+            }
+          },
+          "alternatives": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_in_seconds",
+                "source_out_seconds",
+                "reason"
+              ],
+              "properties": {
+                "source_in_seconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "source_out_seconds": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "reason": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "rejected_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "source_in_seconds",
+          "source_out_seconds",
+          "reason"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_in_seconds": {
+            "type": "number",
+            "minimum": 0
+          },
+          "source_out_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      }
+    },
+    "final_ranked_candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "score",
+          "confidence",
+          "rationale"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        }
+      }
+    }
+  }
+}

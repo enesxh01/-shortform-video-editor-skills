@@ -5,6 +5,16 @@ description: Run technical and visual quality checks on rendered clips, classify
 
 # Quality Assurance
 
+## Executable technical QC baseline
+
+The `shortform-editor render` command automatically runs technical QC after rendering and includes the report in its JSON output. Run `shortform-editor qc OUTPUT.mp4 -o qc-report.json` separately when you need a standalone recheck. The current command checks stream presence, configured dimensions, average frame rate, H.264 codec, yuv420p pixel format, AAC codec and 48 kHz audio, black intervals, frozen-frame intervals, audio sample peak, EBU R128 integrated loudness/loudness range/true peak when audio is present, and audio/video stream start/duration metadata alignment. A missing audio stream is a warning; major technical defects return a failing exit code.
+
+Stream timing is metadata-only and cannot prove lip-sync or perceptual synchronization. This is not complete QC. EBU R128 loudness and true-peak readings are advisory: a general -16 to -12 LUFS band and a true-peak ceiling below -1 dBTP are guidance, not universal platform rules. The report does not validate caption spelling, caption timing overlaps, layout-specific line counts and safe caption positions are checked in the EDL before rendering. QC still does not verify rendered caption OCR/readability, crop quality, HUD/object collisions, audio/video sync by listening, story comprehension or visual appeal. Fullscreen drafts may use sampled face boxes to choose top or bottom captions, but this is not a substitute for visual review. Black/freeze detections can flag intentional creative choices and require review.
+
+## Bounded technical repair
+
+Run `shortform-editor repair INPUT.mp4 OUTPUT.mp4` to create a separate normalized H.264/AAC 1080x1920 60 fps CFR export and run technical QC again. The original is never overwritten. This repairs container/codec/frame-size/frame-rate compatibility only. It does not synthesize missing content, remove black/frozen frames, de-clip audio, correct captions or guarantee visual quality. Inspect the repair report's unresolved list and review the output.
+
 ## QC departments
 
 1. Visual integrity: black/frozen/corrupt/missing frames, aspect ratio, dimensions, FPS, flicker, crop, tracking, layout, transitions.

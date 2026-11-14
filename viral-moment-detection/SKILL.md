@@ -7,6 +7,12 @@ description: Find and rank genuinely compelling, context-complete short-form mom
 
 Find moments people may want to keep watching and share. Do not promise virality. The goal is editorial quality, not a guaranteed outcome.
 
+## Executable baseline
+
+After audio analysis, run `shortform-editor find-moments audio-analysis.json -o candidates.json`. The current implementation proposes transcript-aligned windows and ranks them with an explainable 100-point heuristic using hook/payoff text cues, speech density, lexical variety, audio energy support and boundary evidence.
+
+Treat every candidate as low-confidence (0.35) and human-review-required. Candidate transcript diagnostics include ASR segment log-probability, no-speech probability, word-confidence coverage, low-confidence word count/ratio and up to eight contiguous low-confidence timestamp spans. These are review cues, not calibrated confidence or proof of an error; compare the flagged spans with the original audio. Candidate reports may also include generic energy-rise/transient evidence with timestamp and signal metrics; use it to direct listening, never to label laughter, excitement, emotion or semantic events. The cue lexicon is English-biased, does not understand semantics, and does not estimate virality. It is a triage baseline only. Do not increase its confidence or describe it as AI understanding. Then perform the OpenCode model's full-transcript semantic second pass using `references/semantic-review.md`; the model must use exact transcript timestamps and explain evidence, never invent boundaries. Validate its JSON with `shortform-editor validate-semantic-review review.json --probe probe.json --candidates candidates.json` before creating additional EDL drafts.
+
 ## Analyze the whole recording
 
 - Search the full timeline, including quiet sections and later segments.
@@ -52,7 +58,8 @@ For each candidate include:
 - payoff and whether it is complete;
 - score breakdown and total;
 - confidence and uncertainty;
-- risks: misleading framing, missing context, privacy, inaudible speech, visual ambiguity, repeated content;
+- risks: misleading framing, missing context, privacy, inaudible speech, visual ambiguity, repeated content, low-confidence transcript timestamp spans;
+- generic acoustic event evidence and signal metrics, clearly distinguished from semantic interpretation;
 - boundary alternatives if uncertain.
 
 ## Rejection rules

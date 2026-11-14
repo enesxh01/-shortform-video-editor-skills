@@ -21,6 +21,9 @@
 ### Score breakdown
 List all ten dimensions and evidence, not only the total.
 
+### Audio event evidence
+[Timestamped generic energy-rise/transient cues and measured signal metrics, if present. These are not semantic or emotion labels.]
+
 ### Risks and uncertainties
 [Missing context, ambiguous speech, privacy, visual ambiguity, near-duplicate, misleading interpretation, etc.]
 

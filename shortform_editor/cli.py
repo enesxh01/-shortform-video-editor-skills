@@ -1,0 +1,1419 @@
+from __future__ import annotations
+
+import argparse
+from argparse import Namespace
+from contextlib import nullcontext
+import hashlib
+import json
+import math
+import statistics
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+from fractions import Fraction
+from pathlib import Path
+from typing import Any
+
+
+SCHEMA_PATH = Path(__file__).resolve().parent / "schemas" / "edl.schema.json"
+TIMESTAMP_RE = re.compile(r"^(?:(\d+):)?([0-5]?\d):([0-5]\d)(?:\.(\d{1,6}))?$")
+
+
+class PipelineError(RuntimeError):
+    pass
+
+
+def require_tool(name: str) -> str:
+    executable = shutil.which(name)
+    if not executable:
+        raise PipelineError(f"Required executable not found on PATH: {name}")
+    return executable
+
+
+def run_checked(args: list[str]) -> subprocess.CompletedProcess[str]:
+    process = subprocess.Popen(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        stdout, stderr = process.communicate()
+    except KeyboardInterrupt:
+        try:
+            process.terminate()
+        except OSError:
+            pass
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+        process.communicate()
+        raise
+    completed = subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
+    if process.returncode != 0:
+        detail = (stderr or stdout or f"exit code {process.returncode}").strip()
+        raise PipelineError(f"Command failed ({process.returncode}): {detail}")
+    return completed
+
+
+def file_stat_signature(path: Path) -> tuple[int, int, int, int]:
+    stat = path.stat()
+    return (
+        int(stat.st_size),
+        int(stat.st_mtime_ns),
+        int(getattr(stat, "st_ctime_ns", 0)),
+        int(getattr(stat, "st_ino", 0))
+    )
+
+
+def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(chunk_size), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def analyze_frame_timestamps(timestamps: list[Any], min_samples: int = 12,
+                             sample_window_starts: list[int] | None = None) -> dict[str, Any]:
+    """Classify local frame cadence across sampled windows; not a proof for every frame."""
+    values = []
+    seen_timestamps: set[float] = set()
+    for item in timestamps:
+        try:
+            value = float(item)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(value) and value not in seen_timestamps:
+            values.append(value)
+            seen_timestamps.add(value)
+    deltas = [right - left for left, right in zip(values, values[1:])]
+    positive = [delta for delta in deltas if delta > 0]
+    non_monotonic = sum(delta < 0 for delta in deltas)
+    gap_limit = max(0.25, statistics.median(positive) * 5) if positive else 0.25
+    local_intervals = [delta for delta in deltas if 0 < delta <= gap_limit]
+    windows = len(sample_window_starts or [0])
+    if len(local_intervals) < min_samples - 1:
+        return {"status": "insufficient_samples", "variable_frame_rate": None,
+                "sampled_frames": len(values), "sampled_intervals": len(local_intervals),
+                "non_monotonic_intervals": non_monotonic, "irregular_interval_ratio": None,
+                "median_interval_seconds": None, "sample_windows": windows,
+                "scope": "stratified_frame_samples"}
+    median_interval = statistics.median(local_intervals)
+    tolerance = max(0.002, median_interval * 0.03)
+    irregular = sum(abs(interval - median_interval) > tolerance for interval in local_intervals)
+    ratio = (irregular + non_monotonic) / max(1, len(local_intervals) + non_monotonic)
+    is_vfr = ratio > 0.05
+    return {"status": "likely_vfr" if is_vfr else "likely_cfr",
+            "variable_frame_rate": is_vfr, "sampled_frames": len(values),
+            "sampled_intervals": len(local_intervals), "non_monotonic_intervals": non_monotonic,
+            "irregular_interval_ratio": round(ratio, 4),
+            "median_interval_seconds": round(median_interval, 6),
+            "tolerance_seconds": round(tolerance, 6), "sample_windows": windows,
+            "scope": "stratified_frame_samples",
+            "limitation": "A bounded multi-window sample can miss cadence changes between samples; this is advisory and does not normalize timestamps."}
+
+def probe_frame_timing(source: Path, ffprobe: str, duration_seconds: float | None = None,
+                       nominal_frame_rate: float | None = None, sample_frames: int = 240,
+                       sample_windows: int = 8) -> dict[str, Any]:
+    """Sample bounded frame windows across the file to flag probable variable cadence."""
+    if sample_frames < 12 or sample_windows < 1:
+        raise ValueError("Frame timing sample requires at least 12 frames and one window")
+    frames_per_window = max(2, sample_frames // sample_windows)
+    if duration_seconds and math.isfinite(duration_seconds) and duration_seconds > 0:
+        estimated_window_seconds = frames_per_window / max(1.0, nominal_frame_rate or 30.0)
+        last_start = max(0.0, duration_seconds - estimated_window_seconds)
+        starts = [round(last_start * index / max(1, sample_windows - 1), 3)
+                  for index in range(sample_windows)]
+    else:
+        starts = [0.0]
+    starts = list(dict.fromkeys(starts))
+    intervals = ",".join(str(start) + "%+#" + str(frames_per_window) for start in starts)
+    result = run_checked([
+        ffprobe, "-v", "error", "-select_streams", "v:0",
+        "-read_intervals", intervals, "-show_frames",
+        "-show_entries", "frame=best_effort_timestamp_time", "-of", "json", str(source)
+    ])
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return analyze_frame_timestamps([])
+    timestamps = [frame.get("best_effort_timestamp_time")
+                  for frame in payload.get("frames", []) if isinstance(frame, dict)]
+    return analyze_frame_timestamps(timestamps, sample_window_starts=list(range(len(starts))))
+
+
+def probe_media(source: Path) -> dict[str, Any]:
+    source = source.expanduser().resolve(strict=True)
+    if not source.is_file():
+        raise PipelineError(f"Source is not a regular file: {source}")
+    stat_before = file_stat_signature(source)
+    ffprobe = require_tool("ffprobe")
+    result = run_checked([
+        ffprobe, "-v", "error", "-show_format", "-show_streams",
+        "-show_entries", "format=filename,format_name,duration,size,start_time:stream=index,codec_type,codec_name,width,height,pix_fmt,r_frame_rate,avg_frame_rate,time_base,start_time,duration,channels,channel_layout,sample_rate",
+        "-of", "json", str(source)
+    ])
+    try:
+        data = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise PipelineError("ffprobe returned invalid JSON") from exc
+    streams = data.get("streams", [])
+    if not streams or not any(s.get("codec_type") == "video" for s in streams):
+        raise PipelineError("Input contains no readable video stream")
+    digest = sha256_file(source)
+    stat_after = file_stat_signature(source)
+    if stat_after != stat_before:
+        raise PipelineError("Source media changed while it was being probed and fingerprinted")
+    data["source"] = {
+        "path": str(source),
+        "size_bytes": source.stat().st_size,
+        "sha256": digest,
+        "fingerprint": f"sha256:{digest}",
+    }
+    try:
+        video_stream = next(stream for stream in streams if stream.get("codec_type") == "video")
+        try:
+            nominal_frame_rate = float(Fraction(video_stream.get("avg_frame_rate") or video_stream.get("r_frame_rate") or "30/1"))
+        except (ValueError, ZeroDivisionError):
+            nominal_frame_rate = 30.0
+        try:
+            duration_seconds = float(data.get("format", {}).get("duration") or 0)
+        except (TypeError, ValueError):
+            duration_seconds = None
+        data["frame_timing"] = probe_frame_timing(
+            source, ffprobe,
+            duration_seconds=duration_seconds,
+            nominal_frame_rate=nominal_frame_rate
+        )
+    except (PipelineError, OSError) as exc:
+        data["frame_timing"] = {
+            "status": "unavailable", "variable_frame_rate": None,
+            "sampled_frames": 0, "scope": "stratified_frame_samples",
+            "warning": f"Frame-timing sample unavailable: {type(exc).__name__}: {exc}"
+        }
+    data["tool_versions"] = {
+        "ffprobe": run_checked([ffprobe, "-version"]).stdout.splitlines()[0]
+    }
+    if file_stat_signature(source) != stat_before:
+        raise PipelineError("Source media changed during frame-timing analysis; restart the probe")
+    return data
+
+
+def timestamp_seconds(value: str) -> float:
+    match = TIMESTAMP_RE.fullmatch(value)
+    if not match:
+        raise ValueError(f"Invalid timestamp: {value!r}; expected MM:SS or HH:MM:SS[.ffffff]")
+    hours, minutes, seconds, fraction = match.groups()
+    total = int(hours or 0) * 3600 + int(minutes) * 60 + int(seconds)
+    if fraction:
+        total += float("0." + fraction)
+    return total
+
+
+def load_schema() -> dict[str, Any]:
+    try:
+        return json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PipelineError(f"Cannot load EDL schema at {SCHEMA_PATH}: {exc}") from exc
+
+
+def validate_edl(edl: dict[str, Any], source_duration: float | None = None, source_fingerprint: str | None = None) -> list[str]:
+    try:
+        from jsonschema import Draft202012Validator
+    except ImportError as exc:
+        raise PipelineError("Install project dependencies first: pip install -e .") from exc
+
+    errors = sorted(Draft202012Validator(load_schema()).iter_errors(edl), key=lambda e: list(e.absolute_path))
+    messages = [
+        f"{'.'.join(map(str, err.absolute_path)) or '<root>'}: {err.message}"
+        for err in errors
+    ]
+    if messages:
+        return messages
+
+    render = edl["render"]
+    ratio = render["width"] / render["height"]
+    if source_fingerprint is not None and edl["source"]["fingerprint"] != source_fingerprint:
+        messages.append("EDL source fingerprint does not match the supplied source media")
+    if abs(ratio - (9 / 16)) > 0.002:
+        messages.append("render dimensions must be portrait 9:16 (within 0.2% tolerance)")
+    try:
+        fps = Fraction(render["fps_target"])
+        time_base = Fraction(edl["source"]["time_base"])
+        if fps <= 0 or time_base <= 0:
+            raise ValueError("rational values must be positive")
+        if edl["source"].get("frame_rate"):
+            if Fraction(edl["source"]["frame_rate"]) <= 0:
+                raise ValueError("frame rate must be positive")
+    except (ValueError, ZeroDivisionError):
+        messages.append("frame rate and time_base values must be valid positive rational numbers")
+
+    ids: set[str] = set()
+    expected_timeline_start = 0.0
+    for index, segment in enumerate(edl["segments"]):
+        if segment["id"] in ids:
+            messages.append(f"segments[{index}].id duplicates {segment['id']!r}")
+        ids.add(segment["id"])
+        try:
+            start = timestamp_seconds(segment["source_in"])
+            end = timestamp_seconds(segment["source_out"])
+            if end <= start:
+                messages.append(f"segments[{index}] source_out must be greater than source_in")
+            fade_in = float(segment.get("fade_in_seconds", 0.0))
+            fade_out = float(segment.get("fade_out_seconds", 0.0))
+            if (not math.isfinite(fade_in) or not math.isfinite(fade_out)
+                    or fade_in < 0 or fade_out < 0
+                    or fade_in + fade_out >= max(0.0, end - start)):
+                messages.append(f"segments[{index}] fade durations must be non-negative and sum to less than the segment duration")
+            if source_duration is not None and end > source_duration + 0.05:
+                messages.append(f"segments[{index}] source_out exceeds source duration ({source_duration:.3f}s)")
+            timeline = segment.get("timeline_start")
+            if timeline is not None:
+                timeline_value = timestamp_seconds(timeline)
+                if abs(timeline_value - expected_timeline_start) > 0.05:
+                    messages.append(
+                        f"segments[{index}].timeline_start must equal the sequential render position "
+                        f"({expected_timeline_start:.3f}s); gaps, overlaps and transitions are not supported"
+                    )
+            expected_timeline_start += max(0.0, end - start)
+            for split_key in ("split_top", "split_bottom"):
+                split_source = segment.get(split_key)
+                if split_source:
+                    split_start = timestamp_seconds(split_source["source_in"])
+                    split_end = timestamp_seconds(split_source["source_out"])
+                    if split_end <= split_start:
+                        messages.append(f"segments[{index}].{split_key}.source_out must be greater than source_in")
+                    if abs((split_end - split_start) - (end - start)) > 0.1:
+                        messages.append(f"segments[{index}].{split_key} duration must match the primary segment within 100 ms")
+            if segment["layout"] == "split_vertical":
+                for split_key in ("split_top", "split_bottom"):
+                    if not segment.get(split_key):
+                        messages.append(f"segments[{index}].{split_key} is required for split_vertical layout")
+            crop_keyframes = segment.get("crop_keyframes", [])
+            if crop_keyframes and segment["layout"] != "fullscreen":
+                messages.append(f"segments[{index}].crop_keyframes are currently supported only for fullscreen layout")
+            previous_crop_time = -1.0
+            for crop_index, keyframe in enumerate(crop_keyframes):
+                crop_time = float(keyframe["time_seconds"])
+                if crop_time < start or crop_time > end or crop_time < previous_crop_time:
+                    messages.append(f"segments[{index}].crop_keyframes[{crop_index}] time must be ordered and inside the segment")
+                previous_crop_time = crop_time
+            pacing_review = segment.get("pacing_review")
+            if pacing_review:
+                previous_decision_start = start
+                for decision_index, decision in enumerate(pacing_review.get("decisions", [])):
+                    decision_start = timestamp_seconds(decision["source_in"])
+                    decision_end = timestamp_seconds(decision["source_out"])
+                    if decision_end <= decision_start or decision_start < start or decision_end > end:
+                        messages.append(f"segments[{index}].pacing_review.decisions[{decision_index}] must fit inside the segment source range")
+                    if decision_start < previous_decision_start - 0.001:
+                        messages.append(f"segments[{index}].pacing_review.decisions[{decision_index}] must be ordered by source_in")
+                    previous_decision_start = decision_start
+            previous_caption_end = start
+            for caption_index, caption in enumerate(segment.get("captions", [])):
+                caption_start = timestamp_seconds(caption["start"])
+                caption_end = timestamp_seconds(caption["end"])
+                caption_path = f"segments[{index}].captions[{caption_index}]"
+                if caption_end <= caption_start:
+                    messages.append(f"{caption_path} end must be after start")
+                if caption_start < start or caption_end > end:
+                    messages.append(f"{caption_path} must fit inside the segment source range")
+                if caption_start < previous_caption_end - 0.001:
+                    messages.append(f"{caption_path} overlaps or is out of chronological order with the previous caption")
+                previous_caption_end = max(previous_caption_end, caption_end)
+                caption_text = str(caption.get("text", ""))
+                if any(ord(character) < 32 and character not in "\r\n\t" for character in caption_text):
+                    messages.append(f"{caption_path}.text contains unsupported control characters")
+                line_count = len(caption_text.replace("\r\n", "\n").replace("\r", "\n").split("\n"))
+                if segment["layout"] in {"split_vertical", "blurred_bars_20_60_20"} and line_count != 1:
+                    messages.append(f"{caption_path} must be exactly one line for {segment['layout']} layout")
+                if segment["layout"] == "fullscreen" and line_count > 3:
+                    messages.append(f"{caption_path} may contain at most three lines in fullscreen layout")
+                position = caption.get("position", "auto")
+                if segment["layout"] == "split_vertical" and position not in {"auto", "center"}:
+                    messages.append(f"{caption_path}.position must remain centered in split_vertical layout")
+                if segment["layout"] == "blurred_bars_20_60_20" and position not in {"auto", "bottom"}:
+                    messages.append(f"{caption_path}.position must remain in the main composition for blurred-bars layout")
+                previous_word_end = caption_start
+                for word_index, word in enumerate(caption.get("words", [])):
+                    word_start = timestamp_seconds(word["start"])
+                    word_end = timestamp_seconds(word["end"])
+                    word_text = str(word.get("text", ""))
+                    if any(ord(character) < 32 and character not in "\r\n\t" for character in word_text):
+                        messages.append(f"{caption_path}.words[{word_index}].text contains unsupported control characters")
+                    if word_end <= word_start or word_start < previous_word_end or word_start < caption_start or word_end > caption_end:
+                        messages.append(f"segments[{index}].captions[{caption_index}].words[{word_index}] has invalid or unordered timing")
+                    previous_word_end = word_end
+        except ValueError as exc:
+            messages.append(f"segments[{index}]: {exc}")
+
+    if edl["approval"]["status"] == "approved" and not edl["approval"]["approved_by_user"]:
+        messages.append("approved EDL must have approved_by_user=true")
+    return messages
+
+
+def command_probe(args: argparse.Namespace) -> int:
+    source = Path(args.source).expanduser().resolve(strict=True)
+    report = probe_media(source)
+    output = json.dumps(report, indent=2) + "\n"
+    if args.output:
+        destination = Path(args.output).expanduser().resolve()
+        if destination == source:
+            raise PipelineError("Probe report cannot overwrite the source media")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(output, encoding="utf-8")
+    else:
+        print(output, end="")
+    return 0
+
+
+def command_validate(args: argparse.Namespace) -> int:
+    edl = json.loads(Path(args.edl).read_text(encoding="utf-8"))
+    duration = None
+    source_fingerprint = None
+    if args.probe:
+        probe = json.loads(Path(args.probe).read_text(encoding="utf-8"))
+        source_fingerprint = probe.get("source", {}).get("fingerprint")
+        raw_duration = probe.get("format", {}).get("duration")
+        if raw_duration is not None:
+            duration = float(raw_duration)
+            if not math.isfinite(duration) or duration <= 0:
+                raise PipelineError("Probe report contains an invalid source duration")
+    errors = validate_edl(edl, duration, source_fingerprint)
+    if errors:
+        print("EDL INVALID:")
+        for error in errors:
+            print(f"- {error}")
+        return 2
+    print("EDL VALID")
+    return 0
+
+
+def _resolve_edl_path(edl_path: Path, raw_path: str) -> Path:
+    candidate = Path(raw_path).expanduser()
+    if not candidate.is_absolute():
+        candidate = edl_path.parent / candidate
+    return candidate.resolve(strict=True)
+
+
+def choose_video_encoder(ffmpeg: str, requested: str = "auto") -> str:
+    if requested not in {"auto", "libx264", "h264_nvenc"}:
+        raise PipelineError(f"Unsupported video encoder: {requested}")
+    if requested == "libx264":
+        return "libx264"
+    encoder_result = run_checked([ffmpeg, "-hide_banner", "-encoders"])
+    encoder_listing = (encoder_result.stdout or "") + (encoder_result.stderr or "")
+    has_nvenc = "h264_nvenc" in encoder_listing
+    if requested == "h264_nvenc" and not has_nvenc:
+        raise PipelineError("h264_nvenc was requested but this FFmpeg build does not list the encoder")
+    return "h264_nvenc" if has_nvenc else "libx264"
+
+
+def _concat_demuxer_entry(path: Path) -> str:
+    """Return one safely quoted FFmpeg concat-demuxer file entry."""
+    value = path.expanduser().resolve().as_posix()
+    if any(ord(character) < 32 or ord(character) == 127 for character in value):
+        raise PipelineError("Media paths used by the concat renderer cannot contain control characters")
+    # FFmpeg's concat demuxer uses its own token parser, not shell quoting.
+    escaped = value.replace("\\", "\\\\").replace("'", "\\'")
+    return f"file '{escaped}'\n"
+
+def _segment_fade_filters(segment: dict[str, Any], duration: float) -> tuple[list[str], list[str]]:
+    fade_in = float(segment.get("fade_in_seconds", 0.0))
+    fade_out = float(segment.get("fade_out_seconds", 0.0))
+    if fade_in < 0 or fade_out < 0 or fade_in + fade_out >= duration:
+        raise PipelineError("Segment fade durations must be non-negative and their sum must be shorter than the clip")
+    video_filters = []
+    audio_filters = []
+    if fade_in > 0:
+        video_filters.append(f"fade=t=in:st=0:d={fade_in:.3f}")
+        audio_filters.append(f"afade=t=in:st=0:d={fade_in:.3f}")
+    if fade_out > 0:
+        start = max(0.0, duration - fade_out)
+        video_filters.append(f"fade=t=out:st={start:.3f}:d={fade_out:.3f}")
+        audio_filters.append(f"afade=t=out:st={start:.3f}:d={fade_out:.3f}")
+    return video_filters, audio_filters
+
+
+def _segment_look_filters(segment: dict[str, Any]) -> list[str]:
+    """Build bounded, optional color-correction and sharpening filters."""
+    grade = segment.get("color_grade") or {}
+    if not isinstance(grade, dict):
+        raise PipelineError("color_grade must be an object")
+    defaults = {"brightness": 0.0, "contrast": 1.0, "saturation": 1.0, "gamma": 1.0, "sharpen": 0.0}
+    values = {key: float(grade.get(key, default)) for key, default in defaults.items()}
+    bounds = {
+        "brightness": (-0.2, 0.2), "contrast": (0.5, 2.0),
+        "saturation": (0.0, 2.0), "gamma": (0.5, 2.0), "sharpen": (0.0, 1.5)
+    }
+    for key, value in values.items():
+        low, high = bounds[key]
+        if not math.isfinite(value) or value < low or value > high:
+            raise PipelineError(f"color_grade.{key} must be between {low} and {high}")
+    filters = []
+    if any(abs(values[key] - defaults[key]) > 1e-9 for key in ("brightness", "contrast", "saturation", "gamma")):
+        filters.append(
+            "eq=" + ":".join(f"{key}={values[key]:.4f}" for key in ("brightness", "contrast", "saturation", "gamma"))
+        )
+    if values["sharpen"] > 0:
+        amount = values["sharpen"]
+        filters.append(f"unsharp=5:5:{amount:.3f}:5:5:0")
+    return filters
+
+
+
+
+def _write_render_state(path: Path, state: dict[str, Any]) -> None:
+    staged = None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", prefix=".render-state-",
+                                         suffix=".tmp", dir=path.parent, delete=False) as handle:
+            staged = Path(handle.name)
+            json.dump(state, handle, indent=2, ensure_ascii=False)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(staged, path)
+    finally:
+        if staged is not None:
+            staged.unlink(missing_ok=True)
+
+
+
+def _existing_output_is_resumable(output: Path, overwrite: bool, state_path: Path) -> bool:
+    """Permit a prior output only when explicitly overwriting or resuming a persisted job."""
+    return bool(overwrite or state_path.is_file()) and output.is_file()
+
+
+def _render_part_is_reusable(part: Path, record: Any, ffmpeg: str, ffprobe: str,
+                             width: int, height: int, fps: str) -> bool:
+    if not isinstance(record, dict) or not part.is_file():
+        return False
+    expected_digest = record.get("sha256")
+    if not isinstance(expected_digest, str) or len(expected_digest) != 64:
+        return False
+    if record.get("encoder") not in {"h264_nvenc", "libx264"}:
+        return False
+    try:
+        if sha256_file(part) != expected_digest or part.stat().st_size <= 0:
+            return False
+        metadata = json.loads(run_checked([
+            ffprobe, "-v", "error", "-show_streams", "-show_format", "-of", "json", str(part)
+        ]).stdout)
+        video = next((stream for stream in metadata.get("streams", [])
+                      if stream.get("codec_type") == "video"), None)
+        if not video or video.get("codec_name") != "h264":
+            return False
+        if (int(video.get("width", 0)), int(video.get("height", 0))) != (width, height):
+            return False
+        if Fraction(video.get("avg_frame_rate", "0/1")) != Fraction(fps):
+            return False
+        run_checked([ffmpeg, "-hide_banner", "-v", "error", "-i", str(part), "-f", "null", "-"])
+        return True
+    except (PipelineError, OSError, ValueError, TypeError, ZeroDivisionError, json.JSONDecodeError):
+        return False
+
+
+def command_render(args: argparse.Namespace) -> int:
+    edl_path = Path(args.edl).expanduser().resolve(strict=True)
+    edl = json.loads(edl_path.read_text(encoding="utf-8"))
+    source = Path(args.source).expanduser().resolve(strict=True)
+    output = Path(args.output).expanduser().resolve()
+    if output in {source, edl_path}:
+        raise PipelineError("Output must not overwrite the source media or EDL")
+    if output.suffix.lower() != ".mp4":
+        raise PipelineError("The current renderer produces MP4; use an output filename ending in .mp4")
+    if not 0 <= args.crf <= 51:
+        raise PipelineError("--crf must be between 0 and 51")
+    if not 0 <= getattr(args, "nvenc_cq", 19) <= 51:
+        raise PipelineError("--nvenc-cq must be between 0 and 51")
+    if edl.get("render", {}).get("fps_mode") != "cfr":
+        raise PipelineError("The current renderer supports fps_mode=cfr only")
+    if edl.get("render", {}).get("fps_conversion") != "duplicate_drop":
+        raise PipelineError("The current renderer supports fps_conversion=duplicate_drop only")
+    if edl.get("render", {}).get("video_codec") not in (None, "h264"):
+        raise PipelineError("The current renderer supports H.264 video only")
+    if edl.get("render", {}).get("audio_codec") not in (None, "aac"):
+        raise PipelineError("The current renderer supports AAC audio only")
+
+    probe = probe_media(source)
+    source_signature = file_stat_signature(source)
+    raw_duration = probe.get("format", {}).get("duration")
+    duration = float(raw_duration) if raw_duration is not None else None
+    errors = validate_edl(edl, duration, probe.get("source", {}).get("fingerprint"))
+    if errors:
+        raise PipelineError("Refusing to render invalid EDL:\n- " + "\n- ".join(errors))
+    preview_mode = bool(getattr(args, "preview", False))
+    if not preview_mode:
+        approval = edl["approval"]
+        if approval["status"] != "approved" or not approval["approved_by_user"]:
+            raise PipelineError("Rendering final output requires explicit user approval in the EDL")
+        from .approval import edl_approval_hash
+        if approval.get("approved_edl_sha256") != edl_approval_hash(edl):
+            raise PipelineError("EDL content changed after approval; review the current preview and approve this exact version again")
+
+    ffmpeg = require_tool("ffmpeg")
+    render = edl["render"]
+    width, height, fps = render["width"], render["height"], render["fps_target"]
+    primary_video = next(s for s in probe["streams"] if s.get("codec_type") == "video")
+    source_width, source_height = int(primary_video["width"]), int(primary_video["height"])
+    output.parent.mkdir(parents=True, exist_ok=True)
+    resume_requested = bool(getattr(args, "resume", False))
+    render_workdir = output.parent / f".{output.name}.shortform-work"
+    render_state_path = render_workdir / "render-state.json"
+    resumable_existing_output = resume_requested and _existing_output_is_resumable(output, False, render_state_path)
+    if output.exists() and not args.overwrite and not resumable_existing_output:
+        raise PipelineError(f"Output already exists (use --overwrite, or resume the matching interrupted render): {output}")
+
+    # Validate and fingerprint both secondary sources before any render work begins.
+    split_paths: dict[tuple[int, str], Path] = {}
+    split_signatures: dict[tuple[int, str], tuple[int, int, int, int]] = {}
+    for index, segment in enumerate(edl["segments"]):
+        if segment["layout"] != "split_vertical":
+            continue
+        for key in ("split_top", "split_bottom"):
+            spec = segment[key]
+            path = _resolve_edl_path(edl_path, spec["path"])
+            if path in {source, output, edl_path}:
+                raise PipelineError(f"segments[{index}].{key} must not alias the primary source, EDL or output")
+            secondary_probe = probe_media(path)
+            if secondary_probe["source"]["fingerprint"] != spec["fingerprint"]:
+                raise PipelineError(f"segments[{index}].{key} fingerprint does not match its file")
+            secondary_duration = float(secondary_probe.get("format", {}).get("duration") or 0)
+            if timestamp_seconds(spec["source_out"]) > secondary_duration + 0.05:
+                raise PipelineError(f"segments[{index}].{key} source_out exceeds secondary source duration")
+            split_paths[(index, key)] = path
+            split_signatures[(index, key)] = file_stat_signature(path)
+
+    # Conservative working-set estimate for segment encodes and final assembly.
+    # Encoded size varies by footage; this is a safety preflight, not an exact prediction.
+    from .resources import check_disk_space
+    expected_render_seconds = sum(
+        timestamp_seconds(segment["source_out"]) - timestamp_seconds(segment["source_in"])
+        for segment in edl["segments"]
+    )
+    estimated_working_bytes = int(expected_render_seconds * 30_000_000 / 8 * 2)
+    try:
+        check_disk_space(str(output.parent), estimated_working_bytes)
+        check_disk_space(tempfile.gettempdir(), estimated_working_bytes)
+    except RuntimeError as exc:
+        raise PipelineError(str(exc)) from exc
+
+
+    resume_enabled = resume_requested
+    render_state: dict[str, Any] | None = None
+    reused_segments: list[int] = []
+    segment_encoders: dict[int, str] = {}
+    if resume_enabled:
+        split_fingerprints = [
+            {"segment": index, "source": key, "fingerprint": edl["segments"][index][key]["fingerprint"]}
+            for index, key in sorted(split_paths)
+        ]
+        render_settings = {
+            "renderer_cache_version": "2",
+            "ffmpeg_version": (run_checked([ffmpeg, "-version"]).stdout or "").splitlines()[0],
+            "source_fingerprint": probe["source"]["fingerprint"],
+            "edl_sha256": sha256_file(edl_path),
+            "split_sources": split_fingerprints,
+            "output": str(output),
+            "render": render,
+            "crf": args.crf,
+            "preset": args.preset,
+            "encoder": getattr(args, "encoder", "auto"),
+            "nvenc_preset": getattr(args, "nvenc_preset", "p5"),
+            "nvenc_cq": getattr(args, "nvenc_cq", 19),
+            "preview": preview_mode
+        }
+        settings_sha256 = hashlib.sha256(
+            json.dumps(render_settings, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        render_workdir.mkdir(parents=True, exist_ok=True)
+        if render_state_path.exists():
+            try:
+                render_state = json.loads(render_state_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+                raise PipelineError(f"Cannot resume render: render state is unreadable: {exc}") from exc
+            if not isinstance(render_state, dict) or render_state.get("settings_sha256") != settings_sha256:
+                raise PipelineError("Cannot resume render: source, EDL, output or encoder settings changed; use a new output path or remove the old work directory")
+            if not isinstance(render_state.get("parts"), dict):
+                raise PipelineError("Cannot resume render: render state has an invalid parts manifest")
+        else:
+            render_state = {"schema_version": "2.0", "settings_sha256": settings_sha256,
+                            "settings": render_settings, "parts": {}}
+            _write_render_state(render_state_path, render_state)
+
+    from .captions import ffmpeg_subtitles_filter, write_ass_subtitles
+    from .visual import build_ffmpeg_crop_filter
+
+    render_context = nullcontext(str(render_workdir)) if resume_enabled else tempfile.TemporaryDirectory(prefix="shortform-render-")
+    with render_context as tmp:
+        tmpdir = Path(tmp)
+        parts: list[Path] = []
+        for index, segment in enumerate(edl["segments"]):
+            clip_start = timestamp_seconds(segment["source_in"])
+            clip_end = timestamp_seconds(segment["source_out"])
+            clip_duration = clip_end - clip_start
+            part = tmpdir / f"part-{index:04d}.mp4"
+            if resume_enabled and render_state is not None:
+                record = render_state["parts"].get(str(index))
+                if _render_part_is_reusable(part, record, ffmpeg, require_tool("ffprobe"), width, height, fps):
+                    parts.append(part)
+                    reused_segments.append(index)
+                    segment_encoders[index] = record["encoder"]
+                    continue
+                part.unlink(missing_ok=True)
+                render_state["parts"].pop(str(index), None)
+                _write_render_state(render_state_path, render_state)
+            layout = segment["layout"]
+            ass_path = tmpdir / f"captions-{index:04d}.ass"
+            subtitle_path = write_ass_subtitles(segment, layout, clip_start, ass_path)
+            subtitle_filter = ffmpeg_subtitles_filter(subtitle_path) if subtitle_path else None
+
+            cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+                   "-ss", f"{clip_start:.6f}", "-i", str(source)]
+            if layout == "split_vertical":
+                top = segment["split_top"]
+                bottom = segment["split_bottom"]
+                cmd += ["-ss", f"{timestamp_seconds(top['source_in']):.6f}", "-i", str(split_paths[(index, "split_top")])]
+                cmd += ["-ss", f"{timestamp_seconds(bottom['source_in']):.6f}", "-i", str(split_paths[(index, "split_bottom")])]
+            cmd += ["-t", f"{clip_duration:.6f}"]
+
+            if layout == "fullscreen":
+                crop_filter = build_ffmpeg_crop_filter(
+                    segment.get("crop_keyframes", []), clip_start, fps, source_width, source_height
+                )
+                if crop_filter:
+                    vf = f"setpts=PTS-STARTPTS,fps={fps},{crop_filter},scale={width}:{height},setsar=1,format=yuv420p"
+                else:
+                    vf = (
+                        f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+                        f"crop={width}:{height},setsar=1,setpts=PTS-STARTPTS,fps={fps},format=yuv420p"
+                    )
+                fade_video_filters, fade_audio_filters = _segment_fade_filters(segment, clip_duration)
+                look_filters = _segment_look_filters(segment)
+                if look_filters:
+                    vf += "," + ",".join(look_filters)
+                if subtitle_filter:
+                    vf += f",{subtitle_filter}"
+                if fade_video_filters:
+                    vf += "," + ",".join(fade_video_filters)
+                cmd += ["-map", "0:v:0", "-map", "0:a?", "-vf", vf]
+            elif layout == "blurred_bars_20_60_20":
+                center_height = int(height * 0.6) // 2 * 2
+                bar_offset = (height - center_height) // 2
+                graph = (
+                    f"[0:v]setpts=PTS-STARTPTS,split=2[bgsrc][fgsrc];"
+                    f"[bgsrc]scale={width}:{height}:force_original_aspect_ratio=increase,"
+                    f"crop={width}:{height},boxblur=20:10[bg];"
+                    f"[fgsrc]scale={width}:{center_height}:force_original_aspect_ratio=increase,"
+                    f"crop={width}:{center_height}[fg];"
+                    f"[bg][fg]overlay=0:{bar_offset},setsar=1,fps={fps},format=yuv420p[vbase]"
+                )
+                fade_video_filters, fade_audio_filters = _segment_fade_filters(segment, clip_duration)
+                look_filters = _segment_look_filters(segment)
+                graph_input = "vbase"
+                if look_filters:
+                    graph += f";[vbase]{','.join(look_filters)}[vlook]"
+                    graph_input = "vlook"
+                if subtitle_filter:
+                    graph += f";[{graph_input}]{subtitle_filter}[vcap]"
+                    graph_input = "vcap"
+                if fade_video_filters:
+                    graph += f";[{graph_input}]{','.join(fade_video_filters)}[vfade]"
+                    graph_input = "vfade"
+                graph += f";[{graph_input}]null[vout]"
+                cmd += ["-filter_complex", graph, "-map", "[vout]", "-map", "0:a?"]
+            elif layout == "split_vertical":
+                panel_height = height // 2
+                graph = (
+                    f"[1:v]setpts=PTS-STARTPTS,scale={width}:{panel_height}:force_original_aspect_ratio=increase,"
+                    f"crop={width}:{panel_height},setsar=1[top];"
+                    f"[2:v]setpts=PTS-STARTPTS,scale={width}:{panel_height}:force_original_aspect_ratio=increase,"
+                    f"crop={width}:{panel_height},setsar=1[bottom];"
+                    f"[top][bottom]vstack=inputs=2,setsar=1,fps={fps},format=yuv420p[vbase]"
+                )
+                fade_video_filters, fade_audio_filters = _segment_fade_filters(segment, clip_duration)
+                look_filters = _segment_look_filters(segment)
+                graph_input = "vbase"
+                if look_filters:
+                    graph += f";[vbase]{','.join(look_filters)}[vlook]"
+                    graph_input = "vlook"
+                if subtitle_filter:
+                    graph += f";[{graph_input}]{subtitle_filter}[vcap]"
+                    graph_input = "vcap"
+                if fade_video_filters:
+                    graph += f";[{graph_input}]{','.join(fade_video_filters)}[vfade]"
+                    graph_input = "vfade"
+                graph += f";[{graph_input}]null[vout]"
+                cmd += ["-filter_complex", graph, "-map", "[vout]", "-map", "0:a?"]
+            else:
+                raise PipelineError(f"Unsupported layout: {layout}")
+
+            encoder = getattr(args, "_selected_encoder", None)
+            if encoder is None:
+                requested_encoder = getattr(args, "encoder", "auto")
+                encoder = choose_video_encoder(ffmpeg, requested_encoder)
+                args._selected_encoder = encoder
+
+            def encode_with(codec: str) -> None:
+                encode_cmd = list(cmd)
+                if codec == "h264_nvenc":
+                    encode_cmd += [
+                        "-c:v", "h264_nvenc", "-preset", getattr(args, "nvenc_preset", "p5"),
+                        "-rc", "vbr", "-cq", str(getattr(args, "nvenc_cq", 19)), "-b:v", "0"
+                    ]
+                else:
+                    encode_cmd += ["-c:v", "libx264", "-preset", args.preset, "-crf", str(args.crf)]
+                encode_cmd += [
+                    "-pix_fmt", "yuv420p", "-r", fps, "-fps_mode", "cfr",
+                    "-c:a", "aac", "-b:a", "192k", "-ar", "48000"
+                ]
+                has_source_audio = any(stream.get("codec_type") == "audio" for stream in probe.get("streams", []))
+                if has_source_audio:
+                    # Resample against input timestamps to repair ordinary VFR/audio-clock drift
+                    # while retaining the source timing; this is not a perceptual lip-sync guarantee.
+                    audio_filters = ["aresample=48000:async=1:first_pts=0"]
+                    audio_filters.extend(fade_audio_filters)
+                    encode_cmd += ["-af", ",".join(audio_filters)]
+                encode_cmd += ["-movflags", "+faststart", str(part)]
+                run_checked(encode_cmd)
+
+            try:
+                encode_with(encoder)
+            except PipelineError:
+                if encoder != "h264_nvenc" or getattr(args, "encoder", "auto") != "auto":
+                    raise
+                part.unlink(missing_ok=True)
+                encode_with("libx264")
+                args._selected_encoder = "libx264"
+                args._encoder_fallback = "NVENC failed; CPU libx264 fallback used"
+            parts.append(part)
+            actual_encoder = getattr(args, "_selected_encoder", encoder)
+            segment_encoders[index] = actual_encoder
+            if resume_enabled and render_state is not None:
+                render_state["parts"][str(index)] = {"sha256": sha256_file(part), "size_bytes": part.stat().st_size, "encoder": actual_encoder}
+                _write_render_state(render_state_path, render_state)
+
+        concat_file = tmpdir / "concat.txt"
+        concat_file.write_text("".join(_concat_demuxer_entry(p) for p in parts), encoding="utf-8")
+        assembled = tmpdir / "assembled.mp4"
+        run_checked([
+            ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+            "-f", "concat", "-safe", "0", "-i", str(concat_file),
+            "-c", "copy", "-movflags", "+faststart", str(assembled)
+        ])
+        run_checked([ffmpeg, "-hide_banner", "-v", "error", "-i", str(assembled), "-f", "null", "-"])
+        from .qc import add_expected_duration_check, assess_edit_quality, run_qc
+        expected_duration = sum(
+            timestamp_seconds(segment["source_out"]) - timestamp_seconds(segment["source_in"])
+            for segment in edl["segments"]
+        )
+        staged_output = None
+        try:
+            with tempfile.NamedTemporaryFile(prefix=".shortform-", suffix=output.suffix, dir=output.parent, delete=False) as handle:
+                staged_output = Path(handle.name)
+            shutil.copy2(assembled, staged_output)
+            final_probe = probe_media(staged_output)
+            actual_duration = float(final_probe.get("format", {}).get("duration") or 0)
+            # Run the full technical QC against the staged artifact. Do not publish a file
+            # that fails the same checks the CLI reports to the user.
+            qc_report = run_qc(staged_output, expected_width=width, expected_height=height, expected_fps=fps)
+            qc_report = add_expected_duration_check(
+                qc_report, actual_duration, expected_duration,
+                tolerance=max(0.1, 0.025 * len(edl["segments"]))
+            )
+            if qc_report["status"] not in {"passed", "warning"}:
+                failure_report = output.with_name(f".{output.name}.qc-failed.json")
+                try:
+                    failure_report.write_text(json.dumps(qc_report, indent=2, ensure_ascii=False) + chr(10), encoding="utf-8")
+                except OSError:
+                    pass
+                failures = "; ".join(qc_report.get("failures", [])) or qc_report["status"]
+                raise PipelineError(
+                    f"Staged render failed technical QC ({failures}); final output was not published. "
+                    f"See {failure_report} when the diagnostic report could be written."
+                )
+            if file_stat_signature(source) != source_signature:
+                raise PipelineError("Primary source changed during rendering; refusing to publish an output from an unstable source")
+            for split_key, split_path in split_paths.items():
+                if file_stat_signature(split_path) != split_signatures[split_key]:
+                    raise PipelineError(f"{split_key[1]} source changed during rendering; refusing to publish an output from an unstable source")
+            os.replace(staged_output, output)
+            qc_report["source"]["path"] = str(output)
+        except Exception:
+            if staged_output is not None:
+                staged_output.unlink(missing_ok=True)
+            raise
+
+    if resume_enabled and qc_report["status"] in {"passed", "warning"}:
+        shutil.rmtree(render_workdir, ignore_errors=True)
+
+    creative_quality = assess_edit_quality(edl)
+
+    print(json.dumps({
+        "output": str(output),
+        "source_sha256": probe["source"]["sha256"],
+        "output_sha256": final_probe["source"]["sha256"],
+        "render": render,
+        "segments": len(edl["segments"]),
+        "resumed_segments": reused_segments,
+        "video_encoders_used": sorted(set(segment_encoders.values())),
+        "layouts": sorted({segment["layout"] for segment in edl["segments"]}),
+        "captions": sum(len(segment.get("captions", [])) for segment in edl["segments"]),
+        "status": "preview_rendered_and_decode_checked" if preview_mode else "rendered_and_decode_checked",
+        "technical_qc": qc_report,
+        "creative_quality": creative_quality,
+        "preview_only": preview_mode,
+        "limitations": [
+            "Split layout uses explicit top and bottom secondary video sources; primary source audio is retained.",
+            "Blurred-bars layout uses a blurred full-frame background and sharp 60% center panel.",
+            "Kino captions use ASS/libass; word karaoke requires word timings in the EDL.",
+            f"Video encoder(s) used: {', '.join(sorted(set(segment_encoders.values())))}. Auto mode prefers NVIDIA NVENC when available and falls back to CPU libx264 if NVENC cannot initialize.",
+            *([getattr(args, "_encoder_fallback")] if getattr(args, "_encoder_fallback", None) else []),
+            "60 fps CFR conversion does not create native 60 fps motion from lower-frame-rate footage.",
+            "Decode success is not a substitute for human visual and audio review."
+        ]
+    }, indent=2))
+    return 0 if qc_report["status"] in {"passed", "warning"} else 1
+
+
+def command_analyze_audio(args: argparse.Namespace) -> int:
+    from .audio import analyze_audio
+
+    source = Path(args.source).expanduser().resolve(strict=True)
+    report = analyze_audio(
+        source,
+        model_size=args.model,
+        device=args.device,
+        language=args.language,
+        transcribe=not args.no_transcribe,
+        silence_dbfs=args.silence_dbfs
+    )
+    output = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
+    if args.output:
+        destination = Path(args.output).expanduser().resolve()
+        if destination == source:
+            raise PipelineError("Audio report cannot overwrite the source media")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(output, encoding="utf-8")
+    else:
+        print(output, end="")
+    return 0
+
+
+def command_find_moments(args: argparse.Namespace) -> int:
+    from .moments import detect_moments_file
+
+    result = detect_moments_file(
+        Path(args.analysis).expanduser().resolve(strict=True),
+        Path(args.output).expanduser().resolve(),
+        min_duration=args.min_duration,
+        max_duration=args.max_duration,
+        limit=args.limit
+    )
+    print(json.dumps({
+        "output": str(Path(args.output).expanduser().resolve()),
+        "candidate_count": result["candidate_count"],
+        "method": result["method"],
+        "human_review_required": True
+    }, indent=2))
+    return 0
+
+
+def command_analyze_pacing(args: argparse.Namespace) -> int:
+    from .pacing import analyze_pacing_files
+
+    result = analyze_pacing_files(
+        Path(args.analysis).expanduser().resolve(strict=True),
+        Path(args.candidates).expanduser().resolve(strict=True),
+        Path(args.output).expanduser().resolve(),
+        long_pause_seconds=args.long_pause
+    )
+    print(json.dumps({
+        "output": str(Path(args.output).expanduser().resolve()),
+        "candidate_count": result["candidate_count"],
+        "method": result["method"],
+        "automatic_edits": False
+    }, indent=2))
+    return 0
+
+
+def command_analyze_visuals(args: argparse.Namespace) -> int:
+    from .visual import analyze_visuals
+
+    source = Path(args.source).expanduser().resolve(strict=True)
+    report = analyze_visuals(
+        source,
+        sample_rate=args.sample_rate,
+        max_frames=args.max_frames,
+        detect_faces=not args.no_face_detection,
+        initial_roi=tuple(args.track_roi) if args.track_roi is not None else None
+    )
+    output = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
+    if args.output:
+        destination = Path(args.output).expanduser().resolve()
+        if destination == source:
+            raise PipelineError("Visual report cannot overwrite the source media")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(output, encoding="utf-8")
+    else:
+        print(output, end="")
+    return 0
+
+
+def command_generate_captions(args: argparse.Namespace) -> int:
+    from .caption_generation import generate_captions_file
+
+    result = generate_captions_file(
+        Path(args.analysis).expanduser().resolve(strict=True),
+        Path(args.candidates).expanduser().resolve(strict=True),
+        Path(args.output).expanduser().resolve(),
+        candidate_id=args.candidate_id,
+        layout=args.layout
+    )
+    print(json.dumps({
+        "output": str(Path(args.output).expanduser().resolve()),
+        "candidate_id": result["candidate_id"],
+        "caption_count": len(result["captions"]),
+        "layout": result["layout"]
+    }, indent=2))
+    return 0
+
+
+def command_qc(args: argparse.Namespace) -> int:
+    from .qc import run_qc
+
+    report = run_qc(
+        Path(args.source).expanduser().resolve(strict=True),
+        expected_width=args.width,
+        expected_height=args.height,
+        expected_fps=args.fps
+    )
+    output = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
+    if args.output:
+        destination = Path(args.output).expanduser().resolve()
+        if destination == Path(args.source).expanduser().resolve():
+            raise PipelineError("QC report cannot overwrite the media file")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(output, encoding="utf-8")
+    else:
+        print(output, end="")
+    return 0 if report["status"] in {"passed", "warning"} else 1
+
+
+def command_record_feedback(args: argparse.Namespace) -> int:
+    from .feedback import DEFAULT_FEEDBACK_PATH, record_feedback
+
+    candidates = json.loads(Path(args.candidates).expanduser().resolve(strict=True).read_text(encoding="utf-8"))
+    feedback_path = Path(args.feedback_file).expanduser().resolve() if args.feedback_file else DEFAULT_FEEDBACK_PATH
+    record = record_feedback(candidates, args.candidate_id, args.decision, feedback_path, args.reason)
+    print(json.dumps({
+        "feedback_file": str(feedback_path),
+        "candidate_id": record["candidate_id"],
+        "decision": record["decision"],
+        "stored": True
+    }, indent=2))
+    return 0
+
+
+def command_apply_feedback(args: argparse.Namespace) -> int:
+    from .feedback import DEFAULT_FEEDBACK_PATH, apply_feedback_file
+
+    feedback_path = Path(args.feedback_file).expanduser().resolve() if args.feedback_file else DEFAULT_FEEDBACK_PATH
+    result = apply_feedback_file(
+        Path(args.candidates).expanduser().resolve(strict=True),
+        feedback_path,
+        Path(args.output).expanduser().resolve(),
+        min_observations=args.min_observations
+    )
+    print(json.dumps({
+        "output": str(Path(args.output).expanduser().resolve()),
+        "records_used": result.get("feedback_learning", {}).get("records_used", 0),
+        "status": result.get("feedback_learning", {}).get("status")
+    }, indent=2))
+    return 0
+
+
+def command_repair(args: argparse.Namespace) -> int:
+    from .repair import repair_technical_export
+
+    result = repair_technical_export(
+        Path(args.source).expanduser().resolve(strict=True),
+        Path(args.output).expanduser().resolve(),
+        width=args.width,
+        height=args.height,
+        fps=args.fps,
+        crf=args.crf,
+        preset=args.preset,
+        overwrite=args.overwrite
+    )
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    return 0 if result["qc_after_repair"]["status"] in {"passed", "warning"} else 1
+
+
+def command_analyze_project(args: argparse.Namespace) -> int:
+    from .pipeline import analyze_project
+
+    try:
+        manifest = analyze_project(
+            Path(args.source).expanduser().resolve(strict=True),
+            Path(args.output_dir).expanduser().resolve(),
+            model=args.model,
+            device=args.device,
+            top_candidates=args.top,
+            layout=args.layout,
+            include_visuals=args.visuals,
+            split_top_source=Path(args.split_top_source) if args.split_top_source else None,
+            split_bottom_source=Path(args.split_bottom_source) if args.split_bottom_source else None,
+            split_top_in=args.split_top_in,
+            split_bottom_in=args.split_bottom_in,
+            resume=args.resume,
+            visual_roi=tuple(args.visual_roi) if args.visual_roi is not None else None
+        )
+    except KeyboardInterrupt:
+        print("Analysis cancelled. Completed artifacts and a cancellation manifest were preserved.", file=sys.stderr)
+        return 130
+    print(json.dumps(manifest, indent=2, ensure_ascii=False))
+    return 0
+
+
+def command_validate_semantic_review(args: argparse.Namespace) -> int:
+    from .semantic_review import validate_semantic_review_file
+
+    report = validate_semantic_review_file(
+        Path(args.review).expanduser().resolve(strict=True),
+        Path(args.probe).expanduser().resolve(strict=True) if args.probe else None,
+        Path(args.candidates).expanduser().resolve(strict=True) if args.candidates else None
+    )
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    return 0 if report["status"] == "valid" else 2
+
+
+def command_render_preview(args: argparse.Namespace) -> int:
+    source = Path(args.source).expanduser().resolve(strict=True)
+    edl_path = Path(args.edl).expanduser().resolve(strict=True)
+    output = Path(args.output).expanduser().resolve()
+    if output in {source, edl_path}:
+        raise PipelineError("Preview output must be a separate file")
+    try:
+        edl = json.loads(edl_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PipelineError(f"Cannot read EDL: {exc}") from exc
+    edl["render"]["fps_target"] = "30/1"
+    edl["render"]["fps_mode"] = "cfr"
+    edl["render"]["fps_conversion"] = "duplicate_drop"
+    with tempfile.TemporaryDirectory(prefix="shortform-preview-") as temporary:
+        preview_edl = Path(temporary) / "preview-edl.json"
+        preview_edl.write_text(json.dumps(edl, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        return command_render(Namespace(
+            source=str(source), edl=str(preview_edl), output=str(output),
+            preset="ultrafast", crf=26, overwrite=args.overwrite, preview=True
+        ))
+
+
+def command_approve_edl(args: argparse.Namespace) -> int:
+    from .approval import approve_edl_file
+
+    result = approve_edl_file(
+        Path(args.edl).expanduser().resolve(strict=True),
+        Path(args.source).expanduser().resolve(strict=True),
+        confirm=args.confirm
+    )
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    return 0
+
+
+def command_download_source(args: argparse.Namespace) -> int:
+    from .ingest import download_source
+    report = download_source(args.url, Path(args.output_dir), args.max_filesize_mb)
+    if args.report:
+        report_path = Path(args.report).expanduser().resolve()
+        if report_path == Path(report["source_path"]).expanduser().resolve():
+            raise PipelineError("Download report must not overwrite the downloaded source media")
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
+            json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+    print(json.dumps({key: value for key, value in report.items() if key != "probe"}, indent=2, ensure_ascii=False))
+    return 0
+
+
+
+
+def command_doctor(args: argparse.Namespace) -> int:
+    """Inspect required executables, Python extras and optional hardware acceleration."""
+    import importlib.util
+    import platform
+
+    report: dict[str, Any] = {
+        "status": "checking",
+        "python": {"version": platform.python_version(), "executable": sys.executable},
+        "platform": platform.platform(),
+        "executables": {},
+        "python_modules": {},
+        "accelerators": {}
+    }
+    for name in ("ffmpeg", "ffprobe", "nvidia-smi"):
+        executable = shutil.which(name)
+        item: dict[str, Any] = {"available": executable is not None, "path": executable}
+        if executable:
+            try:
+                result = run_checked([executable, "-version"] if name != "nvidia-smi" else [
+                    executable, "--query-gpu=name,memory.total", "--format=csv,noheader"
+                ])
+                item["version_check_passed"] = True
+                item["version_or_device"] = (result.stdout or result.stderr).splitlines()[0]
+            except PipelineError as exc:
+                item["version_check_passed"] = False
+                item["diagnostic"] = str(exc)
+        report["executables"][name] = item
+
+    modules = {
+        "jsonschema": "core",
+        "psutil": "core",
+        "faster_whisper": "audio extra",
+        "cv2": "visual extra",
+        "yt_dlp": "download extra"
+    }
+    for module, purpose in modules.items():
+        try:
+            available = importlib.util.find_spec(module) is not None
+        except (ImportError, ValueError):
+            available = False
+        report["python_modules"][module] = {"available": available, "purpose": purpose}
+
+    ffmpeg_path = report["executables"]["ffmpeg"]["path"]
+    nvenc_available = False
+    aac_available = False
+    libx264_available = False
+    encoders_text = ""
+    filters_text = ""
+    if ffmpeg_path:
+        try:
+            encoders_result = run_checked([ffmpeg_path, "-hide_banner", "-encoders"])
+            encoders_text = encoders_result.stdout + encoders_result.stderr
+            nvenc_available = "h264_nvenc" in encoders_text
+        except PipelineError as exc:
+            report["accelerators"]["ffmpeg_encoder_check"] = str(exc)
+        try:
+            filters_result = run_checked([ffmpeg_path, "-hide_banner", "-filters"])
+            filters_text = filters_result.stdout + filters_result.stderr
+        except PipelineError as exc:
+            report["accelerators"]["ffmpeg_filter_check"] = str(exc)
+    encoder_tokens = {token for line in encoders_text.splitlines() for token in line.split()}
+    nvenc_available = nvenc_available and "h264_nvenc" in encoder_tokens
+    libx264_available = "libx264" in encoder_tokens
+    aac_available = "aac" in encoder_tokens
+    report["accelerators"]["h264_nvenc"] = {
+        "available": nvenc_available,
+        "note": "FFmpeg build advertises NVENC; actual driver/device initialization is only confirmed during a render."
+    }
+    report["accelerators"]["libx264"] = {"available": libx264_available}
+    report["accelerators"]["aac"] = {"available": aac_available, "required": True}
+    required_filters = (
+        "subtitles", "fps", "scale", "crop", "setpts", "setsar", "format",
+        "aresample", "blackdetect", "freezedetect", "volumedetect", "ebur128",
+        "split", "overlay", "vstack", "boxblur", "fade", "eq", "unsharp", "null"
+    )
+    available_filters = set()
+    for line in filters_text.splitlines():
+        # FFmpeg's filter table starts each row with capability flags, then the
+        # filter name and input/output signature. Only inspect the first fields;
+        # this tolerates flag-format differences across FFmpeg releases.
+        fields = line.split()
+        available_filters.update(name for name in required_filters if name in fields[:3])
+    if not available_filters and filters_text:
+        report["accelerators"]["ffmpeg_filter_listing_sample"] = filters_text.splitlines()[:12]
+    report["accelerators"]["filters"] = {
+        name: {"available": name in available_filters, "required": True}
+        for name in required_filters
+    }
+    report["accelerators"]["subtitles_filter"] = {
+        "available": "subtitles" in available_filters,
+        "note": "The filter must also have libass support in the FFmpeg build."
+    }
+    required_missing = [
+        name for name in ("ffmpeg", "ffprobe")
+        if not report["executables"][name]["available"]
+        or not report["executables"][name].get("version_check_passed", False)
+    ] + [
+        name for name in ("jsonschema", "psutil")
+        if not report["python_modules"][name]["available"]
+    ]
+    if not libx264_available and not nvenc_available:
+        required_missing.append("ffmpeg_h264_encoder")
+    if not aac_available:
+        required_missing.append("ffmpeg_aac_encoder")
+    required_missing.extend(
+        f"ffmpeg_filter:{name}" for name in required_filters
+        if name not in available_filters
+    )
+    report["missing_required"] = required_missing
+    report["missing_optional"] = [
+        name for name in ("faster_whisper", "cv2", "yt_dlp")
+        if not report["python_modules"][name]["available"]
+    ]
+    report["status"] = "needs_attention" if required_missing else (
+        "ready_with_optional_extras_missing" if report["missing_optional"] else "ready"
+    )
+    report["install_hint"] = {
+        "core": "python -m pip install -e .",
+        "all_extras": "python -m pip install -e \".[audio,visual,download]\"",
+        "ffmpeg": "Install FFmpeg and ensure both ffmpeg and ffprobe are available on PATH."
+    }
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    return 2 if required_missing else 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
+    sub = parser.add_subparsers(dest="command", required=True)
+    doctor = sub.add_parser("doctor", help="check required tools, optional extras and encoder availability")
+    doctor.set_defaults(func=command_doctor)
+    probe = sub.add_parser("probe", help="inspect a video with ffprobe and fingerprint the source")
+    probe.add_argument("source")
+    probe.add_argument("-o", "--output")
+    probe.set_defaults(func=command_probe)
+    validate = sub.add_parser("validate-edl", help="validate EDL schema and semantic constraints")
+    validate.add_argument("edl")
+    validate.add_argument("--probe", help="optional ffprobe JSON report for duration checking")
+    validate.set_defaults(func=command_validate)
+    audio = sub.add_parser("analyze-audio", help="extract audio, detect silence candidates and optionally transcribe speech")
+    audio.add_argument("source")
+    audio.add_argument("-o", "--output")
+    audio.add_argument("--model", default="small", choices=["tiny", "base", "small", "medium", "large-v3"])
+    audio.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    audio.add_argument("--language", help="optional ISO language code; omit for automatic detection")
+    audio.add_argument("--no-transcribe", action="store_true", help="run audio energy/silence analysis without loading ASR")
+    audio.add_argument("--silence-dbfs", type=float, default=-38.0)
+    audio.set_defaults(func=command_analyze_audio)
+    moments = sub.add_parser("find-moments", help="rank transcript-led candidate moments with transparent heuristic evidence")
+    moments.add_argument("analysis", help="JSON report from analyze-audio")
+    moments.add_argument("-o", "--output", required=True)
+    moments.add_argument("--min-duration", type=float, default=12.0)
+    moments.add_argument("--max-duration", type=float, default=55.0)
+    moments.add_argument("--limit", type=int, default=10)
+    moments.set_defaults(func=command_find_moments)
+    pacing = sub.add_parser("analyze-pacing", help="propose context-safe pacing decisions for ranked candidates")
+    pacing.add_argument("analysis", help="audio-analysis JSON")
+    pacing.add_argument("candidates", help="candidate JSON from find-moments")
+    pacing.add_argument("-o", "--output", required=True)
+    pacing.add_argument("--long-pause", type=float, default=1.8)
+    pacing.set_defaults(func=command_analyze_pacing)
+    visuals = sub.add_parser("analyze-visuals", help="sample scenes and propose conservative face-guided 9:16 crop keyframes")
+    visuals.add_argument("source")
+    visuals.add_argument("-o", "--output")
+    visuals.add_argument("--sample-rate", type=float, default=1.0)
+    visuals.add_argument("--max-frames", type=int, default=120)
+    visuals.add_argument("--no-face-detection", action="store_true")
+    visuals.add_argument("--track-roi", nargs=4, type=float, metavar=("X", "Y", "WIDTH", "HEIGHT"), help="seed CSRT tracking with a normalized 0..1 box; increase --sample-rate to follow fast motion")
+    visuals.set_defaults(func=command_analyze_visuals)
+    captions = sub.add_parser("generate-captions", help="group ASR word timings into Kino caption events")
+    captions.add_argument("analysis", help="audio-analysis JSON")
+    captions.add_argument("candidates", help="candidate JSON from find-moments")
+    captions.add_argument("-o", "--output", required=True)
+    captions.add_argument("--candidate-id")
+    captions.add_argument("--layout", default="fullscreen", choices=["fullscreen", "split_vertical", "blurred_bars_20_60_20"])
+    captions.set_defaults(func=command_generate_captions)
+    qc = sub.add_parser("qc", help="run technical black/freeze/codec/frame-rate/audio-peak checks")
+    qc.add_argument("source")
+    qc.add_argument("-o", "--output")
+    qc.add_argument("--width", type=int, default=1080)
+    qc.add_argument("--height", type=int, default=1920)
+    qc.add_argument("--fps", default="60/1")
+    qc.set_defaults(func=command_qc)
+    feedback = sub.add_parser("record-feedback", help="store a local human editorial decision for a candidate")
+    feedback.add_argument("candidates")
+    feedback.add_argument("--candidate-id", required=True)
+    feedback.add_argument("--decision", required=True, choices=["approve", "edited", "reject"])
+    feedback.add_argument("--reason", default="")
+    feedback.add_argument("--feedback-file")
+    feedback.set_defaults(func=command_record_feedback)
+    learn = sub.add_parser("apply-feedback", help="apply learned local category preferences to candidate ranking")
+    learn.add_argument("candidates")
+    learn.add_argument("-o", "--output", required=True)
+    learn.add_argument("--feedback-file")
+    learn.add_argument("--min-observations", type=int, default=3)
+    learn.set_defaults(func=command_apply_feedback)
+    repair = sub.add_parser("repair", help="write a separate normalized H.264/AAC export and rerun technical QC")
+    repair.add_argument("source")
+    repair.add_argument("output")
+    repair.add_argument("--width", type=int, default=1080)
+    repair.add_argument("--height", type=int, default=1920)
+    repair.add_argument("--fps", default="60/1")
+    repair.add_argument("--crf", type=int, default=18)
+    repair.add_argument("--preset", default="medium", choices=["ultrafast", "fast", "medium", "slow", "veryslow"])
+    repair.add_argument("--overwrite", action="store_true")
+    repair.set_defaults(func=command_repair)
+    download = sub.add_parser("download-source", help="download one authorized media URL into a validated local source file")
+    download.add_argument("url")
+    download.add_argument("-o", "--output-dir", required=True)
+    download.add_argument("--max-filesize-mb", type=int, default=2048)
+    download.add_argument("--report")
+    download.set_defaults(func=command_download_source)
+    analyze = sub.add_parser("analyze-project", help="run source-to-candidate analysis and create draft EDLs")
+    analyze.add_argument("source")
+    analyze.add_argument("-o", "--output-dir", required=True)
+    analyze.add_argument("--model", default="small", choices=["tiny", "base", "small", "medium", "large-v3"])
+    analyze.add_argument("--device", default="auto", choices=["auto", "cpu", "cuda"])
+    analyze.add_argument("--top", type=int, default=5)
+    analyze.add_argument("--layout", default="fullscreen", choices=["fullscreen", "blurred_bars_20_60_20", "split_vertical"])
+    analyze.add_argument("--split-top-source", help="top panel source required for split_vertical")
+    analyze.add_argument("--split-bottom-source", help="bottom panel source required for split_vertical")
+    analyze.add_argument("--split-top-in", default="00:00:00.000")
+    analyze.add_argument("--split-bottom-in", default="00:00:00.000")
+    analyze.add_argument("--visuals", action="store_true", help="run optional OpenCV visual sampling")
+    analyze.add_argument("--visual-roi", nargs=4, type=float, metavar=("X", "Y", "WIDTH", "HEIGHT"), help="seed CSRT subject tracking with a normalized 0..1 box; requires --visuals")
+    analyze.add_argument("--resume", action="store_true", help="resume an interrupted job using matching, fingerprint-validated checkpoints")
+    analyze.set_defaults(func=command_analyze_project)
+    semantic = sub.add_parser("validate-semantic-review", help="validate OpenCode semantic review JSON against source and baseline candidates")
+    semantic.add_argument("review")
+    semantic.add_argument("--probe")
+    semantic.add_argument("--candidates")
+    semantic.set_defaults(func=command_validate_semantic_review)
+    preview = sub.add_parser("render-preview", help="render a fast 30 fps preview without approving or modifying the EDL")
+    preview.add_argument("source")
+    preview.add_argument("edl")
+    preview.add_argument("output")
+    preview.add_argument("--overwrite", action="store_true")
+    preview.set_defaults(func=command_render_preview)
+    approve = sub.add_parser("approve-edl", help="mark an EDL approved after explicit human confirmation")
+    approve.add_argument("edl")
+    approve.add_argument("--source", required=True, help="primary source media used for fingerprint and duration validation")
+    approve.add_argument("--confirm", action="store_true", help="explicitly confirm human review of this EDL")
+    approve.set_defaults(func=command_approve_edl)
+    render = sub.add_parser("render", help="render approved EDL segments into a vertical MP4")
+    render.add_argument("source")
+    render.add_argument("edl")
+    render.add_argument("output")
+    render.add_argument("--preset", default="medium", choices=["ultrafast", "fast", "medium", "slow", "veryslow"])
+    render.add_argument("--crf", type=int, default=18)
+    render.add_argument("--overwrite", action="store_true")
+    render.add_argument("--resume", action="store_true", help="persist and reuse verified segment encodes after interruption; pass on the first run and every retry")
+    render.add_argument("--encoder", choices=["auto", "libx264", "h264_nvenc"], default="auto",
+                        help="auto prefers NVIDIA NVENC when available, then safely falls back to CPU libx264")
+    render.add_argument("--nvenc-preset", default="p5", choices=["p1", "p2", "p3", "p4", "p5", "p6", "p7"])
+    render.add_argument("--nvenc-cq", type=int, default=19)
+    render.set_defaults(func=command_render)
+    return parser
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    try:
+        if getattr(args, "silence_dbfs", -38.0) < -80 or getattr(args, "silence_dbfs", -38.0) > -10:
+            raise PipelineError("--silence-dbfs must be between -80 and -10 dBFS")
+        return args.func(args)
+    except KeyboardInterrupt:
+        print("Cancelled. Temporary artifacts are cleaned; source media is preserved.", file=sys.stderr)
+        return 130
+    except (PipelineError, OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shortform-editor"
+version = "0.1.0"
+description = "Local-first short-form video editor foundation"
+requires-python = ">=3.10"
+dependencies = ["jsonschema>=4.21,<5", "psutil>=5.9,<7"]
+
+[project.optional-dependencies]
+audio = ["faster-whisper>=1.1,<2"]
+visual = ["opencv-contrib-python-headless>=4.10,<5"]
+download = ["yt-dlp>=2025.1.15,<2027"]
+
+[project.scripts]
+shortform-editor = "shortform_editor.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["shortform_editor*"]
+
+[tool.setuptools.package-data]
+shortform_editor = ["schemas/*.json"]

@@ -5,6 +5,13 @@ description: Analyze source audio for transcription, word timing, speech regions
 
 # Audio Intelligence
 
+## Executable implementation
+
+The repository CLI now provides `shortform-editor analyze-audio SOURCE -o audio-analysis.json`.
+Install ASR support with `python -m pip install -e ".[audio]"`. The default is the small faster-whisper model, with automatic CUDA int8_float16 attempt and CPU int8 fallback. Use `--no-transcribe` for deterministic energy/silence analysis without model downloads. Model weights are downloaded by faster-whisper on first use and are not bundled with this repository.
+
+This is a first usable audio pass, not full audio intelligence: diarization, overlap detection, laughter classification, emotion/delivery classification, multi-microphone separation, and audio/video synchronization QC remain unimplemented. Silence windows and generic energy-rise/transient markers are evidence only and never create edit cuts automatically. These acoustic markers do not identify laughter, emotion, speakers or semantic events.
+
 ## Pipeline
 
 1. Probe audio streams, channels, sample rates, layouts, offsets, and duration.
@@ -22,7 +29,7 @@ Return transcript segments and words with:
 - ASR confidence where available;
 - language/code-switch notes;
 - overlap and uncertainty flags;
-- VAD regions and detected audio events;
+- VAD regions and generic acoustic energy-event candidates (rise/transient), clearly distinguished from semantic event classification;
 - source stream and channel provenance.
 
 ## Accuracy rules
@@ -38,5 +45,10 @@ Return transcript segments and words with:
 Test clean single-speaker audio, multiple speakers, overlapping speech, laughter, meaningful pauses, noisy livestreams, non-English/code-switching, proper names, long quiet recordings, clipping, and low-volume speech. Track WER where reference transcripts exist, timestamp drift, VAD false positives/negatives, diarization errors, runtime, RAM, and VRAM.
 
 ## Resource policy
+
+- Default to `small` rather than loading a large model on a 16 GB RAM desktop.
+- Run one transcription model at a time. The default `auto` mode tries CUDA and falls back to CPU; the report records the actual selected device and compute type.
+- If CUDA initialization fails, check the installed NVIDIA driver, CUDA 12.x runtime, cuBLAS and the cuDNN version supported by the installed CTranslate2/faster-whisper release before concluding the GPU is unsupported. The upstream faster-whisper documentation currently describes CUDA 12 with cuDNN 9; verify the exact dependency combination because CTranslate2 release requirements can differ.
+- faster-whisper and CTranslate2 are MIT-licensed software; the selected Whisper model card/weight terms and any future VAD/diarization models must still be checked before redistribution.
 
 Load one large model at a time unless measured resources justify concurrency. Record model name/version, compute type, device, settings, and fallback. Never claim GPU use without verifying it.

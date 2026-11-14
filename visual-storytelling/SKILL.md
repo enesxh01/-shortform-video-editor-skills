@@ -7,6 +7,12 @@ description: Analyze subjects, actions, scenes, framing, and visual continuity t
 
 Use computer vision to support editorial decisions, not to replace understanding.
 
+## Executable baseline
+
+Install the optional visual dependency with `python -m pip install -e ".[visual]"`, then run `shortform-editor analyze-visuals SOURCE -o visual-analysis.json`. The current module samples frames (the orchestrator prioritizes selected candidate windows and respects a frame budget), estimates scene-change candidates from frame differences, detects frontal faces with OpenCV's bundled Haar cascade, and optionally uses the OpenCV-contrib CSRT tracker to bridge missed detections between samples. It smooths the tracked face center and emits conservative 9:16 crop keyframes. It uses CPU OpenCV; no CUDA model is loaded.
+
+This is limited face tracking, not general subject tracking or scene understanding. It cannot detect gameplay HUDs, sports objects, hands, arbitrary products or actions. CSRT may lose a face during occlusion, fast motion, large scale changes or scene cuts; failed tracking falls back to center framing. When a face is not detected it falls back to center framing. When `analyze-project --visuals` is enabled, detected face keyframes are attached to fullscreen draft EDLs and interpolated by FFmpeg during render. Keyframes are still low-confidence and must be reviewed; no face detection means center crop. Blurred-bars and split layouts do not yet consume these crop keyframes. Treat all crop plans as review-required.
+
 ## Evidence sources
 
 - Scene detection for structural changes.
@@ -16,7 +22,7 @@ Use computer vision to support editorial decisions, not to replace understanding
 - Selective segmentation/masking only when a specific edit requires it.
 - Audio diarization, transcript context, mouth movement, and visual evidence may jointly support active-speaker estimates. Never infer identity from voice alone.
 
-Check current licenses and terms before selecting model families or distributing dependencies. In particular, review licenses for detector frameworks and segmentation models rather than assuming they are permissive.
+OpenCV's software package is Apache-2.0 licensed. Review the exact bundled Haar cascade asset and third-party dependency notices before redistribution; optional model weights must be checked individually. Do not add AGPL-licensed detector frameworks or model weights without explicit project-owner approval.
 
 ## Framing
 
@@ -39,3 +45,14 @@ Choose based on source geometry and storytelling. Do not switch layouts for arbi
 ## Testing
 
 Test single speaker, two similar-looking speakers, subject leaving/re-entering frame, moving camera, gameplay HUD, sports action, hands/objects, edge composition, low-resolution footage, occlusion, and low-confidence tracking. Record crop stability, subject visibility, tracking confidence, and failure cases.
+
+
+## Manual subject tracking
+
+When automatic face detection misses a non-face subject (for example a game character, car, ball or product), a human may seed a normalized region-of-interest box for CSRT tracking:
+
+```bash
+shortform-editor analyze-visuals gameplay.mp4 -o visual-analysis.json --no-face-detection --track-roi 0.32 0.18 0.24 0.42 --sample-rate 3 --max-frames 240
+```
+
+The four values are normalized `x y width height` fractions of the frame (0 to 1). The seed is applied at the first sampled frame of each analyzed region; CSRT follows the visible texture between samples. If tracking is unavailable or lost, the report marks the fallback and uses center framing. This is user-initialized tracking, not automatic object detection or semantic gameplay understanding. Review all crop keyframes.

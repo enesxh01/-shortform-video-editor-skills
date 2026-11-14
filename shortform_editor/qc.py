@@ -1,0 +1,342 @@
+from __future__ import annotations
+
+import re
+from fractions import Fraction
+from pathlib import Path
+from typing import Any
+
+from .cli import PipelineError, probe_media, require_tool, run_checked
+
+
+BLACK_RE = re.compile(r"black_start:([0-9.]+).*?black_end:([0-9.]+).*?black_duration:([0-9.]+)")
+FREEZE_START_RE = re.compile(r"freeze_start:([0-9.]+)")
+FREEZE_END_RE = re.compile(r"freeze_end:([0-9.]+)")
+FREEZE_DURATION_RE = re.compile(r"freeze_duration:([0-9.]+)")
+VOLUME_RE = re.compile(r"(mean_volume|max_volume):\s*(-?[0-9.]+) dB")
+INTEGRATED_LOUDNESS_RE = re.compile(r"^\s*I:\s*(-?[0-9.]+) LUFS\s*$", re.MULTILINE)
+LOUDNESS_RANGE_RE = re.compile(r"^\s*LRA:\s*([0-9.]+) LU\s*$", re.MULTILINE)
+TRUE_PEAK_RE = re.compile(r"^\s*Peak:\s*(-?[0-9.]+) dBFS\s*$", re.MULTILINE)
+
+
+def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 1080,
+                 expected_height: int = 1920, expected_fps: str = "60/1") -> dict[str, Any]:
+    video = next((s for s in report.get("streams", []) if s.get("codec_type") == "video"), None)
+    audio = next((s for s in report.get("streams", []) if s.get("codec_type") == "audio"), None)
+    checks = []
+    failures = []
+    warnings = []
+    if not video:
+        checks.append({"name": "video_stream", "status": "critical", "detail": "No video stream found"})
+        failures.append("No video stream")
+    else:
+        width, height = int(video.get("width", 0)), int(video.get("height", 0))
+        checks.append({
+            "name": "dimensions",
+            "status": "passed" if (width, height) == (expected_width, expected_height) else "major",
+            "detail": f"Actual {width}x{height}; expected {expected_width}x{expected_height}"
+        })
+        if (width, height) != (expected_width, expected_height):
+            failures.append("Unexpected frame dimensions")
+        try:
+            actual_fps = Fraction(video.get("avg_frame_rate", "0/1"))
+            target_fps = Fraction(expected_fps)
+            fps_ok = actual_fps == target_fps
+        except (TypeError, ValueError, ZeroDivisionError):
+            actual_fps, target_fps, fps_ok = Fraction(0, 1), Fraction(0, 1), False
+        checks.append({
+            "name": "frame_rate",
+            "status": "passed" if fps_ok else "major",
+            "detail": f"Average frame rate {actual_fps}; expected {target_fps}"
+        })
+        if not fps_ok:
+            failures.append("Unexpected average frame rate")
+        checks.append({
+            "name": "video_codec",
+            "status": "passed" if video.get("codec_name") == "h264" else "major",
+            "detail": f"Video codec: {video.get('codec_name')}"
+        })
+        if video.get("codec_name") != "h264":
+            failures.append("Unexpected video codec")
+        pixel_format = video.get("pix_fmt")
+        checks.append({
+            "name": "pixel_format",
+            "status": "passed" if pixel_format == "yuv420p" else "major",
+            "detail": f"Pixel format: {pixel_format}"
+        })
+        if pixel_format != "yuv420p":
+            failures.append("Unexpected pixel format")
+
+    if audio:
+        checks.append({
+            "name": "audio_stream",
+            "status": "passed",
+            "detail": f"Audio codec {audio.get('codec_name')}, {audio.get('channels')} channels"
+        })
+        audio_codec_ok = audio.get("codec_name") == "aac"
+        checks.append({
+            "name": "audio_codec",
+            "status": "passed" if audio_codec_ok else "major",
+            "detail": f"Audio codec: {audio.get('codec_name')}"
+        })
+        if not audio_codec_ok:
+            failures.append("Unexpected audio codec")
+        try:
+            audio_rate = int(audio.get("sample_rate", 0))
+        except (TypeError, ValueError):
+            audio_rate = 0
+        checks.append({
+            "name": "audio_sample_rate",
+            "status": "passed" if audio_rate == 48000 else "major",
+            "detail": f"Audio sample rate: {audio_rate}; expected 48000 Hz"
+        })
+        if audio_rate != 48000:
+            failures.append("Unexpected audio sample rate")
+        if video:
+            try:
+                raw_video_start = video.get("start_time")
+                raw_audio_start = audio.get("start_time")
+                raw_video_duration = video.get("duration") or report.get("format", {}).get("duration")
+                raw_audio_duration = audio.get("duration")
+                if any(value in (None, "", "N/A") for value in (raw_video_start, raw_audio_start, raw_video_duration, raw_audio_duration)):
+                    raise ValueError("missing stream timing metadata")
+                video_start = float(raw_video_start)
+                audio_start = float(raw_audio_start)
+                video_duration = float(raw_video_duration)
+                audio_duration = float(raw_audio_duration)
+                start_delta = abs(video_start - audio_start)
+                duration_delta = abs(video_duration - audio_duration)
+                timing_ok = start_delta <= 0.1 and duration_delta <= 0.25
+                checks.append({
+                    "name": "stream_timing",
+                    "status": "passed" if timing_ok else "major",
+                    "detail": f"Stream start delta {start_delta:.3f}s; duration delta {duration_delta:.3f}s (metadata only)"
+                })
+                if not timing_ok:
+                    failures.append("Audio/video stream start or duration metadata differs beyond tolerance")
+            except (TypeError, ValueError):
+                checks.append({"name": "stream_timing", "status": "warning", "detail": "Stream timing metadata unavailable"})
+                warnings.append("Stream timing metadata unavailable")
+    else:
+        checks.append({"name": "audio_stream", "status": "warning", "detail": "No audio stream found"})
+        warnings.append("No audio stream")
+
+    black_regions = [
+        {"start": float(match.group(1)), "end": float(match.group(2)), "duration": float(match.group(3))}
+        for match in BLACK_RE.finditer(ffmpeg_log)
+    ]
+    freeze_starts = [float(match.group(1)) for match in FREEZE_START_RE.finditer(ffmpeg_log)]
+    freeze_ends = [float(match.group(1)) for match in FREEZE_END_RE.finditer(ffmpeg_log)]
+    freeze_durations = [float(match.group(1)) for match in FREEZE_DURATION_RE.finditer(ffmpeg_log)]
+    media_duration = report.get("format", {}).get("duration")
+    try:
+        media_duration = float(media_duration) if media_duration is not None else None
+    except (TypeError, ValueError):
+        media_duration = None
+    freeze_events = []
+    for index, start in enumerate(freeze_starts):
+        if index < len(freeze_ends):
+            end = freeze_ends[index]
+        elif index < len(freeze_durations):
+            end = start + freeze_durations[index]
+        elif media_duration is not None:
+            end = media_duration
+        else:
+            continue
+        if end >= start:
+            freeze_events.append({"start": start, "end": end})
+    checks.append({
+        "name": "black_frames",
+        "status": "major" if any(item["duration"] >= 0.5 for item in black_regions) else "passed",
+        "detail": f"{len(black_regions)} black intervals detected",
+        "events": black_regions
+    })
+    if any(item["duration"] >= 0.5 for item in black_regions):
+        failures.append("Black interval at least 0.5 seconds")
+    checks.append({
+        "name": "frozen_frames",
+        "status": "major" if freeze_events else "passed",
+        "detail": f"{len(freeze_events)} frozen intervals detected",
+        "events": freeze_events
+    })
+    if freeze_events:
+        failures.append("Frozen-frame interval detected")
+
+    volumes = {name: float(value) for name, value in VOLUME_RE.findall(ffmpeg_log)}
+    integrated_match = INTEGRATED_LOUDNESS_RE.search(ffmpeg_log)
+    range_match = LOUDNESS_RANGE_RE.search(ffmpeg_log)
+    true_peak_match = TRUE_PEAK_RE.search(ffmpeg_log)
+    loudness = {
+        "integrated_lufs": float(integrated_match.group(1)) if integrated_match else None,
+        "range_lu": float(range_match.group(1)) if range_match else None,
+        "true_peak_dbfs": float(true_peak_match.group(1)) if true_peak_match else None,
+    }
+    if audio and loudness["integrated_lufs"] is not None:
+        integrated = loudness["integrated_lufs"]
+        # A guidance band, not a platform-specific pass/fail requirement.
+        in_guidance_band = -16.0 <= integrated <= -12.0
+        checks.append({
+            "name": "integrated_loudness",
+            "status": "passed" if in_guidance_band else "warning",
+            "detail": f"Integrated loudness {integrated:.1f} LUFS; general short-form guidance band -16 to -12 LUFS"
+        })
+        if not in_guidance_band:
+            warnings.append("Integrated loudness is outside the general short-form guidance band; listen before changing gain")
+    elif audio:
+        checks.append({"name": "integrated_loudness", "status": "warning", "detail": "EBU R128 integrated loudness measurement unavailable"})
+        warnings.append("Integrated loudness measurement unavailable")
+    if audio and loudness["true_peak_dbfs"] is not None:
+        true_peak = loudness["true_peak_dbfs"]
+        peak_ok = true_peak < -1.0
+        checks.append({
+            "name": "true_peak",
+            "status": "passed" if peak_ok else "warning",
+            "detail": f"Measured EBU R128 true peak {true_peak:.1f} dBFS; recommended ceiling below -1.0 dBTP"
+        })
+        if not peak_ok:
+            warnings.append("True peak reaches the recommended -1.0 dBTP ceiling")
+    elif audio:
+        checks.append({"name": "true_peak", "status": "warning", "detail": "EBU R128 true-peak measurement unavailable"})
+        warnings.append("True-peak measurement unavailable")
+    if audio and "max_volume" in volumes:
+        peak = volumes["max_volume"]
+        checks.append({
+            "name": "audio_peak",
+            "status": "major" if peak >= -0.1 else "passed",
+            "detail": f"Measured sample peak {peak:.1f} dBFS; this is not true-peak measurement"
+        })
+        if peak >= -0.1:
+            failures.append("Audio sample peak is at or near digital clipping")
+    elif audio:
+        checks.append({"name": "audio_peak", "status": "warning", "detail": "Volume detector did not report a peak"})
+        warnings.append("Audio peak measurement unavailable")
+
+    status = "critical" if any(item["status"] == "critical" for item in checks) else (
+        "fail" if failures else ("warning" if warnings else "passed")
+    )
+    return {
+        "status": status,
+        "checks": checks,
+        "failures": failures,
+        "warnings": warnings,
+        "black_regions": black_regions,
+        "freeze_regions": freeze_events,
+        "audio_volume": volumes,
+        "audio_loudness": loudness,
+        "limitations": [
+            "Black/freeze filters can flag intentional pauses, static scenes or fades; inspect the marked intervals.",
+            "Volumedetect measures sample peak; EBU R128 estimates integrated loudness and true peak. These are advisory and do not replace listening.",
+            "This pass does not verify caption spelling, safe areas, story comprehension, crop quality, humor or audio/video sync by listening.",
+            "No automatic repair is performed by QC."
+        ]
+    }
+
+
+
+def add_expected_duration_check(report: dict[str, Any], actual_duration: float,
+                                expected_duration: float, tolerance: float = 0.1) -> dict[str, Any]:
+    delta = abs(float(actual_duration) - float(expected_duration))
+    passed = delta <= tolerance
+    report.setdefault("checks", []).append({
+        "name": "rendered_duration",
+        "status": "passed" if passed else "major",
+        "detail": f"Actual {actual_duration:.3f}s; expected {expected_duration:.3f}s; delta {delta:.3f}s; tolerance {tolerance:.3f}s"
+    })
+    if not passed:
+        report.setdefault("failures", []).append("Rendered duration does not match the EDL timeline")
+        report["status"] = "fail"
+    return report
+
+
+def run_qc(source: Path, expected_width: int = 1080, expected_height: int = 1920,
+           expected_fps: str = "60/1") -> dict[str, Any]:
+    source = source.expanduser().resolve(strict=True)
+    report = probe_media(source)
+    ffmpeg = require_tool("ffmpeg")
+    video_filters = "blackdetect=d=0.5:pix_th=0.10,freezedetect=n=-50dB:d=1.0"
+    args = [ffmpeg, "-hide_banner", "-i", str(source), "-vf", video_filters]
+    if any(s.get("codec_type") == "audio" for s in report.get("streams", [])):
+        args += ["-af", "volumedetect,ebur128=peak=true"]
+    args += ["-f", "null", "-"]
+    result = run_checked(args)
+    assessed = assess_probe(report, result.stderr, expected_width, expected_height, expected_fps)
+    assessed["source"] = {
+        "path": str(source),
+        "fingerprint": report["source"]["fingerprint"],
+        "duration_seconds": report.get("format", {}).get("duration")
+    }
+    assessed["tool"] = run_checked([ffmpeg, "-version"]).stdout.splitlines()[0]
+    return assessed
+
+
+def assess_edit_quality(edl: dict[str, Any]) -> dict[str, Any]:
+    """Produce non-blocking editorial/readability advisories from the approved EDL."""
+    checks: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    segments = edl.get("segments", [])
+    from .cli import timestamp_seconds
+    for index, segment in enumerate(segments):
+        try:
+            duration = timestamp_seconds(segment["source_out"]) - timestamp_seconds(segment["source_in"])
+        except (KeyError, TypeError, ValueError):
+            checks.append({"name": "segment_timing", "segment": index, "status": "unavailable"})
+            continue
+        if duration < 6.0:
+            warnings.append(f"Segment {index + 1} is very short ({duration:.1f}s); confirm it has enough context.")
+            checks.append({"name": "segment_duration", "segment": index, "status": "review",
+                           "detail": f"{duration:.1f}s; under the 6s editorial review threshold"})
+        elif duration > 55.0:
+            warnings.append(f"Segment {index + 1} is long ({duration:.1f}s); confirm the full context earns the runtime.")
+            checks.append({"name": "segment_duration", "segment": index, "status": "review",
+                           "detail": f"{duration:.1f}s; above the 55s editorial review threshold"})
+        else:
+            checks.append({"name": "segment_duration", "segment": index, "status": "passed",
+                           "detail": f"{duration:.1f}s"})
+        captions = segment.get("captions", [])
+        if not captions:
+            warnings.append(f"Segment {index + 1} has no captions; confirm this is intentional.")
+            checks.append({"name": "caption_presence", "segment": index, "status": "review",
+                           "detail": "No captions supplied"})
+            continue
+        checks.append({"name": "caption_presence", "segment": index, "status": "passed",
+                       "detail": f"{len(captions)} caption events"})
+        for caption_index, caption in enumerate(captions):
+            try:
+                caption_duration = timestamp_seconds(caption["end"]) - timestamp_seconds(caption["start"])
+                text_value = str(caption.get("text", ""))
+                visible_chars = len(" ".join(text_value.split()))
+                cps = visible_chars / caption_duration if caption_duration > 0 else float("inf")
+            except (KeyError, TypeError, ValueError, ZeroDivisionError):
+                checks.append({"name": "caption_readability", "segment": index,
+                               "caption": caption_index, "status": "unavailable"})
+                continue
+            if cps > 25:
+                warnings.append(f"Segment {index + 1}, caption {caption_index + 1} is very fast ({cps:.1f} characters/second); shorten or retime it.")
+                status = "review"
+            elif cps > 20:
+                warnings.append(f"Segment {index + 1}, caption {caption_index + 1} may be difficult to read ({cps:.1f} characters/second).")
+                status = "warning"
+            else:
+                status = "passed"
+            checks.append({"name": "caption_readability", "segment": index,
+                           "caption": caption_index, "status": status,
+                           "detail": f"{visible_chars} visible characters over {caption_duration:.2f}s ({cps:.1f} chars/s)"})
+            if segment.get("layout") in {"split_vertical", "blurred_bars_20_60_20"} and len(text_value) > 32:
+                warnings.append(f"Segment {index + 1}, caption {caption_index + 1} is longer than 32 characters for a single-line layout; inspect horizontal scaling.")
+                checks.append({"name": "single_line_caption_length", "segment": index,
+                               "caption": caption_index, "status": "review",
+                               "detail": f"{len(text_value)} characters; recommended maximum 32"})
+            if caption_duration < 0.35:
+                warnings.append(f"Segment {index + 1}, caption {caption_index + 1} displays for less than 0.35s; check for a flash.")
+                checks.append({"name": "caption_display_time", "segment": index,
+                               "caption": caption_index, "status": "review",
+                               "detail": f"{caption_duration:.2f}s"})
+    return {
+        "status": "review_needed" if warnings else "no_obvious_flags",
+        "checks": checks,
+        "warnings": warnings,
+        "limitations": [
+            "These are deterministic editorial heuristics, not a prediction of virality or a substitute for watching the edit.",
+            "Reading-speed thresholds are guidance; names, numbers, language and viewer context can change what is comfortable.",
+            "This check does not inspect rendered pixels, caption contrast, visual obstruction, story coherence or actual audio timing."
+        ]
+    }

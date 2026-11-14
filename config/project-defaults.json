@@ -18,7 +18,13 @@
     "background_music": false,
     "b_roll": false,
     "sound_effects": false,
-    "caption_style": "kino_editorial"
+    "caption_style": "kino_editorial",
+    "layout_selection_policy": {
+      "native_9_16_source": "blurred_bars_20_60_20",
+      "landscape_source": "fullscreen",
+      "split_vertical": "only_when_requested_or_when_two_panel_sources_are_supplied",
+      "allow_editorial_override": true
+    }
   },
   "export": {
     "container": "mp4",

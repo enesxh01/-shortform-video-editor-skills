@@ -1,0 +1,102 @@
+name: Validate project
+
+# New pushes supersede stale branch validation runs instead of building a long queue.
+concurrency:
+  group: validate-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, "implementation/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-and-installer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.10", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install FFmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      - name: Install FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install ffmpeg -y --no-progress
+      - name: Install package and analysis dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[audio,visual,download]"
+      - name: Run unit and FFmpeg integration tests
+        run: python -m unittest discover -s tests -v
+      - name: Validate PowerShell installer syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          foreach ($script in @("scripts/install.ps1", "scripts/setup.ps1")) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path $script), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) { $errors | Format-List | Out-String | Write-Error }
+          }
+      - name: Verify one-command setup (Linux)
+        if: runner.os == 'Linux' && matrix.python-version == '3.12'
+        shell: bash
+        run: bash scripts/setup.sh "$RUNNER_TEMP/opencode-setup-skills"
+      - name: Verify one-command setup (Windows)
+        if: runner.os == 'Windows' && matrix.python-version == '3.12'
+        shell: pwsh
+        run: |
+          $destination = Join-Path $env:RUNNER_TEMP "opencode-setup-skills"
+          & ./scripts/setup.ps1 -Destination $destination
+      - name: Verify CLI entry point
+        run: shortform-editor --help
+
+      - name: Build wheel and verify packaged schemas
+        shell: bash
+        run: |
+          python -m pip install build
+          python -m build --wheel
+          python - <<'PY'
+          import glob
+          import zipfile
+          wheel = glob.glob("dist/*.whl")[0]
+          with zipfile.ZipFile(wheel) as archive:
+              names = set(archive.namelist())
+          required = {
+              "shortform_editor/schemas/edl.schema.json",
+              "shortform_editor/schemas/semantic-review.schema.json",
+          }
+          missing = required - names
+          if missing:
+              raise SystemExit(f"Wheel is missing package schemas: {sorted(missing)}")
+          PY
+          python -m pip install --no-deps --target wheel-test dist/*.whl
+          cd wheel-test
+          python -c "from shortform_editor.cli import load_schema; assert load_schema(); print('Installed wheel loads packaged EDL schema')"
+      - name: Run complete setup script (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          bash scripts/setup.sh "$RUNNER_TEMP/opencode-setup-skills"
+          test -f "$RUNNER_TEMP/opencode-setup-skills/shortform-video-editor/references/viral-scoring.md"
+          test -f "$RUNNER_TEMP/opencode-setup-skills/shortform-video-editor/references/export-and-fps.md"
+          test -f "$RUNNER_TEMP/opencode-setup-skills/edit-decision-list/schemas/edit-decision-list.schema.json"
+      - name: Run complete setup script (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $destination = Join-Path $env:RUNNER_TEMP "opencode-setup-skills"
+          & ./scripts/setup.ps1 $destination
+          if (-not (Test-Path (Join-Path $destination "shortform-video-editor/references/viral-scoring.md"))) { throw "Missing viral scoring reference" }
+          if (-not (Test-Path (Join-Path $destination "shortform-video-editor/references/export-and-fps.md"))) { throw "Missing FPS reference" }
+          if (-not (Test-Path (Join-Path $destination "edit-decision-list/schemas/edit-decision-list.schema.json"))) { throw "Missing EDL schema" }

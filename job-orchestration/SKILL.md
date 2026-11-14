@@ -5,6 +5,12 @@ description: Manage long-running media jobs with progress reporting, pause/cance
 
 # Job Orchestration
 
+## Executable baseline
+
+Run `shortform-editor analyze-project INPUT.mp4 -o JOB_DIR --model small --device auto` for probe → audio/ASR → candidate detection → pacing → optional visual sampling → captions → one draft EDL per candidate. Add `--visuals` when the OpenCV extra is installed. The command writes atomic JSON artifacts and a manifest after each completed stage. It refuses a non-empty job directory and never auto-approves or renders.
+
+The subprocess wrapper terminates its active child on Ctrl+C. Cancellation writes a manifest and preserves completed artifacts. This first version does not resume; rerun into a new empty job directory. Render and repair write temporary files and only publish after decode/probe checks.
+
 ## Job lifecycle
 
 Use explicit states: queued, inspecting, analyzing, selecting, editing, rendering, quality_check, awaiting_approval, completed, failed, cancelled.
@@ -12,6 +18,8 @@ Use explicit states: queued, inspecting, analyzing, selecting, editing, renderin
 Each transition records start/end time, progress, inputs, outputs, warnings, and failure details.
 
 ## Reliability
+
+Current implementation coverage: atomic JSON artifacts, per-stage manifest, child-process interrupt cleanup, temporary render outputs, source fingerprint checks and explicit approval gate. Queueing, pause/resume, disk-space reservation, live progress streaming and bounded retry policy remain design-only.
 
 - Support cancellation at safe boundaries and interrupt subprocesses without corrupting approved files.
 - Use bounded retries only for transient failures; never retry deterministic invalid input indefinitely.
