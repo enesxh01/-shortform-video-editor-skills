@@ -64,5 +64,25 @@ class ResourceSelectionTests(unittest.TestCase):
             choose_inference_device("small", "tpu", {"ram_available_gb": 8.0, "gpu": {}})
 
 
+    def test_disk_preflight_includes_safety_reserve(self):
+        from collections import namedtuple
+        from unittest.mock import patch
+        from shortform_editor.resources import check_disk_space
+        usage = namedtuple("Usage", "total used free")(1000, 100, 900)
+        with patch("shortform_editor.resources.shutil.disk_usage", return_value=usage):
+            report = check_disk_space(".", 100, reserve_bytes=200)
+        self.assertTrue(report["sufficient"])
+        self.assertEqual(report["required_bytes"], 300)
+
+    def test_disk_preflight_rejects_insufficient_space(self):
+        from collections import namedtuple
+        from unittest.mock import patch
+        from shortform_editor.resources import check_disk_space
+        usage = namedtuple("Usage", "total used free")(1000, 900, 100)
+        with patch("shortform_editor.resources.shutil.disk_usage", return_value=usage):
+            with self.assertRaisesRegex(RuntimeError, "Insufficient free disk space"):
+                check_disk_space(".", 200, reserve_bytes=100)
+
+
 if __name__ == "__main__":
     unittest.main()
