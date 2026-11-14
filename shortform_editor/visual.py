@@ -73,7 +73,7 @@ def build_ffmpeg_crop_filter(keyframes: list[dict[str, Any]], clip_start: float,
 
     return (
         f"crop={crop_width}:{crop_height}:x='{expression(1)}':"
-        f"y='{expression(2)}',scale={source_width if False else 1080}:1920"
+        f"y='{expression(2)}'"
     )
 
 def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 120,
