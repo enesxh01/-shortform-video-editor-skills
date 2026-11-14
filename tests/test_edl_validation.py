@@ -119,5 +119,16 @@ class EDLValidationTests(unittest.TestCase):
 
 
 
+    def test_rejects_timeline_gap_unsupported_by_sequential_renderer(self):
+        edl = valid_edl()
+        second = dict(edl["segments"][0])
+        second["id"] = "clip-2"
+        second["source_in"] = "00:00:10.000"
+        second["source_out"] = "00:00:16.000"
+        second["timeline_start"] = "00:00:10.000"
+        edl["segments"].append(second)
+        self.assertTrue(any("sequential render position" in error for error in validate_edl(edl)))
+
+
 if __name__ == "__main__":
     unittest.main()
