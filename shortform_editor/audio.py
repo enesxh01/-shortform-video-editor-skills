@@ -115,67 +115,72 @@ def _transcribe(wav_path: Path, model_size: str, device: str, language: str | No
             selection_notes.append("CPU fallback skipped because available RAM is below the model reserve.")
 
     last_error: Exception | None = None
-    model = None
-    selected_device = None
-    selected_compute = None
-    for candidate_device, compute_type in attempts:
+    for attempt_index, (candidate_device, compute_type) in enumerate(attempts):
+        model = None
         try:
             model = WhisperModel(model_size, device=candidate_device, compute_type=compute_type)
-            selected_device, selected_compute = candidate_device, compute_type
-            break
+            segments_iter, info = model.transcribe(
+                str(wav_path),
+                language=language,
+                beam_size=5,
+                word_timestamps=True,
+                vad_filter=True,
+                vad_parameters={"min_silence_duration_ms": 500, "speech_pad_ms": 200},
+                condition_on_previous_text=False
+            )
+            # Materialize the generator inside the try block: CUDA can initialize
+            # successfully and still fail later when the first inference runs.
+            segments = []
+            words = []
+            for segment in segments_iter:
+                segment_words = []
+                for word in (segment.words or []):
+                    item = {
+                        "text": word.word,
+                        "start": round(float(word.start), 3),
+                        "end": round(float(word.end), 3),
+                        "probability": round(float(word.probability), 4) if word.probability is not None else None
+                    }
+                    words.append(item)
+                    segment_words.append(item)
+                segments.append({
+                    "id": len(segments),
+                    "text": segment.text.strip(),
+                    "start": round(float(segment.start), 3),
+                    "end": round(float(segment.end), 3),
+                    "avg_logprob": round(float(segment.avg_logprob), 4),
+                    "no_speech_prob": round(float(segment.no_speech_prob), 4),
+                    "words": segment_words
+                })
+            if candidate_device == "cpu" and selected_device == "cuda":
+                selection_notes.append(f"CUDA inference failed; completed the full transcription using CPU {compute_type}.")
+            return {
+                "status": "completed",
+                "model": model_size,
+                "device": candidate_device,
+                "compute_type": compute_type,
+                "resource_snapshot": snapshot,
+                "device_selection_notes": selection_notes,
+                "language": info.language,
+                "language_probability": round(float(info.language_probability), 4),
+                "segments": segments,
+                "words": words,
+                "limitations": [
+                    "Word probabilities are model estimates, not calibrated confidence.",
+                    "VAD regions are proposals and must not automatically determine edit boundaries.",
+                    "Speaker diarization is not implemented; speaker labels are intentionally omitted."
+                ]
+            }
         except Exception as exc:
             last_error = exc
-    if model is None:
-        raise PipelineError(f"Could not initialize faster-whisper ({device}): {last_error}") from last_error
+            if candidate_device != "cuda" or attempt_index + 1 >= len(attempts):
+                break
+            selection_notes.append(f"CUDA initialization or inference failed ({type(exc).__name__}); retrying from the source WAV on CPU.")
+            model = None
+            import gc
+            gc.collect()
 
-    segments_iter, info = model.transcribe(
-        str(wav_path),
-        language=language,
-        beam_size=5,
-        word_timestamps=True,
-        vad_filter=True,
-        vad_parameters={"min_silence_duration_ms": 500, "speech_pad_ms": 200},
-        condition_on_previous_text=False
-    )
-    segments = []
-    words = []
-    for segment in segments_iter:
-        segment_words = []
-        for word in (segment.words or []):
-            item = {
-                "text": word.word,
-                "start": round(float(word.start), 3),
-                "end": round(float(word.end), 3),
-                "probability": round(float(word.probability), 4) if word.probability is not None else None
-            }
-            words.append(item)
-            segment_words.append(item)
-        segments.append({
-            "id": len(segments),
-            "text": segment.text.strip(),
-            "start": round(float(segment.start), 3),
-            "end": round(float(segment.end), 3),
-            "avg_logprob": round(float(segment.avg_logprob), 4),
-            "no_speech_prob": round(float(segment.no_speech_prob), 4),
-            "words": segment_words
-        })
-    return {
-        "status": "completed",
-        "model": model_size,
-        "device": selected_device,
-        "compute_type": selected_compute,
-        "resource_snapshot": snapshot,
-        "device_selection_notes": selection_notes,
-        "language": info.language,
-        "language_probability": round(float(info.language_probability), 4),
-        "segments": segments,
-        "words": words,
-        "limitations": [
-            "Word probabilities are model estimates, not calibrated confidence.",
-            "VAD regions are proposals and must not automatically determine edit boundaries.",
-            "Speaker diarization is not implemented; speaker labels are intentionally omitted."
-        ]
-    }
+    raise PipelineError(f"Could not complete faster-whisper transcription ({device}): {last_error}") from last_error
 
 
 def analyze_audio(source: Path, model_size: str = "small", device: str = "auto",
