@@ -342,7 +342,7 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
                     word_start = timestamp_seconds(word["start"])
                     word_end = timestamp_seconds(word["end"])
                     word_text = str(word.get("text", ""))
-                    if any(ord(character) < 32 and character not in "\\r\\n\\t" for character in word_text):
+                    if any(ord(character) < 32 and character not in "\r\n\t" for character in word_text):
                         messages.append(f"{caption_path}.words[{word_index}].text contains unsupported control characters")
                     if word_end <= word_start or word_start < previous_word_end or word_start < caption_start or word_end > caption_end:
                         messages.append(f"segments[{index}].captions[{caption_index}].words[{word_index}] has invalid or unordered timing")
