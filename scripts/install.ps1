@@ -13,5 +13,12 @@ Get-ChildItem -Path $Root -Directory | ForEach-Object {
         Write-Host "Installed $($_.Name)"
     }
 }
+$RuntimeSource = Join-Path $Root "shortform_editor"
+$SkillRuntime = Join-Path $Dest "shortform-video-editor/runtime"
+if (Test-Path $RuntimeSource) {
+    New-Item -ItemType Directory -Force -Path $SkillRuntime | Out-Null
+    Copy-Item -Path (Join-Path $RuntimeSource "*") -Destination $SkillRuntime -Recurse -Force
+    Write-Host "Installed shortform editor runtime"
+}
 Write-Host "OpenCode skills installed to: $Dest"
 Write-Host "Restart/reload OpenCode if the new skills are not discovered."
