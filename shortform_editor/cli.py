@@ -443,8 +443,14 @@ def command_render(args: argparse.Namespace) -> int:
                 staged_output.unlink(missing_ok=True)
             raise
 
-    from .qc import run_qc
+    from .qc import add_expected_duration_check, run_qc
+    expected_duration = sum(
+        timestamp_seconds(segment["source_out"]) - timestamp_seconds(segment["source_in"])
+        for segment in edl["segments"]
+    )
+    actual_duration = float(final_probe.get("format", {}).get("duration") or 0)
     qc_report = run_qc(output, expected_width=width, expected_height=height, expected_fps=fps)
+    qc_report = add_expected_duration_check(qc_report, actual_duration, expected_duration)
 
     print(json.dumps({
         "output": str(output),
