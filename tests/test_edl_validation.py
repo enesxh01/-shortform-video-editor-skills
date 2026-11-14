@@ -130,5 +130,11 @@ class EDLValidationTests(unittest.TestCase):
         self.assertTrue(any("sequential render position" in error for error in validate_edl(edl)))
 
 
+    def test_rejects_approved_edl_without_content_hash(self):
+        edl = valid_edl()
+        edl["approval"] = {"status": "approved", "approved_by_user": True}
+        self.assertTrue(any("approved_edl_sha256" in error for error in validate_edl(edl)))
+
+
 if __name__ == "__main__":
     unittest.main()
