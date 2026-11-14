@@ -11,6 +11,10 @@ Run `shortform-editor qc OUTPUT.mp4 -o qc-report.json` after render. The current
 
 This is not complete QC. It does not validate caption spelling/timing, crop quality, safe areas, audio/video sync by listening, perceived loudness, true peak, story comprehension or visual appeal. Black/freeze detections can flag intentional creative choices and require review.
 
+## Bounded technical repair
+
+Run `shortform-editor repair INPUT.mp4 OUTPUT.mp4` to create a separate normalized H.264/AAC 1080x1920 60 fps CFR export and run technical QC again. The original is never overwritten. This repairs container/codec/frame-size/frame-rate compatibility only. It does not synthesize missing content, remove black/frozen frames, de-clip audio, correct captions or guarantee visual quality. Inspect the repair report's unresolved list and review the output.
+
 ## QC departments
 
 1. Visual integrity: black/frozen/corrupt/missing frames, aspect ratio, dimensions, FPS, flicker, crop, tracking, layout, transitions.
