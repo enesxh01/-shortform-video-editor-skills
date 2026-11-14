@@ -44,6 +44,10 @@ class MomentDetectionTests(unittest.TestCase):
         self.assertTrue(candidate["human_review_required"])
         self.assertEqual(candidate["confidence"], 0.35)
 
+    def test_cue_matching_uses_word_boundaries(self):
+        self.assertTrue(_has_cue("But then it happened", "but"))
+        self.assertFalse(_has_cue("The button was broken", "but"))
+
     def test_requires_completed_transcript(self):
         report = analysis_report()
         report["analysis"]["transcription"]["status"] = "skipped"
