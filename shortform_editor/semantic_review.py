@@ -75,7 +75,13 @@ def validate_semantic_review(review: dict[str, Any], probe: dict[str, Any] | Non
                 messages.append(f"semantic_candidates[{index}].alternatives[{alternative_index}] has invalid bounds")
             if duration is not None and alternative_end > duration + 0.05:
                 messages.append(f"semantic_candidates[{index}].alternatives[{alternative_index}] exceeds source duration")
+            if duration is not None and alternative_end > duration + 0.05:
+                messages.append(f"semantic_candidates[{index}].alternatives[{alternative_index}] exceeds source duration")
 
+    if set(review["baseline_candidate_ids"]) & semantic_ids:
+        messages.append("A candidate ID cannot be both baseline and semantic")
+
+    known_ids = (set(baseline_by_id) if candidates is not None else set(review["baseline_candidate_ids"])) | semantic_ids
     rejected_ids = set()
     for index, candidate in enumerate(review["rejected_candidates"]):
         candidate_id = candidate["candidate_id"]
@@ -104,6 +110,10 @@ def validate_semantic_review(review: dict[str, Any], probe: dict[str, Any] | Non
             messages.append(f"final_ranked_candidates[{index}] references an unknown candidate ID")
         if candidate_id in semantic_scores and candidate["score"] != semantic_scores[candidate_id]:
             messages.append(f"final_ranked_candidates[{index}] score differs from semantic candidate score")
+        if candidate_id in baseline_by_id:
+            baseline_score = baseline_by_id[candidate_id].get("score")
+            if baseline_score is not None and candidate["score"] != baseline_score:
+                messages.append(f"final_ranked_candidates[{index}] score differs from baseline candidate score")
         if candidate_id in rejected_ids:
             messages.append(f"Rejected candidate {candidate_id!r} cannot appear in final ranking")
         if candidate["score"] > previous_rank_score:
