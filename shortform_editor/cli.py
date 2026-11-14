@@ -754,8 +754,13 @@ def command_render(args: argparse.Namespace) -> int:
                     "-pix_fmt", "yuv420p", "-r", fps, "-fps_mode", "cfr",
                     "-c:a", "aac", "-b:a", "192k", "-ar", "48000"
                 ]
-                if fade_audio_filters and any(stream.get("codec_type") == "audio" for stream in probe.get("streams", [])):
-                    encode_cmd += ["-af", ",".join(fade_audio_filters)]
+                has_source_audio = any(stream.get("codec_type") == "audio" for stream in probe.get("streams", []))
+                if has_source_audio:
+                    # Resample against input timestamps to repair ordinary VFR/audio-clock drift
+                    # while retaining the source timing; this is not a perceptual lip-sync guarantee.
+                    audio_filters = ["aresample=48000:async=1:first_pts=0"]
+                    audio_filters.extend(fade_audio_filters)
+                    encode_cmd += ["-af", ",".join(audio_filters)]
                 encode_cmd += ["-movflags", "+faststart", str(part)]
                 run_checked(encode_cmd)
 
