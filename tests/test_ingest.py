@@ -69,5 +69,24 @@ class URLIngestionTests(unittest.TestCase):
             self.assertTrue(state["download"])
 
 
+    def test_cleans_partial_files_after_downloader_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "out"
+            output.mkdir()
+            class FailingYoutubeDL:
+                def __init__(self, options): pass
+                def __enter__(self): return self
+                def __exit__(self, *args): return False
+                def extract_info(self, url, download):
+                    (output / "source.mp4.part").write_bytes(b"partial")
+                    raise RuntimeError("network interrupted")
+            fake = types.ModuleType("yt_dlp")
+            fake.YoutubeDL = FailingYoutubeDL
+            with patch.dict(sys.modules, {"yt_dlp": fake}):
+                with self.assertRaises(PipelineError):
+                    download_source("https://example.com/video", output)
+            self.assertEqual(list(output.iterdir()), [])
+
+
 if __name__ == "__main__":
     unittest.main()
