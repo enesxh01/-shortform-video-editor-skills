@@ -41,7 +41,7 @@ All three layouts and ASS captions have synthetic FFmpeg integration coverage co
 - `resource-management` — RAM/VRAM preflight for ASR
 - `job-orchestration` — analysis pipeline and draft EDL generation
 - `quality-assurance` — technical QC and bounded technical repair
-- `preview-approval` — human review gates (design-only)
+- `preview-approval` — 30 fps preview rendering and explicit fingerprint-checked approval (partial; no graphical preview UI)
 - `video-editor-testing` — unit, integration, benchmark and footage matrix
 - `security-provenance` — safe handling and license/provenance checks
 - `observability` — diagnostics and logging policy
