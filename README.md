@@ -36,7 +36,7 @@ The design supports exactly three primary layouts: fullscreen, top/bottom vertic
 - `kino-editing` — word-timed caption grouping, ASS/Kino rendering and layout-specific placement (partial implementation; advanced motion presets remain design-only)
 - `ffmpeg-rendering` — deterministic rendering and 60 FPS policy
 - `resource-management` — RAM/VRAM preflight and ASR backend selection (partial implementation; job scheduling remains design-only)
-- `job-orchestration` — progress, cancellation, and recovery (design-only)
+- `job-orchestration` — one-command analysis pipeline, staged artifacts and cancellation manifest (partial implementation; resume/queue not yet built)
 - `quality-assurance` — technical codec/dimension/FPS/black/freeze/audio-peak QC (partial; visual/story/caption review still human)
 - `preview-approval` — human review gates (design-only)
 - `video-editor-testing` — unit, integration, benchmark, and footage matrix
@@ -50,6 +50,7 @@ Requirements: Python 3.10+, FFmpeg/ffprobe on PATH.
 
 ```bash
 python -m pip install -e .
+shortform-editor analyze-project input.mp4 -o job-output/ --model small --device auto
 shortform-editor probe input.mp4 -o probe.json
 shortform-editor analyze-audio input.mp4 -o audio-analysis.json
 shortform-editor find-moments audio-analysis.json -o candidates.json
@@ -67,7 +68,7 @@ shortform-editor apply-feedback candidates.json -o ranked.json
 python -m unittest discover -s tests -v
 ```
 
-The current CLI provides source probing and SHA-256 fingerprinting, EDL schema/semantic validation, an approved-EDL FFmpeg renderer, and an initial audio analysis command. Audio analysis extracts mono 16 kHz WAV in a temporary directory, measures half-second RMS/peak windows and sustained silence candidates, and optionally runs faster-whisper with word timestamps and VAD. Default ASR model is `small`; CUDA is attempted with int8_float16 and falls back to CPU int8. Install ASR with `python -m pip install -e '.[audio]'`; model weights download on first use. The renderer supports fullscreen center-crop, blurred 20/60/20 bars, and top/bottom split using two fingerprint-verified secondary sources; per-segment ASS captions support word-level karaoke when timings are supplied; `generate-captions` groups ASR word timestamps into caption events for manual insertion into the selected EDL segment. Moment discovery currently uses a transparent English-biased cue heuristic, speech density, lexical variety, audio energy and boundary evidence; it assigns low confidence and requires human review. It is not a trained semantic model or a virality predictor. The pipeline does not yet perform diarization, speaker attribution, laughter/emotion classification, smart crop/tracking, general subject tracking, content repair, or complete visual/story/caption QC. A separate technical repair command can normalize codec, dimensions and FPS without overwriting the source. Technical QC checks codecs, dimensions, frame rate, black/frozen intervals and sample peak. The 60 fps output policy is not a claim of native 60 fps motion from lower-frame-rate footage.
+The `analyze-project` command orchestrates source probing, audio/ASR, candidate ranking, pacing, optional visual analysis, caption generation and per-candidate draft EDLs. Drafts are never auto-approved or rendered. The current CLI provides source probing and SHA-256 fingerprinting, EDL schema/semantic validation, an approved-EDL FFmpeg renderer, and an initial audio analysis command. Audio analysis extracts mono 16 kHz WAV in a temporary directory, measures half-second RMS/peak windows and sustained silence candidates, and optionally runs faster-whisper with word timestamps and VAD. Default ASR model is `small`; CUDA is attempted with int8_float16 and falls back to CPU int8. Install ASR with `python -m pip install -e '.[audio]'`; model weights download on first use. The renderer supports fullscreen center-crop, blurred 20/60/20 bars, and top/bottom split using two fingerprint-verified secondary sources; per-segment ASS captions support word-level karaoke when timings are supplied; `generate-captions` groups ASR word timestamps into caption events for manual insertion into the selected EDL segment. Moment discovery currently uses a transparent English-biased cue heuristic, speech density, lexical variety, audio energy and boundary evidence; it assigns low confidence and requires human review. It is not a trained semantic model or a virality predictor. The pipeline does not yet perform diarization, speaker attribution, laughter/emotion classification, smart crop/tracking, general subject tracking, content repair, or complete visual/story/caption QC. A separate technical repair command can normalize codec, dimensions and FPS without overwriting the source. Technical QC checks codecs, dimensions, frame rate, black/frozen intervals and sample peak. The 60 fps output policy is not a claim of native 60 fps motion from lower-frame-rate footage.
 
 ## Install OpenCode skills
 
