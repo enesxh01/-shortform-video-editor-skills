@@ -71,7 +71,7 @@ class PipelineOrchestrationTests(unittest.TestCase):
             self.assertEqual(edl["segments"][0]["layout"], "fullscreen")
             self.assertEqual(len(edl["segments"][0]["captions"]), 1)
             self.assertEqual(edl["segments"][0]["pacing_review"]["repeated_word_flags"], ["the"])
-            self.assertEqual(set(edl["segments"][0]["crop_keyframes"][0]), {"time_seconds", "crop_9_16"})
+            self.assertEqual(set(edl["segments"][0]["crop_keyframes"][0]), {"time_seconds", "crop_9_16", "scene_cut"})
             self.assertEqual(validate_edl(edl), [])
 
 
