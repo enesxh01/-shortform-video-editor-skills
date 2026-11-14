@@ -90,6 +90,8 @@ def sample_timestamps(duration: float, sample_rate: float = 1.0,
 def sample_region_timestamps(regions: list[tuple[float, float]], duration: float,
                             source_offset: float, sample_rate: float = 1.0,
                             max_frames: int = 120) -> list[tuple[float, int]]:
+    if duration <= 0 or sample_rate <= 0 or max_frames < 2:
+        raise ValueError("Duration, sample rate and frame cap must be positive")
     intervals = []
     for index, (source_start, source_end) in enumerate(regions):
         local_start = max(0.0, float(source_start) - source_offset)
