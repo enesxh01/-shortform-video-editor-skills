@@ -147,6 +147,14 @@ class EDLValidationTests(unittest.TestCase):
         self.assertTrue(any("split_bottom" in error for error in validate_edl(edl)))
 
 
+    def test_split_layout_reports_each_missing_source_once(self):
+        edl = valid_edl()
+        edl["segments"][0]["layout"] = "split_vertical"
+        errors = validate_edl(edl)
+        self.assertEqual(sum("split_top is required" in error for error in errors), 1)
+        self.assertEqual(sum("split_bottom is required" in error for error in errors), 1)
+        self.assertFalse(any("requires both" in error for error in errors))
+
     def test_rejects_caption_outside_segment(self):
         edl = valid_edl()
         edl["segments"][0]["captions"] = [{

@@ -255,8 +255,6 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
         if segment["id"] in ids:
             messages.append(f"segments[{index}].id duplicates {segment['id']!r}")
         ids.add(segment["id"])
-        if segment.get("layout") == "split_vertical" and not all(segment.get(key) for key in ("split_top", "split_bottom")):
-            messages.append(f"segments[{index}] split_vertical requires both split_top and split_bottom source specs")
         try:
             start = timestamp_seconds(segment["source_in"])
             end = timestamp_seconds(segment["source_out"])
