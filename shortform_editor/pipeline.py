@@ -10,6 +10,7 @@ from typing import Any
 
 from .audio import analyze_audio
 from .caption_generation import generate_captions
+from .feedback import apply_feedback, load_feedback
 from .cli import PipelineError, probe_media, timestamp_seconds
 from .moments import detect_moments
 from .pacing import analyze_pacing
@@ -106,6 +107,21 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
         _write_json(output_dir / "audio-analysis.json", audio)
 
         candidates = stage("moment_detection", lambda: detect_moments(audio, limit=top_candidates))
+
+        def apply_local_feedback():
+            try:
+                return apply_feedback(candidates, load_feedback())
+            except PipelineError as exc:
+                warnings.append(f"Local feedback was ignored: {exc}")
+                result = dict(candidates)
+                result["feedback_learning"] = {
+                    "status": "ignored_invalid_feedback",
+                    "records_used": 0,
+                    "reason": str(exc)
+                }
+                return result
+
+        candidates = stage("performance_feedback", apply_local_feedback)
         _write_json(output_dir / "candidates.json", candidates)
 
         pacing = stage("retention_pacing", lambda: analyze_pacing(audio, candidates))
@@ -246,6 +262,7 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                 "visuals": "visual-analysis.json" if visuals else None
             },
             "draft_edls": drafts,
+            "feedback_learning": candidates.get("feedback_learning", {"status": "not_available"}),
             "warnings": warnings,
             "next_step": "Review candidate boundaries and EDL drafts, add/adjust layouts and captions, then explicitly set approval.status=approved and approved_by_user=true before rendering."
         }
