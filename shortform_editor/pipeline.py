@@ -97,7 +97,14 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
         visuals = None
         if include_visuals:
             try:
-                visuals = stage("visual_analysis", lambda: analyze_visuals(source))
+                candidate_regions = [
+                    (item["source_in_seconds"], item["source_out_seconds"])
+                    for item in candidates["candidates"]
+                ]
+                visuals = stage(
+                    "visual_analysis",
+                    lambda: analyze_visuals(source, regions=candidate_regions)
+                )
                 _write_json(output_dir / "visual-analysis.json", visuals)
             except PipelineError as exc:
                 warnings.append(f"Visual analysis unavailable: {exc}")
