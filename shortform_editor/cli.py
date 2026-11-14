@@ -53,6 +53,16 @@ def run_checked(args: list[str]) -> subprocess.CompletedProcess[str]:
     return completed
 
 
+def file_stat_signature(path: Path) -> tuple[int, int, int, int]:
+    stat = path.stat()
+    return (
+        int(stat.st_size),
+        int(stat.st_mtime_ns),
+        int(getattr(stat, "st_ctime_ns", 0)),
+        int(getattr(stat, "st_ino", 0))
+    )
+
+
 def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -65,6 +75,7 @@ def probe_media(source: Path) -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
     if not source.is_file():
         raise PipelineError(f"Source is not a regular file: {source}")
+    stat_before = file_stat_signature(source)
     ffprobe = require_tool("ffprobe")
     result = run_checked([
         ffprobe, "-v", "error", "-show_format", "-show_streams",
@@ -79,6 +90,9 @@ def probe_media(source: Path) -> dict[str, Any]:
     if not streams or not any(s.get("codec_type") == "video" for s in streams):
         raise PipelineError("Input contains no readable video stream")
     digest = sha256_file(source)
+    stat_after = file_stat_signature(source)
+    if stat_after != stat_before:
+        raise PipelineError("Source media changed while it was being probed and fingerprinted")
     data["source"] = {
         "path": str(source),
         "size_bytes": source.stat().st_size,
