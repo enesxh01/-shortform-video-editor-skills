@@ -21,7 +21,30 @@ You are the lead editor and technical director for a local-first short-form vide
 
 ## Executable foundation
 
-When the repository's Python package is installed with `python -m pip install -e .`, use the `shortform-editor` CLI:
+When the repository's Python package is installed with `python -m pip install -e .`, use the `shortform-editor` CLI.
+
+### Complete setup (run from the cloned repository root)
+
+The OpenCode skill installer and Python package installer do different jobs. The skill installer copies the instruction folders into OpenCode; it does **not** install the Python CLI or its dependencies.
+
+Windows PowerShell:
+
+```powershell
+py -m pip install --upgrade pip
+py -m pip install -e ".[audio,visual,download]"
+.\scripts\install.ps1
+```
+
+Linux/macOS:
+
+```bash
+python3 -m pip install --upgrade pip
+python3 -m pip install -e ".[audio,visual,download]"
+bash scripts/install.sh
+```
+
+FFmpeg and ffprobe must also be installed separately and available on PATH. Restart the terminal and OpenCode after installation so the CLI and newly installed skills are discoverable. The `audio`, `visual`, and `download` extras enable faster-whisper ASR, OpenCV analysis, and optional public-URL ingestion respectively.
+
 
 - `shortform-editor analyze-project INPUT.mp4 -o JOB_DIR` — orchestrate probe, audio/ASR, candidate ranking, pacing, optional visual analysis, caption generation and draft EDL creation. It never approves or renders automatically.\n- `shortform-editor probe INPUT.mp4 -o probe.json` — ffprobe inspection and SHA-256 fingerprint.
 - `shortform-editor analyze-audio INPUT.mp4 -o audio.json` — audio energy/silence analysis and optional faster-whisper ASR.
@@ -60,7 +83,7 @@ The `analyze-project` command is the preferred end-to-end entry point. After the
 - `split_vertical`: explicit top/bottom secondary sources stacked vertically; centered caption style.
 - `blurred_bars_20_60_20`: blurred 20% top, sharp 60% center, blurred 20% bottom.
 
-All three layouts have initial FFmpeg code and a synthetic integration test; the latest CI result is pending. Split mode requires fingerprinted `split_top` and `split_bottom` source specs in the EDL. The visual module only provides face-guided crop suggestions; those crop keyframes are not yet wired into the renderer.
+All three layouts have initial FFmpeg code and a synthetic integration test; the latest CI result is pending. Split mode requires fingerprinted `split_top` and `split_bottom` source specs in the EDL. Fullscreen rendering supports the face-guided crop keyframes produced by visual analysis, interpolating crop movement with FFmpeg. Face detection is limited to frontal Haar-cascade detections, so inspect framing carefully.
 
 ## Decision hierarchy
 
