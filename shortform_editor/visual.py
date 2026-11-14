@@ -247,7 +247,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             "requested_sample_rate_fps": sample_rate,
             "effective_sample_rate_fps": round(len(samples) / duration, 4),
             "sampled_frames": len(samples),
-            "sampling_regions": regions or [[0.0, duration]],
+            "sampling_regions": regions if regions is not None else [[0.0, duration]],
             "scene_change_candidates": scene_changes,
             "crop_keyframes": samples
         },
