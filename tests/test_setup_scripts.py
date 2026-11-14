@@ -28,6 +28,7 @@ class SetupScriptTests(unittest.TestCase):
         self.assertIn('Get-Command ffmpeg', script)
         self.assertIn('Get-Command ffprobe', script)
         self.assertIn('[version]"3.10"', script)
+        self.assertLess(script.index('$Launcher = Get-Command py'), script.index('$PythonVersionText ='))
 
 
 if __name__ == "__main__":
