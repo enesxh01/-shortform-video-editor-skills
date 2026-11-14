@@ -7,12 +7,12 @@ from .cli import PipelineError, file_stat_signature, probe_media
 
 
 def get_face_tracker_factory(cv2: Any):
-    """Return the CSRT factory when the OpenCV contrib build exposes it.""
+    """Return the CSRT factory when the OpenCV contrib build exposes it."""
     factory = getattr(cv2, "TrackerCSRT_create", None)
     if factory is None:
         legacy = getattr(cv2, "legacy", None)
         factory = getattr(legacy, "TrackerCSRT_create", None) if legacy is not None else None
-    return factory() if callable(factory) else None
+    return factory if callable(factory) else None
 
 
 def compute_crop_box(width: int, height: int, center_x: float, center_y: float,
