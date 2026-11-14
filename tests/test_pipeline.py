@@ -64,6 +64,17 @@ class PipelineOrchestrationTests(unittest.TestCase):
             with self.assertRaises(PipelineError):
                 analyze_project(source, root)
 
+    def test_refuses_nonempty_job_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.mp4"
+            source.write_bytes(b"source")
+            output = root / "job"
+            output.mkdir()
+            (output / "old.json").write_text("{}", encoding="utf-8")
+            with self.assertRaises(PipelineError):
+                analyze_project(source, output)
+
 
 if __name__ == "__main__":
     unittest.main()
