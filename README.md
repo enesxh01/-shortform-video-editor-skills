@@ -89,7 +89,7 @@ shortform-editor apply-feedback job-output/candidates.json -o ranked.json
 
 ### Implementation limits
 
-- Moment detection is an English-biased heuristic, not semantic AI or a virality predictor; it deliberately reports low confidence.
+- The Python moment detector is an English-biased heuristic and deliberately reports low confidence. The OpenCode skill adds a separate LLM semantic review pass over the full timestamped transcript, but that prompt-driven review has not been benchmarked or evaluated on a labeled set; neither stage predicts virality.
 - Audio has ASR and energy/silence analysis, but no diarization, overlap, laughter/emotion classification or multi-mic separation.
 - Visual analysis detects scene-change candidates and frontal faces only; it does not understand arbitrary objects, actions, sports or gameplay HUDs.
 - Pacing trims are advisory and never automatically remove content.
