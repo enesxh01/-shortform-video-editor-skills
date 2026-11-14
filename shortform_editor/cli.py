@@ -156,6 +156,8 @@ def probe_media(source: Path) -> dict[str, Any]:
     data["tool_versions"] = {
         "ffprobe": run_checked([ffprobe, "-version"]).stdout.splitlines()[0]
     }
+    if file_stat_signature(source) != stat_before:
+        raise PipelineError("Source media changed during frame-timing analysis; restart the probe")
     return data
 
 
