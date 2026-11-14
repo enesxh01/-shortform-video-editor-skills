@@ -6,6 +6,7 @@ import unittest
 from argparse import Namespace
 from pathlib import Path
 
+from shortform_editor.approval import edl_approval_hash
 from shortform_editor.cli import command_render, command_render_preview, probe_media
 from shortform_editor.repair import repair_technical_export
 
@@ -90,7 +91,13 @@ class RenderIntegrationTests(unittest.TestCase):
                         "container": "mp4", "video_codec": "h264", "audio_codec": "aac"
                     },
                     "segments": [segment],
-                    "approval": {"status": "approved", "approved_by_user": True}
+                    "approval": {"status": "draft", "approved_by_user": False}
+                }
+                edl["approval"] = {
+                    "status": "approved",
+                    "approved_by_user": True,
+                    "approved_edl_sha256": edl_approval_hash(edl),
+                    "approved_at": "2026-01-01T00:00:00+00:00"
                 }
                 edl_path = root / f"{layout}.json"
                 edl_path.write_text(json.dumps(edl), encoding="utf-8")
