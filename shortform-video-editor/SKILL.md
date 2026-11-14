@@ -75,6 +75,10 @@ The `analyze-project` command is the preferred end-to-end entry point. After the
 10. Present previews, rationale, export settings, QC results and uncertainties. Require human approval.
 11. Record only explicit persistent preferences.
 
+## Layout selection
+
+For native 9:16 footage, the preferred default is `blurred_bars_20_60_20`: blurred full-frame background with the sharp, slightly enlarged source centered in the middle 60%, preserving the 20% blurred top and bottom. Do not add black borders. For landscape sources, prefer `fullscreen` when the crop preserves the story and subject; otherwise use blurred bars. Use `split_vertical` only when requested or when the user supplies two panel sources. Explicit user instructions always override this default.
+
 ## Three supported design layouts
 
 - `fullscreen`: vertical 9:16 center-crop; basic outlined ASS captions, optional word karaoke.

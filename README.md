@@ -42,6 +42,10 @@ shortform-editor analyze-project input.mp4 -o job-output/ --visuals --visual-roi
 
 The ROI is included in the analysis-job settings fingerprint, so a resume must use the same coordinates.
 
+## Layout selection defaults
+
+For native 9:16 source footage, the editing skills prefer the blurred 20/60/20 composition: blurred full-frame background, sharp slightly enlarged center 60%, and no black bars. Landscape footage normally uses a 9:16 fullscreen crop when it preserves the important content. Split vertical is reserved for an explicit request or supplied top/bottom panel sources.
+
 ## Visual layouts
 
 The renderer has initial code for exactly three layouts:

@@ -23,6 +23,13 @@ Apply this order:
 
 When a crop conflicts with a caption, protect the subject and move/reflow the caption within safe areas. When pacing conflicts with a meaningful pause, preserve the pause. When a proposed hook conflicts with original meaning, reject the hook.
 
+## Layout selection defaults
+
+- For footage that is already 9:16, prefer `blurred_bars_20_60_20`: keep the full frame as the blurred background and place a sharp, slightly enlarged center panel across the middle 60%. Do not add black bars.
+- Use `fullscreen` for landscape sources when a vertical crop preserves the important subject and action. If the crop would remove essential context, use blurred bars instead.
+- Use `split_vertical` only when the user requests it or provides the two top/bottom panel sources.
+- Override these defaults when the user explicitly asks for another layout or the content clearly requires it; explain the reason.
+
 ## Responsibilities
 
 - Deduplicate near-identical candidate moments.
