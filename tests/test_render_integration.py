@@ -84,7 +84,7 @@ class RenderIntegrationTests(unittest.TestCase):
                         "variable_frame_rate": False
                     },
                     "render": {
-                        "width": 1080, "height": 1920, "fps_target": "30/1",
+                        "width": 1080, "height": 1920, "fps_target": "60/1",
                         "fps_mode": "cfr", "fps_conversion": "duplicate_drop",
                         "container": "mp4", "video_codec": "h264", "audio_codec": "aac"
                     },
@@ -104,7 +104,7 @@ class RenderIntegrationTests(unittest.TestCase):
                 video = next(s for s in rendered["streams"] if s["codec_type"] == "video")
                 self.assertEqual((video["width"], video["height"]), (1080, 1920))
                 self.assertEqual(video["codec_name"], "h264")
-                self.assertEqual(video["avg_frame_rate"], "30/1")
+                self.assertEqual(video["avg_frame_rate"], "60/1")
                 self.assertTrue(any(s["codec_type"] == "audio" for s in rendered["streams"]))
 
             repaired = root / "repaired.mp4"
