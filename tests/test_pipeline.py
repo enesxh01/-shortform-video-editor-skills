@@ -141,5 +141,41 @@ class PipelineOrchestrationTests(unittest.TestCase):
                 analyze_project(source, output)
 
 
+    def test_pipeline_applies_saved_feedback_before_ranking_candidates(self):
+        fingerprint = "sha256:" + ("8" * 64)
+        candidates = [
+            {"candidate_id": "story", "source_fingerprint": fingerprint, "source_in_seconds": 2.0,
+             "source_out_seconds": 18.0, "family": "story_or_commentary", "transcript_excerpt": "Story",
+             "confidence": 0.35, "score": 54},
+            {"candidate_id": "comedy", "source_fingerprint": fingerprint, "source_in_seconds": 20.0,
+             "source_out_seconds": 36.0, "family": "comedy_or_reaction", "transcript_excerpt": "Comedy",
+             "confidence": 0.35, "score": 50}
+        ]
+        records = (
+            [{"candidate_id": f"comedy-{i}", "source_fingerprint": "past", "family": "comedy_or_reaction", "decision": "approve"} for i in range(3)] +
+            [{"candidate_id": f"story-{i}", "source_fingerprint": "past", "family": "story_or_commentary", "decision": "reject"} for i in range(3)]
+        )
+        probe = {
+            "source": {"path": "source.mp4", "sha256": "8" * 64, "fingerprint": fingerprint},
+            "format": {"duration": "40.0"},
+            "streams": [{"codec_type": "video", "time_base": "1/90000", "avg_frame_rate": "30/1"}]
+        }
+        audio = {"source": {"fingerprint": fingerprint}, "analysis": {"transcription": {"status": "completed"}}}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.mp4"
+            source.write_bytes(b"placeholder")
+            with patch("shortform_editor.pipeline.probe_media", return_value=probe), \
+                 patch("shortform_editor.pipeline.analyze_audio", return_value=audio), \
+                 patch("shortform_editor.pipeline.detect_moments", return_value={"source_fingerprint": fingerprint, "candidates": candidates}), \
+                 patch("shortform_editor.pipeline.load_feedback", return_value=records), \
+                 patch("shortform_editor.pipeline.analyze_pacing", return_value={"candidates": []}), \
+                 patch("shortform_editor.pipeline.generate_captions", return_value={"captions": []}):
+                manifest = analyze_project(source, root / "job", top_candidates=2)
+            ranked = json.loads((root / "job" / "candidates.json").read_text(encoding="utf-8"))
+            self.assertEqual(ranked["candidates"][0]["candidate_id"], "comedy")
+            self.assertEqual(manifest["feedback_learning"]["records_used"], 6)
+
+
 if __name__ == "__main__":
     unittest.main()
