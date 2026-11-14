@@ -159,6 +159,41 @@ def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 
         failures.append("Frozen-frame interval detected")
 
     volumes = {name: float(value) for name, value in VOLUME_RE.findall(ffmpeg_log)}
+    integrated_match = INTEGRATED_LOUDNESS_RE.search(ffmpeg_log)
+    range_match = LOUDNESS_RANGE_RE.search(ffmpeg_log)
+    true_peak_match = TRUE_PEAK_RE.search(ffmpeg_log)
+    loudness = {
+        "integrated_lufs": float(integrated_match.group(1)) if integrated_match else None,
+        "range_lu": float(range_match.group(1)) if range_match else None,
+        "true_peak_dbtp": float(true_peak_match.group(1)) if true_peak_match else None,
+    }
+    if audio and loudness["integrated_lufs"] is not None:
+        integrated = loudness["integrated_lufs"]
+        # A guidance band, not a platform-specific pass/fail requirement.
+        in_guidance_band = -16.0 <= integrated <= -12.0
+        checks.append({
+            "name": "integrated_loudness",
+            "status": "passed" if in_guidance_band else "warning",
+            "detail": f"Integrated loudness {integrated:.1f} LUFS; general short-form guidance band -16 to -12 LUFS"
+        })
+        if not in_guidance_band:
+            warnings.append("Integrated loudness is outside the general short-form guidance band; listen before changing gain")
+    elif audio:
+        checks.append({"name": "integrated_loudness", "status": "warning", "detail": "EBU R128 integrated loudness measurement unavailable"})
+        warnings.append("Integrated loudness measurement unavailable")
+    if audio and loudness["true_peak_dbtp"] is not None:
+        true_peak = loudness["true_peak_dbtp"]
+        peak_ok = true_peak < -1.0
+        checks.append({
+            "name": "true_peak",
+            "status": "passed" if peak_ok else "warning",
+            "detail": f"Measured true peak {true_peak:.1f} dBTP; recommended ceiling below -1.0 dBTP"
+        })
+        if not peak_ok:
+            warnings.append("True peak reaches the recommended -1.0 dBTP ceiling")
+    elif audio:
+        checks.append({"name": "true_peak", "status": "warning", "detail": "EBU R128 true-peak measurement unavailable"})
+        warnings.append("True-peak measurement unavailable")
     if audio and "max_volume" in volumes:
         peak = volumes["max_volume"]
         checks.append({
@@ -182,10 +217,10 @@ def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 
         "warnings": warnings,
         "black_regions": black_regions,
         "freeze_regions": freeze_events,
-        "audio_volume": volumes,
+        "audio_volume": volumes,\n        "audio_loudness": loudness,
         "limitations": [
             "Black/freeze filters can flag intentional pauses, static scenes or fades; inspect the marked intervals.",
-            "Volume detection measures sample peak, not true peak or perceived loudness.",
+            "Volumedetect measures sample peak; EBU R128 estimates integrated loudness and true peak. These are advisory and do not replace listening.",
             "This pass does not verify caption spelling, safe areas, story comprehension, crop quality, humor or audio/video sync by listening.",
             "No automatic repair is performed by QC."
         ]
@@ -216,7 +251,7 @@ def run_qc(source: Path, expected_width: int = 1080, expected_height: int = 1920
     video_filters = "blackdetect=d=0.5:pix_th=0.10,freezedetect=n=-50dB:d=1.0"
     args = [ffmpeg, "-hide_banner", "-i", str(source), "-vf", video_filters]
     if any(s.get("codec_type") == "audio" for s in report.get("streams", [])):
-        args += ["-af", "volumedetect"]
+        args += ["-af", "volumedetect,ebur128=peak=true"]
     args += ["-f", "null", "-"]
     result = run_checked(args)
     assessed = assess_probe(report, result.stderr, expected_width, expected_height, expected_fps)
