@@ -51,6 +51,7 @@ class RenderIntegrationTests(unittest.TestCase):
                     "layout": layout,
                     "fade_in_seconds": 0.15,
                     "fade_out_seconds": 0.15,
+                    "color_grade": {"brightness": 0.015, "contrast": 1.05, "saturation": 1.08, "gamma": 1.0, "sharpen": 0.35},
                     "captions": [{
                         "start": "00:00:00.200",
                         "end": "00:00:01.500",
