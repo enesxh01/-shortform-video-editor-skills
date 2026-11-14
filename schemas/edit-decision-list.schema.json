@@ -13,7 +13,7 @@
       "additionalProperties": false,
       "required": ["fingerprint", "time_base"],
       "properties": {
-        "fingerprint": {"type": "string", "minLength": 1},
+        "fingerprint": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "time_base": {"type": "string", "pattern": "^[1-9][0-9]*/[1-9][0-9]*$"},
         "frame_rate": {"type": ["string", "null"], "pattern": "^[1-9][0-9]*/[1-9][0-9]*$"},
         "variable_frame_rate": {"type": ["boolean", "null"]}
