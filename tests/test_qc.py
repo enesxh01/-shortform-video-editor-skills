@@ -107,7 +107,7 @@ class QCTests(unittest.TestCase):
                     source, Path(directory) / "out.mp4", fps="120/2"
                 )
             self.assertEqual(result["qc_after_repair"]["status"], "passed")
-            self.assertIn("fps=60/1", run.call_args_list[0].args[0])
+            self.assertTrue(any("fps=60/1" in arg for arg in run.call_args_list[0].args[0]))
 
     def test_repair_warning_is_nonfatal(self):
         report = {"qc_after_repair": {"status": "warning"}}
@@ -125,7 +125,7 @@ class QCTests(unittest.TestCase):
     def test_flags_freeze_that_continues_to_end_of_file(self):
         report = probe()
         report["format"] = {"duration": "10.0"}
-        result = assess_probe(report, "freeze_start:8.0\\nfreeze_duration:2.0")
+        result = assess_probe(report, "freeze_start:8.0\nfreeze_duration:2.0")
         self.assertEqual(result["freeze_regions"], [{"start": 8.0, "end": 10.0}])
         self.assertEqual(result["status"], "fail")
 
@@ -140,10 +140,10 @@ class QCTests(unittest.TestCase):
 
     def test_parses_ebu_r128_loudness_and_true_peak(self):
         logs = (
-            "mean_volume: -18.0 dB\\nmax_volume: -2.0 dB\\n"
-            "Integrated loudness:\\n    I: -14.0 LUFS\\n"
-            "Loudness range:\\n    LRA: 4.2 LU\\n"
-            "True peak:\\n    Peak: -0.8 dBFS\\n"
+            "mean_volume: -18.0 dB\nmax_volume: -2.0 dB\n"
+            "Integrated loudness:\n    I: -14.0 LUFS\n"
+            "Loudness range:\n    LRA: 4.2 LU\n"
+            "True peak:\n    Peak: -0.8 dBFS\n"
         )
         result = assess_probe(probe(), logs)
         self.assertEqual(result["audio_loudness"]["integrated_lufs"], -14.0)
@@ -156,10 +156,10 @@ class QCTests(unittest.TestCase):
 
     def test_reports_loudness_outside_guidance_as_advisory(self):
         logs = (
-            "max_volume: -4.0 dB\\n"
-            "Integrated loudness:\\n    I: -22.0 LUFS\\n"
-            "Loudness range:\\n    LRA: 8.0 LU\\n"
-            "True peak:\\n    Peak: -3.0 dBFS\\n"
+            "max_volume: -4.0 dB\n"
+            "Integrated loudness:\n    I: -22.0 LUFS\n"
+            "Loudness range:\n    LRA: 8.0 LU\n"
+            "True peak:\n    Peak: -3.0 dBFS\n"
         )
         result = assess_probe(probe(), logs)
         self.assertEqual(result["status"], "warning")

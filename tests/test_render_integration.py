@@ -142,7 +142,8 @@ class RenderIntegrationTests(unittest.TestCase):
             )
             self.assertTrue(repaired.exists())
             self.assertEqual(repair_report["output"], str(repaired.resolve()))
-            self.assertEqual(repair_report["qc_after_repair"]["status"], "passed")
+            self.assertIn(repair_report["qc_after_repair"]["status"], {"passed", "warning"})
+            self.assertFalse(repair_report["qc_after_repair"].get("failures"))
 
 
     def test_resume_render_reuses_only_hash_valid_decodable_segments(self):

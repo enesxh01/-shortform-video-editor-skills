@@ -100,7 +100,7 @@ class URLIngestionTests(unittest.TestCase):
             fake = types.ModuleType("yt_dlp")
             fake.YoutubeDL = FakeYoutubeDL
             probe = {"source": {"fingerprint": "sha256:test"}, "format": {"duration": "10"}}
-            with patch.dict(sys.modules, {"yt_dlp": fake}), \\
+            with patch.dict(sys.modules, {"yt_dlp": fake}), \
                  patch("shortform_editor.ingest.probe_media", return_value=probe):
                 result = download_source("https://example.com/watch?v=123", output)
 

@@ -255,6 +255,8 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
         if segment["id"] in ids:
             messages.append(f"segments[{index}].id duplicates {segment['id']!r}")
         ids.add(segment["id"])
+        if segment.get("layout") == "split_vertical" and not all(segment.get(key) for key in ("split_top", "split_bottom")):
+            messages.append(f"segments[{index}] split_vertical requires both split_top and split_bottom source specs")
         try:
             start = timestamp_seconds(segment["source_in"])
             end = timestamp_seconds(segment["source_out"])
@@ -321,7 +323,7 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
                 caption_text = str(caption.get("text", ""))
                 if any(ord(character) < 32 and character not in "\\r\\n\\t" for character in caption_text):
                     messages.append(f"{caption_path}.text contains unsupported control characters")
-                line_count = len(caption_text.replace("\\r\\n", "\\n").replace("\\r", "\\n").split("\\n"))
+                line_count = len(caption_text.replace("\r\n", "\n").replace("\r", "\n").split("\n"))
                 if segment["layout"] in {"split_vertical", "blurred_bars_20_60_20"} and line_count != 1:
                     messages.append(f"{caption_path} must be exactly one line for {segment['layout']} layout")
                 if segment["layout"] == "fullscreen" and line_count > 3:

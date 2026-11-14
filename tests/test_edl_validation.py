@@ -134,15 +134,8 @@ class EDLValidationTests(unittest.TestCase):
     def test_split_layout_requires_two_source_specs(self):
         edl = valid_edl()
         edl["segments"][0]["layout"] = "split_vertical"
-        edl["segments"][0]["split_top"] = {
-            "path": "top.mp4", "fingerprint": "sha256:" + ("b" * 64),
-            "source_in": "00:00:02.000", "source_out": "00:00:08.500"
-        }
-        edl["segments"][0]["split_bottom"] = {
-            "path": "bottom.mp4", "fingerprint": "sha256:" + ("c" * 64),
-            "source_in": "00:00:02.000", "source_out": "00:00:08.500"
-        }
-        self.assertTrue(validate_edl(edl))
+        self.assertTrue(any("requires both split_top and split_bottom" in error for error in validate_edl(edl)))
+
 
     def test_rejects_caption_outside_segment(self):
         edl = valid_edl()
