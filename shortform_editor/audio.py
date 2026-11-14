@@ -218,6 +218,10 @@ def analyze_audio(source: Path, model_size: str = "small", device: str = "auto",
             for word in segment["words"]:
                 shift_time(word)
 
+    final_source_probe = probe_media(source)
+    if final_source_probe["source"]["fingerprint"] != report["source"]["fingerprint"]:
+        raise PipelineError("Source media changed during audio analysis; discard this analysis and restart from the new source version")
+
     return {
         "schema_version": "1.0",
         "source": {
