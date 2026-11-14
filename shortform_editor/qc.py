@@ -61,12 +61,18 @@ def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 
         })
         if video:
             try:
-                video_start = float(video.get("start_time") or 0.0)
-                audio_start = float(audio.get("start_time") or 0.0)
-                video_duration = float(video.get("duration") or report.get("format", {}).get("duration") or 0.0)
-                audio_duration = float(audio.get("duration") or 0.0)
+                raw_video_start = video.get("start_time")
+                raw_audio_start = audio.get("start_time")
+                raw_video_duration = video.get("duration") or report.get("format", {}).get("duration")
+                raw_audio_duration = audio.get("duration")
+                if any(value in (None, "", "N/A") for value in (raw_video_start, raw_audio_start, raw_video_duration, raw_audio_duration)):
+                    raise ValueError("missing stream timing metadata")
+                video_start = float(raw_video_start)
+                audio_start = float(raw_audio_start)
+                video_duration = float(raw_video_duration)
+                audio_duration = float(raw_audio_duration)
                 start_delta = abs(video_start - audio_start)
-                duration_delta = abs(video_duration - audio_duration) if audio_duration > 0 and video_duration > 0 else 0.0
+                duration_delta = abs(video_duration - audio_duration)
                 timing_ok = start_delta <= 0.1 and duration_delta <= 0.25
                 checks.append({
                     "name": "stream_timing",
