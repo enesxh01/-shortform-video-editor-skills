@@ -187,7 +187,7 @@ def analyze_audio(source: Path, model_size: str = "small", device: str = "auto",
     source = source.expanduser().resolve(strict=True)
     if not source.is_file():
         raise PipelineError(f"Source is not a regular file: {source}")
-    report = probe_report or probe_media(source)
+    report = probe_report if probe_report is not None else probe_media(source)
     reported_path = Path(report.get("source", {}).get("path", source)).expanduser().resolve()
     if reported_path != source:
         raise PipelineError("Supplied probe report belongs to a different source path")
