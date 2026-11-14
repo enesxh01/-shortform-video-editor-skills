@@ -94,13 +94,19 @@ def _transcribe(wav_path: Path, model_size: str, device: str, language: str | No
     except ImportError as exc:
         raise PipelineError("ASR requires the optional audio extra: pip install -e '.[audio]'") from exc
 
-    attempts = []
-    if device == "auto":
-        attempts = [("cuda", "int8_float16"), ("cpu", "int8")]
-    elif device == "cuda":
-        attempts = [("cuda", "int8_float16"), ("cuda", "float16")]
-    else:
-        attempts = [("cpu", "int8")]
+    from .resources import choose_inference_device, resource_snapshot
+
+    snapshot = resource_snapshot()
+    try:
+        selected_device, selected_compute, selection_notes = choose_inference_device(
+            model_size, requested=device, snapshot=snapshot
+        )
+    except RuntimeError as exc:
+        raise PipelineError(str(exc)) from exc
+
+    attempts = [(selected_device, selected_compute)]
+    if device == "auto" and selected_device == "cuda":
+        attempts.append(("cpu", "int8"))
 
     last_error: Exception | None = None
     model = None
@@ -152,6 +158,8 @@ def _transcribe(wav_path: Path, model_size: str, device: str, language: str | No
         "model": model_size,
         "device": selected_device,
         "compute_type": selected_compute,
+        "resource_snapshot": snapshot,
+        "device_selection_notes": selection_notes,
         "language": info.language,
         "language_probability": round(float(info.language_probability), 4),
         "segments": segments,
