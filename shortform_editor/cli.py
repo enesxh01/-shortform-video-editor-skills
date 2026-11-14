@@ -546,6 +546,23 @@ def command_apply_feedback(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_repair(args: argparse.Namespace) -> int:
+    from .repair import repair_technical_export
+
+    result = repair_technical_export(
+        Path(args.source).expanduser().resolve(strict=True),
+        Path(args.output).expanduser().resolve(),
+        width=args.width,
+        height=args.height,
+        fps=args.fps,
+        crf=args.crf,
+        preset=args.preset,
+        overwrite=args.overwrite
+    )
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    return 0 if result["qc_after_repair"]["status"] == "passed" else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -613,6 +630,16 @@ def build_parser() -> argparse.ArgumentParser:
     learn.add_argument("--feedback-file")
     learn.add_argument("--min-observations", type=int, default=3)
     learn.set_defaults(func=command_apply_feedback)
+    repair = sub.add_parser("repair", help="write a separate normalized H.264/AAC export and rerun technical QC")
+    repair.add_argument("source")
+    repair.add_argument("output")
+    repair.add_argument("--width", type=int, default=1080)
+    repair.add_argument("--height", type=int, default=1920)
+    repair.add_argument("--fps", default="60/1")
+    repair.add_argument("--crf", type=int, default=18)
+    repair.add_argument("--preset", default="medium", choices=["ultrafast", "fast", "medium", "slow", "veryslow"])
+    repair.add_argument("--overwrite", action="store_true")
+    repair.set_defaults(func=command_repair)
     render = sub.add_parser("render", help="render approved EDL segments into a vertical MP4")
     render.add_argument("source")
     render.add_argument("edl")
