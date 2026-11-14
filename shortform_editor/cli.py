@@ -474,6 +474,12 @@ def _write_render_state(path: Path, state: dict[str, Any]) -> None:
             staged.unlink(missing_ok=True)
 
 
+
+def _existing_output_is_resumable(output: Path, overwrite: bool, state_path: Path) -> bool:
+    """Permit a prior output only when explicitly overwriting or resuming a persisted job."""
+    return bool(overwrite or state_path.is_file()) and output.is_file()
+
+
 def _render_part_is_reusable(part: Path, record: Any, ffmpeg: str, ffprobe: str,
                              width: int, height: int, fps: str) -> bool:
     if not isinstance(record, dict) or not part.is_file():
@@ -547,8 +553,12 @@ def command_render(args: argparse.Namespace) -> int:
     primary_video = next(s for s in probe["streams"] if s.get("codec_type") == "video")
     source_width, source_height = int(primary_video["width"]), int(primary_video["height"])
     output.parent.mkdir(parents=True, exist_ok=True)
-    if output.exists() and not args.overwrite:
-        raise PipelineError(f"Output already exists (use --overwrite): {output}")
+    resume_requested = bool(getattr(args, "resume", False))
+    render_workdir = output.parent / f".{output.name}.shortform-work"
+    render_state_path = render_workdir / "render-state.json"
+    resumable_existing_output = resume_requested and _existing_output_is_resumable(output, False, render_state_path)
+    if output.exists() and not args.overwrite and not resumable_existing_output:
+        raise PipelineError(f"Output already exists (use --overwrite, or resume the matching interrupted render): {output}")
 
     # Validate and fingerprint both secondary sources before any render work begins.
     split_paths: dict[tuple[int, str], Path] = {}
@@ -585,9 +595,7 @@ def command_render(args: argparse.Namespace) -> int:
         raise PipelineError(str(exc)) from exc
 
 
-    resume_enabled = bool(getattr(args, "resume", False))
-    render_workdir = output.parent / f".{output.name}.shortform-work"
-    render_state_path = render_workdir / "render-state.json"
+    resume_enabled = resume_requested
     render_state: dict[str, Any] | None = None
     reused_segments: list[int] = []
     segment_encoders: dict[int, str] = {}
@@ -597,6 +605,8 @@ def command_render(args: argparse.Namespace) -> int:
             for index, key in sorted(split_paths)
         ]
         render_settings = {
+            "renderer_cache_version": "2",
+            "ffmpeg_version": (run_checked([ffmpeg, "-version"]).stdout or "").splitlines()[0],
             "source_fingerprint": probe["source"]["fingerprint"],
             "edl_sha256": sha256_file(edl_path),
             "split_sources": split_fingerprints,
@@ -623,7 +633,7 @@ def command_render(args: argparse.Namespace) -> int:
             if not isinstance(render_state.get("parts"), dict):
                 raise PipelineError("Cannot resume render: render state has an invalid parts manifest")
         else:
-            render_state = {"schema_version": "1.0", "settings_sha256": settings_sha256,
+            render_state = {"schema_version": "2.0", "settings_sha256": settings_sha256,
                             "settings": render_settings, "parts": {}}
             _write_render_state(render_state_path, render_state)
 
