@@ -1,6 +1,6 @@
 import unittest
 
-from shortform_editor.visual import build_ffmpeg_crop_filter, compute_crop_box, sample_timestamps
+from shortform_editor.visual import build_ffmpeg_crop_filter, compute_crop_box, sample_region_timestamps, sample_timestamps
 
 
 class CropGeometryTests(unittest.TestCase):
@@ -26,6 +26,13 @@ class CropGeometryTests(unittest.TestCase):
         self.assertEqual(len(times), 120)
         self.assertEqual(times[0], 0.0)
         self.assertGreater(times[-1], 3500.0)
+
+    def test_samples_candidate_regions_in_source_order(self):
+        sampled = sample_region_timestamps([(100.0, 110.0), (0.0, 10.0)], 120.0, 0.0, 1.0, 30)
+        self.assertEqual(len(sampled), 20)
+        self.assertEqual(sampled[0][1], 1)
+        self.assertEqual(sampled[-1][1], 0)
+        self.assertLess(sampled[0][0], sampled[-1][0])
 
     def test_builds_interpolated_crop_expression(self):
         keyframes = [
