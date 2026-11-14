@@ -220,7 +220,8 @@ def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 
         "warnings": warnings,
         "black_regions": black_regions,
         "freeze_regions": freeze_events,
-        "audio_volume": volumes,\n        "audio_loudness": loudness,
+        "audio_volume": volumes,
+        "audio_loudness": loudness,
         "limitations": [
             "Black/freeze filters can flag intentional pauses, static scenes or fades; inspect the marked intervals.",
             "Volumedetect measures sample peak; EBU R128 estimates integrated loudness and true peak. These are advisory and do not replace listening.",
