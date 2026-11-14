@@ -72,8 +72,9 @@ def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
     return digest.hexdigest()
 
 
-def analyze_frame_timestamps(timestamps: list[Any], min_samples: int = 12) -> dict[str, Any]:
-    """Classify sampled frame cadence; this is a diagnostic, not full-file VFR proof."""
+def analyze_frame_timestamps(timestamps: list[Any], min_samples: int = 12,
+                             sample_window_starts: list[int] | None = None) -> dict[str, Any]:
+    """Classify local frame cadence across sampled windows; not a proof for every frame."""
     values = []
     for item in timestamps:
         try:
@@ -82,35 +83,50 @@ def analyze_frame_timestamps(timestamps: list[Any], min_samples: int = 12) -> di
             continue
         if math.isfinite(value):
             values.append(value)
-
     deltas = [right - left for left, right in zip(values, values[1:])]
-    intervals = [delta for delta in deltas if delta > 0]
+    positive = [delta for delta in deltas if delta > 0]
     non_monotonic = sum(delta < 0 for delta in deltas)
-    if len(intervals) < min_samples - 1:
+    gap_limit = max(1.0, statistics.median(positive) * 5) if positive else 1.0
+    local_intervals = [delta for delta in deltas if 0 < delta <= gap_limit]
+    windows = len(sample_window_starts or [0])
+    if len(local_intervals) < min_samples - 1:
         return {"status": "insufficient_samples", "variable_frame_rate": None,
-                "sampled_frames": len(values), "sampled_intervals": len(intervals),
-                "non_monotonic_intervals": non_monotonic,
-                "irregular_interval_ratio": None, "median_interval_seconds": None,
-                "scope": "initial_frame_sample_only"}
-    median_interval = statistics.median(intervals)
+                "sampled_frames": len(values), "sampled_intervals": len(local_intervals),
+                "non_monotonic_intervals": non_monotonic, "irregular_interval_ratio": None,
+                "median_interval_seconds": None, "sample_windows": windows,
+                "scope": "stratified_frame_samples"}
+    median_interval = statistics.median(local_intervals)
     tolerance = max(0.002, median_interval * 0.03)
-    irregular = sum(abs(interval - median_interval) > tolerance for interval in intervals)
-    ratio = (irregular + non_monotonic) / max(1, len(deltas))
+    irregular = sum(abs(interval - median_interval) > tolerance for interval in local_intervals)
+    ratio = (irregular + non_monotonic) / max(1, len(local_intervals) + non_monotonic)
     is_vfr = ratio > 0.05
     return {"status": "likely_vfr" if is_vfr else "likely_cfr",
             "variable_frame_rate": is_vfr, "sampled_frames": len(values),
-            "sampled_intervals": len(intervals), "non_monotonic_intervals": non_monotonic,
+            "sampled_intervals": len(local_intervals), "non_monotonic_intervals": non_monotonic,
             "irregular_interval_ratio": round(ratio, 4),
             "median_interval_seconds": round(median_interval, 6),
-            "tolerance_seconds": round(tolerance, 6), "scope": "initial_frame_sample_only",
-            "limitation": "A short initial sample can miss later cadence changes; this is advisory and does not normalize timestamps."}
-def probe_frame_timing(source: Path, ffprobe: str, sample_frames: int = 240) -> dict[str, Any]:
-    """Sample initial decoded frame timestamps to flag probable variable cadence."""
+            "tolerance_seconds": round(tolerance, 6), "sample_windows": windows,
+            "scope": "stratified_frame_samples",
+            "limitation": "A bounded multi-window sample can miss cadence changes between samples; this is advisory and does not normalize timestamps."}
+
+def probe_frame_timing(source: Path, ffprobe: str, duration_seconds: float | None = None,
+                       sample_frames: int = 240, sample_windows: int = 8) -> dict[str, Any]:
+    """Sample bounded frame windows across the file to flag probable variable cadence."""
+    if sample_frames < 12 or sample_windows < 1:
+        raise ValueError("Frame timing sample requires at least 12 frames and one window")
+    frames_per_window = max(2, sample_frames // sample_windows)
+    if duration_seconds and math.isfinite(duration_seconds) and duration_seconds > 0:
+        last_start = max(0.0, duration_seconds - (frames_per_window / 10))
+        starts = [round(last_start * index / max(1, sample_windows - 1), 3)
+                  for index in range(sample_windows)]
+    else:
+        starts = [0.0]
+    starts = list(dict.fromkeys(starts))
+    intervals = ",".join(str(start) + "%+#" + str(frames_per_window) for start in starts)
     result = run_checked([
         ffprobe, "-v", "error", "-select_streams", "v:0",
-        "-read_intervals", "%+#" + str(sample_frames),
-        "-show_frames", "-show_entries", "frame=best_effort_timestamp_time",
-        "-of", "json", str(source)
+        "-read_intervals", intervals, "-show_frames",
+        "-show_entries", "frame=best_effort_timestamp_time", "-of", "json", str(source)
     ])
     try:
         payload = json.loads(result.stdout)
@@ -118,8 +134,7 @@ def probe_frame_timing(source: Path, ffprobe: str, sample_frames: int = 240) -> 
         return analyze_frame_timestamps([])
     timestamps = [frame.get("best_effort_timestamp_time")
                   for frame in payload.get("frames", []) if isinstance(frame, dict)]
-    return analyze_frame_timestamps(timestamps)
-
+    return analyze_frame_timestamps(timestamps, sample_window_starts=list(range(len(starts))))
 def probe_media(source: Path) -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
     if not source.is_file():
@@ -149,7 +164,7 @@ def probe_media(source: Path) -> dict[str, Any]:
         "fingerprint": f"sha256:{digest}",
     }
     try:
-        data["frame_timing"] = probe_frame_timing(source, ffprobe)
+        data["frame_timing"] = probe_frame_timing(\n            source, ffprobe, duration_seconds=float(data.get("format", {}).get("duration") or 0)\n        )
     except (PipelineError, OSError) as exc:
         data["frame_timing"] = {
             "status": "unavailable", "variable_frame_rate": None,
