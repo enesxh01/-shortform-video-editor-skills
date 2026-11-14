@@ -27,7 +27,7 @@ class DoctorTests(unittest.TestCase):
             return {"ffmpeg": "/fake/ffmpeg", "ffprobe": "/fake/ffprobe"}.get(name)
         def run(args):
             stdout = ("Encoders: h264_nvenc libx264" if args[-1] == "-encoders" else
-                      ("Filters: subtitles" if args[-1] == "-filters" else "tool version fake"))
+                      (" T.. subtitles\n T.. fps\n T.. scale\n T.. crop\n T.. setpts\n T.. setsar\n T.. format\n T.. aresample\n T.. blackdetect\n T.. freezedetect\n T.. volumedetect\n T.. ebur128" if args[-1] == "-filters" else "tool version fake"))
             return subprocess.CompletedProcess(args, 0, stdout, "")
         def find_spec(name):
             return object() if name in {"jsonschema", "psutil"} else None
@@ -42,6 +42,28 @@ class DoctorTests(unittest.TestCase):
         self.assertTrue(report["accelerators"]["libx264"]["available"])
         self.assertTrue(report["accelerators"]["subtitles_filter"]["available"])
         self.assertEqual(set(report["missing_optional"]), {"faster_whisper", "cv2", "yt_dlp"})
+
+
+    def test_reports_missing_required_filter_instead_of_false_ready(self):
+        output = StringIO()
+        def which(name):
+            return {"ffmpeg": "/fake/ffmpeg", "ffprobe": "/fake/ffprobe"}.get(name)
+        required = "subtitles fps scale crop setpts setsar format aresample blackdetect freezedetect volumedetect".split()
+        filters = "\\n".join(f" T.. {name}" for name in required)
+        def run(args):
+            stdout = ("Encoders: libx264" if args[-1] == "-encoders" else
+                      (filters if args[-1] == "-filters" else "tool version fake"))
+            return subprocess.CompletedProcess(args, 0, stdout, "")
+        def find_spec(name):
+            return object() if name in {"jsonschema", "psutil"} else None
+        with patch("shortform_editor.cli.shutil.which", side_effect=which), \\
+             patch("shortform_editor.cli.run_checked", side_effect=run), \\
+             patch("importlib.util.find_spec", side_effect=find_spec), redirect_stdout(output):
+            result = command_doctor(Namespace())
+        report = json.loads(output.getvalue())
+        self.assertEqual(result, 2)
+        self.assertIn("ffmpeg_filter:ebur128", report["missing_required"])
+        self.assertFalse(report["accelerators"]["filters"]["ebur128"]["available"])
 
 
 if __name__ == "__main__":
