@@ -317,6 +317,12 @@
                     "face_overlap_with_upper_caption_safe_area"
                   ]
                 },
+                "font_name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64,
+                  "pattern": "^[A-Za-z0-9 _-]+$"
+                },
                 "font_size": {"type": "integer", "minimum": 28, "maximum": 100},
                 "margin_v": {"type": "integer", "minimum": 0, "maximum": 600},
                 "animation": {"type": "string", "enum": ["none", "fade", "pop", "pop_fade"]}
