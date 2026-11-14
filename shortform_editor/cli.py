@@ -213,6 +213,13 @@ def command_validate(args: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_edl_path(edl_path: Path, raw_path: str) -> Path:
+    candidate = Path(raw_path).expanduser()
+    if not candidate.is_absolute():
+        candidate = edl_path.parent / candidate
+    return candidate.resolve(strict=True)
+
+
 def command_render(args: argparse.Namespace) -> int:
     edl_path = Path(args.edl).expanduser().resolve(strict=True)
     edl = json.loads(edl_path.read_text(encoding="utf-8"))
@@ -224,49 +231,115 @@ def command_render(args: argparse.Namespace) -> int:
         raise PipelineError("The current renderer produces MP4; use an output filename ending in .mp4")
     if not 0 <= args.crf <= 51:
         raise PipelineError("--crf must be between 0 and 51")
-    if any(segment.get("layout") != "fullscreen" for segment in edl.get("segments", [])):
-        raise PipelineError("This MVP renderer supports fullscreen only; split_vertical and blurred_bars_20_60_20 are not implemented")
     if edl.get("render", {}).get("fps_mode") != "cfr":
-        raise PipelineError("This MVP renderer supports fps_mode=cfr only")
+        raise PipelineError("The current renderer supports fps_mode=cfr only")
     if edl.get("render", {}).get("fps_conversion") != "duplicate_drop":
-        raise PipelineError("This MVP renderer supports fps_conversion=duplicate_drop only")
+        raise PipelineError("The current renderer supports fps_conversion=duplicate_drop only")
     if edl.get("render", {}).get("video_codec") not in (None, "h264"):
-        raise PipelineError("This MVP renderer supports H.264 video only")
+        raise PipelineError("The current renderer supports H.264 video only")
     if edl.get("render", {}).get("audio_codec") not in (None, "aac"):
-        raise PipelineError("This MVP renderer supports AAC audio only")
+        raise PipelineError("The current renderer supports AAC audio only")
 
     probe = probe_media(source)
     raw_duration = probe.get("format", {}).get("duration")
     duration = float(raw_duration) if raw_duration is not None else None
     errors = validate_edl(edl, duration, probe.get("source", {}).get("fingerprint"))
     if errors:
-        raise PipelineError("Refusing to render invalid EDL:\n- " + "\n- ".join(errors))
+        raise PipelineError("Refusing to render invalid EDL:\\n- " + "\\n- ".join(errors))
     if edl["approval"]["status"] != "approved" or not edl["approval"]["approved_by_user"]:
         raise PipelineError("Rendering final output requires explicit user approval in the EDL")
 
     ffmpeg = require_tool("ffmpeg")
     render = edl["render"]
+    width, height, fps = render["width"], render["height"], render["fps_target"]
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists() and not args.overwrite:
         raise PipelineError(f"Output already exists (use --overwrite): {output}")
+
+    # Validate and fingerprint both secondary sources before any render work begins.
+    split_paths: dict[tuple[int, str], Path] = {}
+    for index, segment in enumerate(edl["segments"]):
+        if segment["layout"] != "split_vertical":
+            continue
+        for key in ("split_top", "split_bottom"):
+            spec = segment[key]
+            path = _resolve_edl_path(edl_path, spec["path"])
+            if path in {source, output, edl_path}:
+                raise PipelineError(f"segments[{index}].{key} must not alias the primary source, EDL or output")
+            secondary_probe = probe_media(path)
+            if secondary_probe["source"]["fingerprint"] != spec["fingerprint"]:
+                raise PipelineError(f"segments[{index}].{key} fingerprint does not match its file")
+            secondary_duration = float(secondary_probe.get("format", {}).get("duration") or 0)
+            if timestamp_seconds(spec["source_out"]) > secondary_duration + 0.05:
+                raise PipelineError(f"segments[{index}].{key} source_out exceeds secondary source duration")
+            split_paths[(index, key)] = path
+
+    from .captions import ffmpeg_subtitles_filter, write_ass_subtitles
 
     with tempfile.TemporaryDirectory(prefix="shortform-render-") as tmp:
         tmpdir = Path(tmp)
         parts: list[Path] = []
         for index, segment in enumerate(edl["segments"]):
-            start = timestamp_seconds(segment["source_in"])
-            end = timestamp_seconds(segment["source_out"])
+            clip_start = timestamp_seconds(segment["source_in"])
+            clip_end = timestamp_seconds(segment["source_out"])
+            clip_duration = clip_end - clip_start
             part = tmpdir / f"part-{index:04d}.mp4"
-            width, height = render["width"], render["height"]
-            fps = render["fps_target"]
-            vf = (
-                f"scale={width}:{height}:force_original_aspect_ratio=increase,"
-                f"crop={width}:{height},setsar=1,fps={fps},format=yuv420p"
-            )
-            cmd = [
-                ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
-                "-ss", f"{start:.6f}", "-i", str(source), "-t", f"{end-start:.6f}",
-                "-map", "0:v:0", "-map", "0:a?", "-vf", vf,
+            layout = segment["layout"]
+            ass_path = tmpdir / f"captions-{index:04d}.ass"
+            subtitle_path = write_ass_subtitles(segment, layout, clip_start, ass_path)
+            subtitle_filter = ffmpeg_subtitles_filter(subtitle_path) if subtitle_path else None
+
+            cmd = [ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+                   "-ss", f"{clip_start:.6f}", "-i", str(source)]
+            if layout == "split_vertical":
+                top = segment["split_top"]
+                bottom = segment["split_bottom"]
+                cmd += ["-ss", f"{timestamp_seconds(top['source_in']):.6f}", "-i", str(split_paths[(index, "split_top")])]
+                cmd += ["-ss", f"{timestamp_seconds(bottom['source_in']):.6f}", "-i", str(split_paths[(index, "split_bottom")])]
+            cmd += ["-t", f"{clip_duration:.6f}"]
+
+            if layout == "fullscreen":
+                vf = (
+                    f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+                    f"crop={width}:{height},setsar=1,fps={fps},format=yuv420p"
+                )
+                if subtitle_filter:
+                    vf += f",{subtitle_filter}"
+                cmd += ["-map", "0:v:0", "-map", "0:a?", "-vf", vf]
+            elif layout == "blurred_bars_20_60_20":
+                center_height = int(height * 0.6) // 2 * 2
+                bar_offset = (height - center_height) // 2
+                graph = (
+                    f"[0:v]split=2[bgsrc][fgsrc];"
+                    f"[bgsrc]scale={width}:{height}:force_original_aspect_ratio=increase,"
+                    f"crop={width}:{height},boxblur=20:10[bg];"
+                    f"[fgsrc]scale={width}:{center_height}:force_original_aspect_ratio=decrease,"
+                    f"pad={width}:{center_height}:(ow-iw)/2:(oh-ih)/2[fg];"
+                    f"[bg][fg]overlay=0:{bar_offset},setsar=1,fps={fps},format=yuv420p[vbase]"
+                )
+                if subtitle_filter:
+                    graph += f";[vbase]{subtitle_filter}[vout]"
+                else:
+                    graph += ";[vbase]null[vout]"
+                cmd += ["-filter_complex", graph, "-map", "[vout]", "-map", "0:a?"]
+            elif layout == "split_vertical":
+                panel_height = height // 2
+                graph = (
+                    f"[1:v]scale={width}:{panel_height}:force_original_aspect_ratio=increase,"
+                    f"crop={width}:{panel_height},setsar=1[top];"
+                    f"[2:v]scale={width}:{panel_height}:force_original_aspect_ratio=increase,"
+                    f"crop={width}:{panel_height},setsar=1[bottom];"
+                    f"[top][bottom]vstack=inputs=2,setsar=1,fps={fps},format=yuv420p[vbase]"
+                )
+                if subtitle_filter:
+                    graph += f";[vbase]{subtitle_filter}[vout]"
+                else:
+                    graph += ";[vbase]null[vout]"
+                cmd += ["-filter_complex", graph, "-map", "[vout]", "-map", "0:a?"]
+            else:
+                raise PipelineError(f"Unsupported layout: {layout}")
+
+            cmd += [
                 "-c:v", "libx264", "-preset", args.preset, "-crf", str(args.crf),
                 "-pix_fmt", "yuv420p", "-r", fps, "-fps_mode", "cfr",
                 "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
@@ -276,7 +349,7 @@ def command_render(args: argparse.Namespace) -> int:
             parts.append(part)
 
         concat_file = tmpdir / "concat.txt"
-        concat_file.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
+        concat_file.write_text("".join(f"file '{p.as_posix()}'\\n" for p in parts), encoding="utf-8")
         assembled = tmpdir / "assembled.mp4"
         run_checked([
             ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
@@ -286,7 +359,7 @@ def command_render(args: argparse.Namespace) -> int:
         run_checked([ffmpeg, "-hide_banner", "-v", "error", "-i", str(assembled), "-f", "null", "-"])
         staged_output = None
         try:
-            with tempfile.NamedTemporaryFile(prefix=".shortform-", suffix=output.suffix or ".mp4", dir=output.parent, delete=False) as handle:
+            with tempfile.NamedTemporaryFile(prefix=".shortform-", suffix=output.suffix, dir=output.parent, delete=False) as handle:
                 staged_output = Path(handle.name)
             shutil.copy2(assembled, staged_output)
             final_probe = probe_media(staged_output)
@@ -302,11 +375,16 @@ def command_render(args: argparse.Namespace) -> int:
         "output_sha256": final_probe["source"]["sha256"],
         "render": render,
         "segments": len(edl["segments"]),
+        "layouts": sorted({segment["layout"] for segment in edl["segments"]}),
+        "captions": sum(len(segment.get("captions", [])) for segment in edl["segments"]),
         "status": "rendered_and_decode_checked",
         "limitations": [
-            "MVP renderer applies center-crop fullscreen framing only.",
-            "Split-screen, blurred-bars, captions, tracking, transitions and automated QC are not implemented yet.",
-            "60 fps CFR conversion does not create native 60 fps motion from lower-frame-rate footage."
+            "Split layout uses explicit top and bottom secondary video sources; primary source audio is retained.",
+            "Blurred-bars layout uses a blurred full-frame background and sharp 60% center panel.",
+            "Kino captions use ASS/libass; word karaoke requires word timings in the EDL.",
+            "CPU libx264 is used; CUDA/NVENC encoding is not implemented.",
+            "60 fps CFR conversion does not create native 60 fps motion from lower-frame-rate footage.",
+            "Decode success is not a substitute for human visual and audio review."
         ]
     }, indent=2))
     return 0
