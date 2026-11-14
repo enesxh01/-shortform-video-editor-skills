@@ -1,16 +1,25 @@
 # Test Plan
 
-This repository currently defines the skill and validation requirements; it does not claim that a complete editor implementation or automated test suite exists yet.
+## Automated coverage
 
-## Required automated tests
+Run all unit tests from the repository root:
 
-- JSON Schema validation for EDL.
-- YAML frontmatter validation and folder/name matching for every skill.
-- Relative-link validation for Markdown references.
-- Unit tests for timestamp/time-base conversions, VFR mapping, crop transforms, caption safe areas, scoring aggregation, and FFmpeg argument construction.
-- Integration tests for ingestion → analysis → candidate → EDL → render → QC.
-- Failure tests for corrupt media, missing streams, GPU OOM, disk full, cancellation, interrupted render, and retry recovery.
-- Security tests for path traversal, shell injection, untrusted metadata, and unsafe archive inputs.
+```bash
+python -m unittest discover -s tests -p "test_*.py" -v
+python -m py_compile shortform_editor/cli.py
+```
+
+The current unit suite covers timestamp parsing, malformed timestamps, EDL structural validation, invalid layouts, split-layout requirements, approval enforcement, and source fingerprint mismatch. GitHub Actions runs compilation and unit tests on pushes and pull requests.
+
+## Required media integration tests (must run on a machine with FFmpeg)
+
+- Generate short synthetic CFR videos with and without audio and render approved EDLs.
+- Verify fullscreen and blurred-bars layouts; verify split_vertical with two independent sources.
+- Verify caption timing, Unicode text, safe margins, and no-caption output.
+- Verify output metadata, frame count, CFR rate, stream mapping, audio sync, and complete decode.
+- Exercise VFR, 23.976/24/25/29.97/30/50/59.94/60/120 fps inputs.
+- Exercise corrupt media, missing streams, missing FFmpeg, insufficient disk, cancellation, and interrupted render.
+- Confirm source files remain unchanged and previous approved exports survive failed rerenders.
 
 ## Real-footage validation matrix
 
@@ -27,4 +36,4 @@ This repository currently defines the skill and validation requirements; it does
 
 ## Honest reporting
 
-For each test, report fixture, environment, expected result, actual result, pass/fail, logs, and known limitations. Never mark a test as passed because it was not run.
+A test is passed only after it actually runs. Unit tests do not establish successful rendering on the user's machine or prove visual storytelling quality. Report environment, fixture, expected result, actual result, pass/fail, logs, and known limitations.
