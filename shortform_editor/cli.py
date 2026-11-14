@@ -254,7 +254,7 @@ def command_render(args: argparse.Namespace) -> int:
     duration = float(raw_duration) if raw_duration is not None else None
     errors = validate_edl(edl, duration, probe.get("source", {}).get("fingerprint"))
     if errors:
-        raise PipelineError("Refusing to render invalid EDL:\\n- " + "\\n- ".join(errors))
+        raise PipelineError("Refusing to render invalid EDL:\n- " + "\n- ".join(errors))
     if edl["approval"]["status"] != "approved" or not edl["approval"]["approved_by_user"]:
         raise PipelineError("Rendering final output requires explicit user approval in the EDL")
 
@@ -367,7 +367,7 @@ def command_render(args: argparse.Namespace) -> int:
             parts.append(part)
 
         concat_file = tmpdir / "concat.txt"
-        concat_file.write_text("".join(f"file '{p.as_posix()}'\\n" for p in parts), encoding="utf-8")
+        concat_file.write_text("".join(f"file '{p.as_posix()}'\n" for p in parts), encoding="utf-8")
         assembled = tmpdir / "assembled.mp4"
         run_checked([
             ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
@@ -420,7 +420,7 @@ def command_analyze_audio(args: argparse.Namespace) -> int:
         transcribe=not args.no_transcribe,
         silence_dbfs=args.silence_dbfs
     )
-    output = json.dumps(report, indent=2, ensure_ascii=False) + "\\n"
+    output = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
     if args.output:
         destination = Path(args.output).expanduser().resolve()
         if destination == source:
@@ -479,7 +479,7 @@ def command_analyze_visuals(args: argparse.Namespace) -> int:
         max_frames=args.max_frames,
         detect_faces=not args.no_face_detection
     )
-    output = json.dumps(report, indent=2, ensure_ascii=False) + "\\n"
+    output = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
     if args.output:
         destination = Path(args.output).expanduser().resolve()
         if destination == source:
@@ -519,7 +519,7 @@ def command_qc(args: argparse.Namespace) -> int:
         expected_height=args.height,
         expected_fps=args.fps
     )
-    output = json.dumps(report, indent=2, ensure_ascii=False) + "\\n"
+    output = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
     if args.output:
         destination = Path(args.output).expanduser().resolve()
         if destination == Path(args.source).expanduser().resolve():
