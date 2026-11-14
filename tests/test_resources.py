@@ -45,5 +45,18 @@ class ResourceSelectionTests(unittest.TestCase):
             choose_inference_device("medium", "auto", snapshot)
 
 
+    def test_cuda_still_requires_model_specific_host_ram_reserve(self):
+        snapshot = {
+            "ram_available_gb": 4.0,
+            "gpu": {"available": True, "memory_free_mb": 9000}
+        }
+        with self.assertRaises(RuntimeError):
+            choose_inference_device("medium", "cuda", snapshot)
+
+    def test_rejects_unknown_device(self):
+        with self.assertRaises(ValueError):
+            choose_inference_device("small", "tpu", {"ram_available_gb": 8.0, "gpu": {}})
+
+
 if __name__ == "__main__":
     unittest.main()
