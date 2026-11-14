@@ -6,8 +6,8 @@ from typing import Any
 from .cli import PipelineError, file_stat_signature, probe_media
 
 
-def create_face_tracker(cv2: Any):
-    """Return a CSRT tracker when the OpenCV contrib build exposes one."""
+def get_face_tracker_factory(cv2: Any):
+    """Return the CSRT factory when the OpenCV contrib build exposes it.""
     factory = getattr(cv2, "TrackerCSRT_create", None)
     if factory is None:
         legacy = getattr(cv2, "legacy", None)
@@ -174,11 +174,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
 
     samples = []
     face_tracker = None
-    tracker_factory = None
-    if detect_faces:
-        tracker_factory = getattr(cv2, "TrackerCSRT_create", None)
-        if tracker_factory is None and getattr(cv2, "legacy", None) is not None:
-            tracker_factory = getattr(cv2.legacy, "TrackerCSRT_create", None)
+    tracker_factory = get_face_tracker_factory(cv2) if detect_faces else None
     previous_gray = None
     previous_center = (width / 2.0, height / 2.0)
     smoothed_center = previous_center
@@ -229,8 +225,12 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
         if selected_face is not None:
             tracker_box = tuple(float(value) for value in selected_face)
             if callable(tracker_factory):
-                face_tracker = tracker_factory()
-                face_tracker.init(frame, tracker_box)
+                try:
+                    candidate_tracker = tracker_factory()
+                    initialized = candidate_tracker.init(frame, tracker_box)
+                    face_tracker = candidate_tracker if initialized is not False else None
+                except Exception:
+                    face_tracker = None
             cx_small = float(selected_face[0] + selected_face[2] / 2)
             cy_small = float(selected_face[1] + selected_face[3] / 2)
             center_x = cx_small / frame.shape[1] * width
