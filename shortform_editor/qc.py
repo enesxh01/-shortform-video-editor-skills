@@ -13,6 +13,9 @@ FREEZE_START_RE = re.compile(r"freeze_start:([0-9.]+)")
 FREEZE_END_RE = re.compile(r"freeze_end:([0-9.]+)")
 FREEZE_DURATION_RE = re.compile(r"freeze_duration:([0-9.]+)")
 VOLUME_RE = re.compile(r"(mean_volume|max_volume):\s*(-?[0-9.]+) dB")
+INTEGRATED_LOUDNESS_RE = re.compile(r"^\s*I:\s*(-?[0-9.]+) LUFS\s*$", re.MULTILINE)
+LOUDNESS_RANGE_RE = re.compile(r"^\s*LRA:\s*([0-9.]+) LU\s*$", re.MULTILINE)
+TRUE_PEAK_RE = re.compile(r"^\s*Peak:\s*(-?[0-9.]+) dBFS\s*$", re.MULTILINE)
 
 
 def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 1080,
@@ -187,7 +190,7 @@ def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 
         checks.append({
             "name": "true_peak",
             "status": "passed" if peak_ok else "warning",
-            "detail": f"Measured true peak {true_peak:.1f} dBTP; recommended ceiling below -1.0 dBTP"
+            "detail": f"Measured EBU R128 true peak {true_peak:.1f} dBFS; recommended ceiling below -1.0 dBTP"
         })
         if not peak_ok:
             warnings.append("True peak reaches the recommended -1.0 dBTP ceiling")
