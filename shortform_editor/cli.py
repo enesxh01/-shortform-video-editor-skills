@@ -303,6 +303,7 @@ def command_render(args: argparse.Namespace) -> int:
 
     # Validate and fingerprint both secondary sources before any render work begins.
     split_paths: dict[tuple[int, str], Path] = {}
+    split_fingerprints: dict[tuple[int, str], str] = {}
     for index, segment in enumerate(edl["segments"]):
         if segment["layout"] != "split_vertical":
             continue
@@ -318,6 +319,7 @@ def command_render(args: argparse.Namespace) -> int:
             if timestamp_seconds(spec["source_out"]) > secondary_duration + 0.05:
                 raise PipelineError(f"segments[{index}].{key} source_out exceeds secondary source duration")
             split_paths[(index, key)] = path
+            split_fingerprints[(index, key)] = spec["fingerprint"]
 
     from .captions import ffmpeg_subtitles_filter, write_ass_subtitles
     from .visual import build_ffmpeg_crop_filter
@@ -415,6 +417,13 @@ def command_render(args: argparse.Namespace) -> int:
                 staged_output = Path(handle.name)
             shutil.copy2(assembled, staged_output)
             final_probe = probe_media(staged_output)
+            source_after_render = probe_media(source)
+            if source_after_render["source"]["fingerprint"] != probe["source"]["fingerprint"]:
+                raise PipelineError("Primary source changed during rendering; refusing to publish an output from an unstable source")
+            for split_key, split_path in split_paths.items():
+                split_after_render = probe_media(split_path)
+                if split_after_render["source"]["fingerprint"] != split_fingerprints[split_key]:
+                    raise PipelineError(f"{split_key[1]} source changed during rendering; refusing to publish an output from an unstable source")
             os.replace(staged_output, output)
         except Exception:
             if staged_output is not None:
