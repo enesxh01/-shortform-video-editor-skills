@@ -15,6 +15,7 @@ from .cli import PipelineError, file_stat_signature, probe_media, timestamp_seco
 from .moments import detect_moments
 from .pacing import analyze_pacing
 from .visual import analyze_visuals
+from .captions import apply_face_aware_caption_positions
 
 
 def _timecode(seconds: float) -> str:
@@ -228,11 +229,17 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                     item for item in visuals["analysis"]["crop_keyframes"]
                     if candidate["source_in_seconds"] <= item["time_seconds"] <= candidate["source_out_seconds"]
                 ]
-                if any(item["subject_evidence"] == "face_detection" for item in crop_frames):
+                if any(item["subject_evidence"] in {"face_detection", "face_tracking"} for item in crop_frames):
                     segment_edl["crop_keyframes"] = [
                         {"time_seconds": item["time_seconds"], "crop_9_16": item["crop_9_16"], "scene_cut": item.get("scene_cut", False)}
                         for item in crop_frames
                     ]
+                    segment_edl["captions"] = apply_face_aware_caption_positions(
+                        captions,
+                        crop_frames,
+                        int(visuals["source"]["width"]),
+                        int(visuals["source"]["height"])
+                    )
 
             edl = {
                 "schema_version": "1.0",
