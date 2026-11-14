@@ -338,5 +338,68 @@ class RenderIntegrationTests(unittest.TestCase):
 
 
 
+    def test_failed_technical_qc_does_not_publish_staged_output(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "qc-failure-source.mp4"
+            subprocess.run([
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=2",
+                "-t", "2", "-c:v", "libx264", "-preset", "ultrafast",
+                "-pix_fmt", "yuv420p", str(source)
+            ], check=True, capture_output=True)
+            source_probe = probe_media(source)
+            video_stream = next(item for item in source_probe["streams"] if item["codec_type"] == "video")
+            edl = {
+                "schema_version": "1.0",
+                "project_id": "qc-publication-gate",
+                "source": {
+                    "fingerprint": source_probe["source"]["fingerprint"],
+                    "time_base": video_stream["time_base"],
+                    "frame_rate": "30/1",
+                    "variable_frame_rate": False
+                },
+                "render": {
+                    "width": 1080, "height": 1920, "fps_target": "60/1",
+                    "fps_mode": "cfr", "fps_conversion": "duplicate_drop",
+                    "container": "mp4", "video_codec": "h264", "audio_codec": "aac"
+                },
+                "segments": [{
+                    "id": "qc-failure", "source_in": "00:00:00.000",
+                    "source_out": "00:00:01.000", "timeline_start": "00:00:00.000",
+                    "layout": "fullscreen", "reason": "technical QC publication gate",
+                    "confidence": 0.8, "captions": []
+                }],
+                "approval": {
+                    "status": "approved", "approved_by_user": True,
+                    "approved_at": "2026-01-01T00:00:00+00:00"
+                }
+            }
+            edl["approval"]["approved_edl_sha256"] = edl_approval_hash(edl)
+            edl_path = root / "qc-failure-edl.json"
+            edl_path.write_text(json.dumps(edl), encoding="utf-8")
+            output = root / "must-not-publish.mp4"
+            args = Namespace(
+                source=str(source), edl=str(edl_path), output=str(output),
+                crf=30, preset="ultrafast", overwrite=False, encoder="libx264",
+                nvenc_preset="p5", nvenc_cq=19
+            )
+            from shortform_editor.cli import PipelineError
+            failed_qc = {
+                "status": "fail", "checks": [],
+                "failures": ["synthetic technical QC failure"],
+                "warnings": [], "source": {"path": "staged", "fingerprint": "synthetic"}
+            }
+            with patch("shortform_editor.qc.run_qc", return_value=failed_qc):
+                with self.assertRaisesRegex(PipelineError, "final output was not published"):
+                    command_render(args)
+            self.assertFalse(output.exists())
+            diagnostic = root / f".{output.name}.qc-failed.json"
+            self.assertTrue(diagnostic.is_file())
+            report = json.loads(diagnostic.read_text(encoding="utf-8"))
+            self.assertIn("synthetic technical QC failure", report["failures"])
+
+
+
 if __name__ == "__main__":
     unittest.main()
