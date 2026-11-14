@@ -712,6 +712,17 @@ def command_approve_edl(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_download_source(args: argparse.Namespace) -> int:
+    from .ingest import download_source
+    report = download_source(args.url, Path(args.output_dir), args.max_filesize_mb)
+    if args.report:
+        Path(args.report).expanduser().resolve().write_text(
+            json.dumps(report, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8"
+        )
+    print(json.dumps({key: value for key, value in report.items() if key != "probe"}, indent=2, ensure_ascii=False))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -789,6 +800,12 @@ def build_parser() -> argparse.ArgumentParser:
     repair.add_argument("--preset", default="medium", choices=["ultrafast", "fast", "medium", "slow", "veryslow"])
     repair.add_argument("--overwrite", action="store_true")
     repair.set_defaults(func=command_repair)
+    download = sub.add_parser("download-source", help="download one authorized media URL into a validated local source file")
+    download.add_argument("url")
+    download.add_argument("-o", "--output-dir", required=True)
+    download.add_argument("--max-filesize-mb", type=int, default=2048)
+    download.add_argument("--report")
+    download.set_defaults(func=command_download_source)
     analyze = sub.add_parser("analyze-project", help="run source-to-candidate analysis and create draft EDLs")
     analyze.add_argument("source")
     analyze.add_argument("-o", "--output-dir", required=True)
