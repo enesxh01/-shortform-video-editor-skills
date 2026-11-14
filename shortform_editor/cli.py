@@ -165,6 +165,10 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
             end = timestamp_seconds(segment["source_out"])
             if end <= start:
                 messages.append(f"segments[{index}] source_out must be greater than source_in")
+            fade_in = float(segment.get("fade_in_seconds", 0.0))
+            fade_out = float(segment.get("fade_out_seconds", 0.0))
+            if fade_in < 0 or fade_out < 0 or fade_in + fade_out >= max(0.0, end - start):
+                messages.append(f"segments[{index}] fade durations must be non-negative and sum to less than the segment duration")
             if source_duration is not None and end > source_duration + 0.05:
                 messages.append(f"segments[{index}] source_out exceeds source duration ({source_duration:.3f}s)")
             timeline = segment.get("timeline_start")
@@ -271,6 +275,23 @@ def _resolve_edl_path(edl_path: Path, raw_path: str) -> Path:
     return candidate.resolve(strict=True)
 
 
+def _segment_fade_filters(segment: dict[str, Any], duration: float) -> tuple[list[str], list[str]]:
+    fade_in = float(segment.get("fade_in_seconds", 0.0))
+    fade_out = float(segment.get("fade_out_seconds", 0.0))
+    if fade_in < 0 or fade_out < 0 or fade_in + fade_out >= duration:
+        raise PipelineError("Segment fade durations must be non-negative and their sum must be shorter than the clip")
+    video_filters = []
+    audio_filters = []
+    if fade_in > 0:
+        video_filters.append(f"fade=t=in:st=0:d={fade_in:.3f}")
+        audio_filters.append(f"afade=t=in:st=0:d={fade_in:.3f}")
+    if fade_out > 0:
+        start = max(0.0, duration - fade_out)
+        video_filters.append(f"fade=t=out:st={start:.3f}:d={fade_out:.3f}")
+        audio_filters.append(f"afade=t=out:st={start:.3f}:d={fade_out:.3f}")
+    return video_filters, audio_filters
+
+
 def command_render(args: argparse.Namespace) -> int:
     edl_path = Path(args.edl).expanduser().resolve(strict=True)
     edl = json.loads(edl_path.read_text(encoding="utf-8"))
@@ -372,6 +393,9 @@ def command_render(args: argparse.Namespace) -> int:
                         f"scale={width}:{height}:force_original_aspect_ratio=increase,"
                         f"crop={width}:{height},setsar=1,fps={fps},format=yuv420p"
                     )
+                fade_video_filters, fade_audio_filters = _segment_fade_filters(segment, clip_duration)
+                if fade_video_filters:
+                    vf += "," + ",".join(fade_video_filters)
                 if subtitle_filter:
                     vf += f",{subtitle_filter}"
                 cmd += ["-map", "0:v:0", "-map", "0:a?", "-vf", vf]
@@ -386,10 +410,15 @@ def command_render(args: argparse.Namespace) -> int:
                     f"crop={width}:{center_height}[fg];"
                     f"[bg][fg]overlay=0:{bar_offset},setsar=1,fps={fps},format=yuv420p[vbase]"
                 )
+                fade_video_filters, fade_audio_filters = _segment_fade_filters(segment, clip_duration)
+                graph_input = "vbase"
+                if fade_video_filters:
+                    graph += f";[vbase]{','.join(fade_video_filters)}[vfade]"
+                    graph_input = "vfade"
                 if subtitle_filter:
-                    graph += f";[vbase]{subtitle_filter}[vout]"
+                    graph += f";[{graph_input}]{subtitle_filter}[vout]"
                 else:
-                    graph += ";[vbase]null[vout]"
+                    graph += f";[{graph_input}]null[vout]"
                 cmd += ["-filter_complex", graph, "-map", "[vout]", "-map", "0:a?"]
             elif layout == "split_vertical":
                 panel_height = height // 2
@@ -400,10 +429,15 @@ def command_render(args: argparse.Namespace) -> int:
                     f"crop={width}:{panel_height},setsar=1[bottom];"
                     f"[top][bottom]vstack=inputs=2,setsar=1,fps={fps},format=yuv420p[vbase]"
                 )
+                fade_video_filters, fade_audio_filters = _segment_fade_filters(segment, clip_duration)
+                graph_input = "vbase"
+                if fade_video_filters:
+                    graph += f";[vbase]{','.join(fade_video_filters)}[vfade]"
+                    graph_input = "vfade"
                 if subtitle_filter:
-                    graph += f";[vbase]{subtitle_filter}[vout]"
+                    graph += f";[{graph_input}]{subtitle_filter}[vout]"
                 else:
-                    graph += ";[vbase]null[vout]"
+                    graph += f";[{graph_input}]null[vout]"
                 cmd += ["-filter_complex", graph, "-map", "[vout]", "-map", "0:a?"]
             else:
                 raise PipelineError(f"Unsupported layout: {layout}")
@@ -429,9 +463,11 @@ def command_render(args: argparse.Namespace) -> int:
                     encode_cmd += ["-c:v", "libx264", "-preset", args.preset, "-crf", str(args.crf)]
                 encode_cmd += [
                     "-pix_fmt", "yuv420p", "-r", fps, "-fps_mode", "cfr",
-                    "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
-                    "-movflags", "+faststart", str(part)
+                    "-c:a", "aac", "-b:a", "192k", "-ar", "48000"
                 ]
+                if fade_audio_filters and any(stream.get("codec_type") == "audio" for stream in probe.get("streams", [])):
+                    encode_cmd += ["-af", ",".join(fade_audio_filters)]
+                encode_cmd += ["-movflags", "+faststart", str(part)]
                 run_checked(encode_cmd)
 
             try:
