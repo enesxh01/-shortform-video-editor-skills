@@ -27,7 +27,7 @@ The design supports exactly three primary layouts: fullscreen, top/bottom vertic
 - `shortform-video-editor` — end-to-end orchestrator
 - `video-editor-architecture` — module boundaries and contracts
 - `media-ingestion` — safe source inspection and staging
-- `audio-intelligence` — ASR, word timing, VAD, speaker-turn evidence (design-only)
+- `audio-intelligence` — FFmpeg audio extraction, energy/silence evidence, optional faster-whisper ASR with word timestamps (partial implementation)
 - `viral-moment-detection` — full-source candidate discovery and scoring (design-only)
 - `visual-storytelling` — subject/action analysis and framing (design-only)
 - `retention-pacing` — context-safe tightening (design-only)
@@ -51,12 +51,14 @@ Requirements: Python 3.10+, FFmpeg/ffprobe on PATH.
 ```bash
 python -m pip install -e .
 shortform-editor probe input.mp4 -o probe.json
+shortform-editor analyze-audio input.mp4 -o audio-analysis.json
+# Optional ASR: python -m pip install -e '.[audio]'
 shortform-editor validate-edl edit.json --probe probe.json
 shortform-editor render input.mp4 edit.json output.mp4
 python -m unittest discover -s tests -v
 ```
 
-The current CLI provides source probing and SHA-256 fingerprinting, EDL schema/semantic validation, and an approved-EDL FFmpeg renderer. The renderer currently supports only fullscreen center-crop and sequential segment concatenation. It does not perform ASR, viral detection, diarization, smart crop/tracking, captions, split-screen, blurred bars, automatic repair, or visual QC. The 60 fps output policy is not a claim of native 60 fps motion from lower-frame-rate footage.
+The current CLI provides source probing and SHA-256 fingerprinting, EDL schema/semantic validation, an approved-EDL FFmpeg renderer, and an initial audio analysis command. Audio analysis extracts mono 16 kHz WAV in a temporary directory, measures half-second RMS/peak windows and sustained silence candidates, and optionally runs faster-whisper with word timestamps and VAD. Default ASR model is `small`; CUDA is attempted with int8_float16 and falls back to CPU int8. Install ASR with `python -m pip install -e '.[audio]'`; model weights download on first use. The renderer currently supports only fullscreen center-crop and sequential segment concatenation. It does not yet perform viral detection, diarization, speaker attribution, laughter/emotion classification, smart crop/tracking, captions, split-screen, blurred bars, automatic repair, or visual QC. The 60 fps output policy is not a claim of native 60 fps motion from lower-frame-rate footage.
 
 ## Install OpenCode skills
 
