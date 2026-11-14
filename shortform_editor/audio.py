@@ -106,7 +106,13 @@ def _transcribe(wav_path: Path, model_size: str, device: str, language: str | No
 
     attempts = [(selected_device, selected_compute)]
     if device == "auto" and selected_device == "cuda":
-        attempts.append(("cpu", "int8"))
+        try:
+            cpu_device, cpu_compute, _ = choose_inference_device(
+                model_size, requested="cpu", snapshot=snapshot
+            )
+            attempts.append((cpu_device, cpu_compute))
+        except RuntimeError:
+            selection_notes.append("CPU fallback skipped because available RAM is below the model reserve.")
 
     last_error: Exception | None = None
     model = None
