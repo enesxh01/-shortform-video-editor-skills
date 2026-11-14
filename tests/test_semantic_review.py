@@ -49,7 +49,7 @@ class SemanticReviewTests(unittest.TestCase):
         review = review_fixture()
         fingerprint = review["source_fingerprint"]
         probe = {"source": {"fingerprint": fingerprint}, "format": {"duration": "30.0"}}
-        candidates = {"source_fingerprint": fingerprint}
+        candidates = {"source_fingerprint": fingerprint, "candidates": [{"candidate_id": "moment-baseline-1"}]}
         self.assertEqual(validate_semantic_review(review, probe, candidates), [])
 
     def test_rejects_fingerprint_mismatch_and_score_mismatch(self):
