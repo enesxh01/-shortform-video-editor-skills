@@ -430,6 +430,20 @@ def command_render(args: argparse.Namespace) -> int:
             split_paths[(index, key)] = path
             split_signatures[(index, key)] = file_stat_signature(path)
 
+    # Conservative working-set estimate for segment encodes and final assembly.
+    # Encoded size varies by footage; this is a safety preflight, not an exact prediction.
+    from .resources import check_disk_space
+    expected_render_seconds = sum(
+        timestamp_seconds(segment["source_out"]) - timestamp_seconds(segment["source_in"])
+        for segment in edl["segments"]
+    )
+    estimated_working_bytes = int(expected_render_seconds * 30_000_000 / 8 * 2)
+    try:
+        check_disk_space(str(output.parent), estimated_working_bytes)
+        check_disk_space(tempfile.gettempdir(), estimated_working_bytes)
+    except RuntimeError as exc:
+        raise PipelineError(str(exc)) from exc
+
     from .captions import ffmpeg_subtitles_filter, write_ass_subtitles
     from .visual import build_ffmpeg_crop_filter
 
