@@ -53,6 +53,14 @@ def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 
         })
         if video.get("codec_name") != "h264":
             failures.append("Unexpected video codec")
+        pixel_format = video.get("pix_fmt")
+        checks.append({
+            "name": "pixel_format",
+            "status": "passed" if pixel_format == "yuv420p" else "major",
+            "detail": f"Pixel format: {pixel_format}"
+        })
+        if pixel_format != "yuv420p":
+            failures.append("Unexpected pixel format")
 
     if audio:
         checks.append({
@@ -60,6 +68,25 @@ def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 
             "status": "passed",
             "detail": f"Audio codec {audio.get('codec_name')}, {audio.get('channels')} channels"
         })
+        audio_codec_ok = audio.get("codec_name") == "aac"
+        checks.append({
+            "name": "audio_codec",
+            "status": "passed" if audio_codec_ok else "major",
+            "detail": f"Audio codec: {audio.get('codec_name')}"
+        })
+        if not audio_codec_ok:
+            failures.append("Unexpected audio codec")
+        try:
+            audio_rate = int(audio.get("sample_rate", 0))
+        except (TypeError, ValueError):
+            audio_rate = 0
+        checks.append({
+            "name": "audio_sample_rate",
+            "status": "passed" if audio_rate == 48000 else "major",
+            "detail": f"Audio sample rate: {audio_rate}; expected 48000 Hz"
+        })
+        if audio_rate != 48000:
+            failures.append("Unexpected audio sample rate")
         if video:
             try:
                 raw_video_start = video.get("start_time")
