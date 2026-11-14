@@ -168,7 +168,7 @@ def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 
     loudness = {
         "integrated_lufs": float(integrated_match.group(1)) if integrated_match else None,
         "range_lu": float(range_match.group(1)) if range_match else None,
-        "true_peak_dbtp": float(true_peak_match.group(1)) if true_peak_match else None,
+        "true_peak_dbfs": float(true_peak_match.group(1)) if true_peak_match else None,
     }
     if audio and loudness["integrated_lufs"] is not None:
         integrated = loudness["integrated_lufs"]
@@ -184,8 +184,8 @@ def assess_probe(report: dict[str, Any], ffmpeg_log: str, expected_width: int = 
     elif audio:
         checks.append({"name": "integrated_loudness", "status": "warning", "detail": "EBU R128 integrated loudness measurement unavailable"})
         warnings.append("Integrated loudness measurement unavailable")
-    if audio and loudness["true_peak_dbtp"] is not None:
-        true_peak = loudness["true_peak_dbtp"]
+    if audio and loudness["true_peak_dbfs"] is not None:
+        true_peak = loudness["true_peak_dbfs"]
         peak_ok = true_peak < -1.0
         checks.append({
             "name": "true_peak",
