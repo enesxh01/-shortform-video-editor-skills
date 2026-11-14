@@ -154,6 +154,16 @@
               "blurred_bars_20_60_20"
             ]
           },
+          "fade_in_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "fade_out_seconds": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 2
+          },
           "reason": {
             "type": [
               "string",
