@@ -131,7 +131,15 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
         for c in seg.get("captions",[]):
             a=offset+seconds(c["start"]); b=offset+seconds(c["end"])
             if a<offset-0.001 or b>end-start+offset+0.05: continue
-            text=ass_escape(c["text"])
+            words=c.get("words") or []
+            if words:
+                pieces=[]
+                for word in words:
+                    duration=max(1,round((seconds(word["end"])-seconds(word["start"]))*100))
+                    pieces.append("{\\\\k"+str(duration)+"}"+ass_escape(word["text"]))
+                text=" ".join(pieces)
+            else:
+                text=ass_escape(c["text"])
             if seg.get("layout")=="split_vertical": text=f"{{\\an5\\pos({w//2},{h//2})}}"+text
             elif c.get("position")=="center": text="{\\an5}"+text
             elif c.get("position")=="bottom" or c.get("position") is None: text="{\\an2}"+text
