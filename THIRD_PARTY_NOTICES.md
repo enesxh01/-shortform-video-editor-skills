@@ -7,7 +7,7 @@ This file records the current intended runtime choices. It is not a substitute f
 | Component | Use | Upstream license / obligations | Distribution note |
 |---|---|---|---|
 | faster-whisper | Optional ASR adapter | MIT; retain copyright and license notice | Installed as an optional Python extra; code is not vendored. |
-| CTranslate2 | faster-whisper inference runtime | MIT; retain copyright and license notice | Transitive dependency; exact installed version should be captured in an SBOM. |
+| CTranslate2 | faster-whisper inference runtime | MIT; retain copyright and license notice | Transitive dependency; exact installed version should be captured in an SBOM. |\n| jsonschema | EDL schema validation | MIT | Mandatory Python dependency. |\n| psutil | RAM telemetry and inference preflight | BSD-3-Clause | Mandatory Python dependency; retain license notice when redistributing. |
 | OpenCV 4.10+ headless | Optional frame sampling and Haar face detection | Apache-2.0 for OpenCV 4.5+ | Installed as an optional Python extra; not vendored. |
 | OpenCV frontal-face Haar cascade | Frontal-face detector data shipped with OpenCV | Cascade XML contains an Intel License Agreement with BSD-style attribution, redistribution and non-endorsement conditions | Preserve the asset's complete license notice when redistributing the cascade or a binary containing it. |
 | PyAV / NumPy / tokenizers / Hugging Face Hub / ONNX Runtime | Transitive faster-whisper dependencies | Common upstream licenses include BSD-3-Clause, Apache-2.0 and MIT; verify each exact installed package | Generate a dependency license report before packaging a standalone build. |
