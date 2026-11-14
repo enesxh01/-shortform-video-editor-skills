@@ -110,6 +110,7 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
 
         pacing = stage("retention_pacing", lambda: analyze_pacing(audio, candidates))
         _write_json(output_dir / "pacing.json", pacing)
+        pacing_by_id = {item.get("candidate_id"): item for item in pacing.get("candidates", [])}
 
         visuals = None
         if include_visuals:
@@ -178,6 +179,13 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                     continue
                 segment_edl.update(split_specs)
 
+            pacing_item = pacing_by_id.get(candidate["candidate_id"])
+            if pacing_item:
+                segment_edl["pacing_review"] = {
+                    "decisions": pacing_item.get("decisions", []),
+                    "repeated_word_flags": pacing_item.get("repeated_word_flags", []),
+                    "note": pacing_item.get("note", "Pacing proposals are advisory; no cuts are applied automatically.")
+                }
             if visuals and layout == "fullscreen":
                 crop_frames = [
                     item for item in visuals["analysis"]["crop_keyframes"]
