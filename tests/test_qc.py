@@ -138,5 +138,34 @@ class QCTests(unittest.TestCase):
         self.assertIn("Rendered duration does not match the EDL timeline", failed["failures"])
 
 
+    def test_parses_ebu_r128_loudness_and_true_peak(self):
+        logs = (
+            "mean_volume: -18.0 dB\\nmax_volume: -2.0 dB\\n"
+            "Integrated loudness:\\n    I: -14.0 LUFS\\n"
+            "Loudness range:\\n    LRA: 4.2 LU\\n"
+            "True peak:\\n    Peak: -0.8 dBFS\\n"
+        )
+        result = assess_probe(probe(), logs)
+        self.assertEqual(result["audio_loudness"]["integrated_lufs"], -14.0)
+        self.assertEqual(result["audio_loudness"]["range_lu"], 4.2)
+        self.assertEqual(result["audio_loudness"]["true_peak_dbtp"], -0.8)
+        checks = {item["name"]: item for item in result["checks"]}
+        self.assertEqual(checks["integrated_loudness"]["status"], "passed")
+        self.assertEqual(checks["true_peak"]["status"], "warning")
+        self.assertEqual(result["status"], "warning")
+
+    def test_reports_loudness_outside_guidance_as_advisory(self):
+        logs = (
+            "max_volume: -4.0 dB\\n"
+            "Integrated loudness:\\n    I: -22.0 LUFS\\n"
+            "Loudness range:\\n    LRA: 8.0 LU\\n"
+            "True peak:\\n    Peak: -3.0 dBFS\\n"
+        )
+        result = assess_probe(probe(), logs)
+        self.assertEqual(result["status"], "warning")
+        self.assertIn("Integrated loudness is outside the general short-form guidance band; listen before changing gain", result["warnings"])
+        self.assertEqual(result["audio_loudness"]["integrated_lufs"], -22.0)
+
+
 if __name__ == "__main__":
     unittest.main()
