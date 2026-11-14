@@ -49,6 +49,56 @@ def _karaoke_text(caption: dict[str, Any]) -> str:
     return "".join(pieces) if pieces else _escape_ass(caption["text"])
 
 
+def apply_face_aware_caption_positions(captions: list[dict[str, Any]],
+                                     visual_samples: list[dict[str, Any]],
+                                     source_width: int, source_height: int) -> list[dict[str, Any]]:
+    """Move fullscreen captions away from detected/tracked faces when evidence is available.
+
+    Coordinates are transformed from source-frame normalized boxes into each 9:16 crop.
+    Ambiguous or conflicting evidence leaves the caption at its normal automatic position.
+    """
+    if source_width <= 0 or source_height <= 0:
+        return [dict(caption) for caption in captions]
+    positioned = []
+    for caption in captions:
+        item = dict(caption)
+        if item.get("position", "auto") != "auto":
+            positioned.append(item)
+            continue
+        start = timestamp_seconds(caption["start"])
+        end = timestamp_seconds(caption["end"])
+        top_collisions = 0
+        bottom_collisions = 0
+        for sample in visual_samples:
+            sample_time = float(sample.get("time_seconds", -1))
+            box = sample.get("subject_bbox_normalized")
+            crop = sample.get("crop_9_16")
+            if not (start <= sample_time <= end) or not isinstance(box, dict) or not isinstance(crop, dict):
+                continue
+            crop_width = float(crop.get("width", 0))
+            crop_height = float(crop.get("height", 0))
+            if crop_width <= 0 or crop_height <= 0:
+                continue
+            x1 = (float(box.get("x", 0)) * source_width - float(crop.get("x", 0))) / crop_width
+            y1 = (float(box.get("y", 0)) * source_height - float(crop.get("y", 0))) / crop_height
+            x2 = x1 + float(box.get("width", 0)) * source_width / crop_width
+            y2 = y1 + float(box.get("height", 0)) * source_height / crop_height
+            if x2 <= 0.08 or x1 >= 0.92:
+                continue
+            if y1 < 0.24 and y2 > 0.06:
+                top_collisions += 1
+            if y2 > 0.76 and y1 < 0.94:
+                bottom_collisions += 1
+        if bottom_collisions > top_collisions:
+            item["position"] = "top"
+            item["position_reason"] = "face_overlap_with_lower_caption_safe_area"
+        elif top_collisions > bottom_collisions:
+            item["position"] = "bottom"
+            item["position_reason"] = "face_overlap_with_upper_caption_safe_area"
+        positioned.append(item)
+    return positioned
+
+
 def write_ass_subtitles(segment: dict[str, Any], layout: str, clip_start: float,
                         output_path: Path) -> Path | None:
     captions = segment.get("captions", [])
@@ -81,6 +131,8 @@ def write_ass_subtitles(segment: dict[str, Any], layout: str, clip_start: float,
             alignment_tag = r"\an5"
         elif position == "bottom":
             alignment_tag = r"\an2"
+        elif position == "top":
+            alignment_tag = r"\an8"
         else:
             alignment_tag = r"\an5" if layout == "split_vertical" else r"\an2"
         caption_font_size = int(caption.get("font_size", font_size))
