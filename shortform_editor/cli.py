@@ -145,6 +145,29 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
                 if timeline_value < previous_timeline_start:
                     messages.append(f"segments[{index}].timeline_start must be nondecreasing")
                 previous_timeline_start = timeline_value
+            for split_key in ("split_top", "split_bottom"):
+                split_source = segment.get(split_key)
+                if split_source:
+                    split_start = timestamp_seconds(split_source["source_in"])
+                    split_end = timestamp_seconds(split_source["source_out"])
+                    if split_end <= split_start:
+                        messages.append(f"segments[{index}].{split_key}.source_out must be greater than source_in")
+                    if abs((split_end - split_start) - (end - start)) > 0.1:
+                        messages.append(f"segments[{index}].{split_key} duration must match the primary segment within 100 ms")
+            for caption_index, caption in enumerate(segment.get("captions", [])):
+                caption_start = timestamp_seconds(caption["start"])
+                caption_end = timestamp_seconds(caption["end"])
+                if caption_end <= caption_start:
+                    messages.append(f"segments[{index}].captions[{caption_index}] end must be after start")
+                if caption_start < start or caption_end > end:
+                    messages.append(f"segments[{index}].captions[{caption_index}] must fit inside the segment source range")
+                previous_word_end = caption_start
+                for word_index, word in enumerate(caption.get("words", [])):
+                    word_start = timestamp_seconds(word["start"])
+                    word_end = timestamp_seconds(word["end"])
+                    if word_end <= word_start or word_start < previous_word_end or word_start < caption_start or word_end > caption_end:
+                        messages.append(f"segments[{index}].captions[{caption_index}].words[{word_index}] has invalid or unordered timing")
+                    previous_word_end = word_end
         except ValueError as exc:
             messages.append(f"segments[{index}]: {exc}")
 
