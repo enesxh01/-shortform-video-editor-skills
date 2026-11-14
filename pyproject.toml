@@ -21,3 +21,6 @@ include = ["shortform_editor*"]
 
 [tool.setuptools.package-data]
 shortform_editor = ["schemas/*.json"]
+
+[tool.setuptools.package-data]
+shortform_editor = ["schemas/*.json"]
