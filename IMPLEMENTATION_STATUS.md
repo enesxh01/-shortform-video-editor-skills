@@ -28,7 +28,7 @@ This file records repository evidence, not design intent. A feature is not verif
 - FFprobe samples up to 240 decoded video-frame timestamps across up to eight evenly spaced windows throughout the source when duration is known (one initial window otherwise).
 - The analyzer compares adjacent timestamp intervals against a median-based tolerance and reports `likely_cfr`, `likely_vfr`, or `insufficient_samples` with sample counts and irregular-interval ratio.
 - The diagnostic is carried into generated EDL source metadata when available. If the sample cannot be read, the report remains unknown rather than silently assuming CFR.
-- This is not complete VFR detection: a bounded multi-window sample can miss cadence changes between sampled windows. It does not rewrite timestamps, normalize audio/video PTS, or guarantee A/V sync for arbitrary VFR media. Those remain explicit implementation and real-footage validation gates.
+- This is not complete VFR detection: a bounded multi-window sample can miss cadence changes between sampled windows. The renderer now rebases per-segment video PTS, applies CFR conversion and uses asynchronous audio resampling to compensate for ordinary timestamp gaps/clock drift. This is not exhaustive VFR detection or a guarantee of perceptual sync for arbitrary damaged timestamps; real-footage validation remains required.
 
 ## Automated tests and verification
 
@@ -128,3 +128,9 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 - Native 9:16 footage prefers the user's blurred 20/60/20 composition: full-frame blurred background with a sharp, slightly enlarged center 60% and no black bars.
 - Landscape footage prefers fullscreen cropping when the important subject and context remain visible; otherwise blurred bars are preferred.
 - Split vertical is reserved for explicit requests or supplied top/bottom panel sources. Explicit user instructions always override defaults.
+
+
+## Environment doctor filter checks
+
+- `shortform-editor doctor` parses FFmpeg's advertised filter list and now blocks a ready status when core rendering/QC filters are absent (`subtitles`, `fps`, `scale`, `crop`, `setpts`, `setsar`, `format`, `aresample`, `blackdetect`, `freezedetect`, `volumedetect`, `ebur128`).
+- This catches incomplete FFmpeg builds before a long render. Advertised filter presence does not prove optional library integration (for example, libass initialization) or NVENC driver initialization; those are runtime checks.
