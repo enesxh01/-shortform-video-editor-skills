@@ -717,7 +717,9 @@ def command_download_source(args: argparse.Namespace) -> int:
     from .ingest import download_source
     report = download_source(args.url, Path(args.output_dir), args.max_filesize_mb)
     if args.report:
-        Path(args.report).expanduser().resolve().write_text(
+        report_path = Path(args.report).expanduser().resolve()
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(
             json.dumps(report, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8"
         )
     print(json.dumps({key: value for key, value in report.items() if key != "probe"}, indent=2, ensure_ascii=False))
