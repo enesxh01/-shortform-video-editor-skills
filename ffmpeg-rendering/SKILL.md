@@ -21,6 +21,17 @@ Render only from a validated, versioned EDL. Probe inputs and verify stream mapp
 - Faststart enabled where appropriate.
 - Verify actual output dimensions, frame rate, frame count, duration, codec, audio streams, and decode integrity after render.
 
+## Implemented layouts and captions
+
+The current renderer supports:
+- `fullscreen`: center-crop to the configured 9:16 frame.
+- `blurred_bars_20_60_20`: full-frame blurred background with a sharp center panel occupying 60% of output height and blurred 20% top/bottom bands.
+- `split_vertical`: top and bottom panels sourced from explicit `split_top` and `split_bottom` EDL source specs; both secondary source fingerprints and durations are verified. Primary source audio is retained.
+
+Per-segment captions use ASS/libass. Word-level karaoke highlighting is available when caption word timestamps are supplied. Fullscreen captions use a bold outlined bottom style; split-layout captions are centered and use a smaller single-line style. Fonts depend on the host's font availability. A build without FFmpeg libass support cannot render captions and must fail clearly.
+
+The current split layout requires two explicit secondary videos; it does not silently duplicate one source or guess the second panel.
+
 ## 60 FPS policy
 
 - 60 fps is the default output target, not permission to fabricate motion or destroy source cadence.
