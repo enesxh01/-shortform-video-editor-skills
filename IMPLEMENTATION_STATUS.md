@@ -20,12 +20,12 @@ This file records repository evidence, not design intent. A feature is not verif
 | Human approval | Partial | Final renderer requires explicit EDL approval. No preview UI or in-app approval workflow. |
 | Resource management | Partial implementation; CI pending | psutil RAM and nvidia-smi VRAM preflight, model-specific reserves, CUDA/CPU choice and actual backend reporting. No job queue, concurrency manager, disk reservation, live peak sampling or OOM retry. |
 | Performance feedback & learning | Partial implementation; CI pending | Local approve/edited/reject labels and smoothed category preference adjustments bounded to +/-5 points after three observations. No model training, audience metrics or YouTube Analytics (intentionally excluded). |
-| Job orchestration | Partial implementation; CI pending | `analyze-project` runs probe → audio/ASR → candidate ranking → pacing → optional visuals → captions → per-candidate draft EDLs. Atomic artifacts, per-stage progress/failure/cancel manifest and non-empty output-folder protection. No resume, bounded queue or subprocess progress streaming. |
+| Job orchestration | Partial implementation; CI pending | `analyze-project` runs probe → audio/ASR → candidate ranking → pacing → optional visuals → captions → per-candidate draft EDLs. Atomic artifacts, per-stage progress/failure/cancel manifest, child-process termination on Ctrl+C and non-empty output-folder protection. No resume, bounded queue or subprocess progress streaming. |
 | Installers | Implemented and CI-tested | Linux and PowerShell installers stage skills, include referenced support files and preserve prior installations with backups. Earlier Linux/Windows CI runs passed. |
 
 ## Automated tests and verification
 
-Tests have been added for EDL validation, audio metrics, moment ranking, pacing, crop geometry/keyframe expressions, captions, resource selection, QC, local feedback, pipeline orchestration and FFmpeg render/repair integration.
+Tests have been added for EDL validation, subprocess cancellation, audio metrics, moment ranking, pacing, crop geometry/keyframe expressions, captions, resource selection, QC, local feedback, pipeline orchestration and FFmpeg render/repair integration.
 
 **Important:** The last confirmed Linux/Windows CI run passed before most of these new modules and integration tests were added. The latest branch revision has not yet reported a CI run. Do not treat the new tests as passing until Actions runs them. The FFmpeg integration test generates synthetic videos and exercises all three layouts, ASS captions, dynamic crop keyframes and technical repair; it is not a substitute for testing the user's real footage.
 
