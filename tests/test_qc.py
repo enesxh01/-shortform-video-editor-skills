@@ -1,6 +1,9 @@
 import unittest
+from argparse import Namespace
+from unittest.mock import patch
 
 from shortform_editor.qc import assess_probe
+from shortform_editor.cli import command_qc, command_repair
 
 
 def probe():
@@ -52,6 +55,22 @@ class QCTests(unittest.TestCase):
         result = assess_probe(report, "")
         self.assertEqual(result["status"], "fail")
         self.assertIn("Audio/video stream start or duration metadata differs beyond tolerance", result["failures"])
+
+
+    def test_qc_warning_is_nonfatal_for_optional_missing_audio(self):
+        report = {"status": "warning", "checks": [], "failures": [], "warnings": ["No audio stream"]}
+        with patch("shortform_editor.qc.run_qc", return_value=report):
+            result = command_qc(Namespace(source="unused.mp4", width=1080, height=1920, fps="60/1", output=None))
+        self.assertEqual(result, 0)
+
+    def test_repair_warning_is_nonfatal(self):
+        report = {"qc_after_repair": {"status": "warning"}}
+        with patch("shortform_editor.repair.repair_technical_export", return_value=report):
+            result = command_repair(Namespace(
+                source="unused.mp4", output="unused-out.mp4", width=1080, height=1920,
+                fps="60/1", crf=18, preset="medium", overwrite=False
+            ))
+        self.assertEqual(result, 0)
 
 
 if __name__ == "__main__":
