@@ -630,6 +630,18 @@ def command_analyze_project(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_validate_semantic_review(args: argparse.Namespace) -> int:
+    from .semantic_review import validate_semantic_review_file
+
+    report = validate_semantic_review_file(
+        Path(args.review).expanduser().resolve(strict=True),
+        Path(args.probe).expanduser().resolve(strict=True) if args.probe else None,
+        Path(args.candidates).expanduser().resolve(strict=True) if args.candidates else None
+    )
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    return 0 if report["status"] == "valid" else 2
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -720,6 +732,11 @@ def build_parser() -> argparse.ArgumentParser:
     analyze.add_argument("--split-bottom-in", default="00:00:00.000")
     analyze.add_argument("--visuals", action="store_true", help="run optional OpenCV visual sampling")
     analyze.set_defaults(func=command_analyze_project)
+    semantic = sub.add_parser("validate-semantic-review", help="validate OpenCode semantic review JSON against source and baseline candidates")
+    semantic.add_argument("review")
+    semantic.add_argument("--probe")
+    semantic.add_argument("--candidates")
+    semantic.set_defaults(func=command_validate_semantic_review)
     render = sub.add_parser("render", help="render approved EDL segments into a vertical MP4")
     render.add_argument("source")
     render.add_argument("edl")
