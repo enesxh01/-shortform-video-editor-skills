@@ -176,7 +176,8 @@ def render(edl_path, output):
                 a,b=seconds(seg["source_in"]),seconds(seg["source_out"])
                 filters.append(f"[0:a:0]atrim=start={a:.6f}:end={b:.6f},asetpts=PTS-STARTPTS,aresample=async=1:first_pts=0[a{i}]")
             filters.append("".join(f"[a{i}]" for i in range(len(labels)))+f"concat=n={len(labels)}:v=0:a=1[aout]")
-        filters.append(f"[vout]subtitles='{str(ass).replace(chr(92),'/').replace(':',r'\:').replace(chr(39),r"\'")}'[vfinal]")
+        ass_filter_path=str(ass).replace("\\","/").replace(":","\\:").replace("'","\\'")
+        filters.append("[vout]subtitles='"+ass_filter_path+"'[vfinal]")
         graph=";".join(filters)
         tmp=td/"render.mp4"
         cmd=["ffmpeg","-hide_banner","-y",*inputs,"-filter_complex",graph,"-map","[vfinal]"]
