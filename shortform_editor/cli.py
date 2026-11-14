@@ -171,14 +171,16 @@ def command_probe(args: argparse.Namespace) -> int:
 def command_validate(args: argparse.Namespace) -> int:
     edl = json.loads(Path(args.edl).read_text(encoding="utf-8"))
     duration = None
+    source_fingerprint = None
     if args.probe:
         probe = json.loads(Path(args.probe).read_text(encoding="utf-8"))
+        source_fingerprint = probe.get("source", {}).get("fingerprint")
         raw_duration = probe.get("format", {}).get("duration")
         if raw_duration is not None:
             duration = float(raw_duration)
             if not math.isfinite(duration) or duration <= 0:
                 raise PipelineError("Probe report contains an invalid source duration")
-    errors = validate_edl(edl, duration, probe.get("source", {}).get("fingerprint"))
+    errors = validate_edl(edl, duration, source_fingerprint)
     if errors:
         print("EDL INVALID:")
         for error in errors:
