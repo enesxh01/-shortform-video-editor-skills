@@ -11,8 +11,8 @@ from shortform_editor.cli import command_qc, command_repair
 def probe():
     return {
         "streams": [
-            {"codec_type": "video", "width": 1080, "height": 1920, "avg_frame_rate": "60/1", "codec_name": "h264", "start_time": "0.0", "duration": "10.0"},
-            {"codec_type": "audio", "codec_name": "aac", "channels": 2, "start_time": "0.0", "duration": "10.0"}
+            {"codec_type": "video", "width": 1080, "height": 1920, "avg_frame_rate": "60/1", "codec_name": "h264", "pix_fmt": "yuv420p", "start_time": "0.0", "duration": "10.0"},
+            {"codec_type": "audio", "codec_name": "aac", "channels": 2, "sample_rate": "48000", "start_time": "0.0", "duration": "10.0"}
         ]
     }
 
