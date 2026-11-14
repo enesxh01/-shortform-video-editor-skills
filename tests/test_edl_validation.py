@@ -151,8 +151,8 @@ class EDLValidationTests(unittest.TestCase):
         edl = valid_edl()
         edl["segments"][0]["layout"] = "split_vertical"
         errors = validate_edl(edl)
-        self.assertEqual(sum("split_top is required" in error for error in errors), 1)
-        self.assertEqual(sum("split_bottom is required" in error for error in errors), 1)
+        self.assertEqual(sum("split_top" in error and "required property" in error for error in errors), 1)
+        self.assertEqual(sum("split_bottom" in error and "required property" in error for error in errors), 1)
         self.assertFalse(any("requires both" in error for error in errors))
 
     def test_rejects_caption_outside_segment(self):
