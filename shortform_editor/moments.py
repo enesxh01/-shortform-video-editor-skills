@@ -166,7 +166,7 @@ def detect_moments(analysis: dict[str, Any], min_duration: float = 12.0,
         if candidate is None:
             continue
         start, end = candidate["source_in_seconds"], candidate["source_out_seconds"]
-        if end - start > max_duration + 0.1:
+        if end - start < min_duration - 0.1 or end - start > max_duration + 0.1:
             continue
         overlap = any(
             max(0.0, min(end, old_end) - max(start, old_start)) / max(0.001, min(end-start, old_end-old_start)) > 0.65
