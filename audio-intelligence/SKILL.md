@@ -48,7 +48,7 @@ Test clean single-speaker audio, multiple speakers, overlapping speech, laughter
 
 - Default to `small` rather than loading a large model on a 16 GB RAM desktop.
 - Run one transcription model at a time. The default `auto` mode tries CUDA and falls back to CPU; the report records the actual selected device and compute type.
-- If CUDA initialization fails, check the installed NVIDIA driver, CUDA runtime and cuDNN compatibility before concluding the GPU is unsupported.
+- If CUDA initialization fails, check the installed NVIDIA driver, CUDA 12.x runtime, cuBLAS and the cuDNN version supported by the installed CTranslate2/faster-whisper release before concluding the GPU is unsupported. The upstream faster-whisper documentation currently describes CUDA 12 with cuDNN 9; verify the exact dependency combination because CTranslate2 release requirements can differ.
 - faster-whisper and CTranslate2 are MIT-licensed software; the selected Whisper model card/weight terms and any future VAD/diarization models must still be checked before redistribution.
 
 Load one large model at a time unless measured resources justify concurrency. Record model name/version, compute type, device, settings, and fallback. Never claim GPU use without verifying it.
