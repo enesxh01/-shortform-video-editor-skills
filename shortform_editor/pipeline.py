@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import tempfile
@@ -42,12 +43,36 @@ def _write_json(path: Path, data: dict[str, Any]) -> None:
             staged.unlink(missing_ok=True)
 
 
+
+def _read_json(path: Path) -> dict[str, Any] | None:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
+def _cached_artifact(output_dir: Path, filename: str, source_fingerprint: str,
+                     fingerprint_path: tuple[str, ...]) -> dict[str, Any] | None:
+    value = _read_json(output_dir / filename)
+    if value is None:
+        return None
+    current: Any = value
+    for key in fingerprint_path:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    if current != source_fingerprint:
+        return None
+    return value
+
+
 def analyze_project(source: Path, output_dir: Path, model: str = "small",
                     device: str = "auto", top_candidates: int = 5,
                     layout: str = "fullscreen", include_visuals: bool = False,
                     split_top_source: Path | None = None, split_bottom_source: Path | None = None,
                     split_top_in: str = "00:00:00.000",
-                    split_bottom_in: str = "00:00:00.000") -> dict[str, Any]:
+                    split_bottom_in: str = "00:00:00.000", resume: bool = False) -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
     output_dir = output_dir.expanduser().resolve()
     if output_dir == source or source.is_relative_to(output_dir):
@@ -64,20 +89,40 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
         timestamp_seconds(split_top_in)
         timestamp_seconds(split_bottom_in)
 
+    job_settings = {
+        "source": str(source), "model": model, "device": device,
+        "top_candidates": top_candidates, "layout": layout,
+        "include_visuals": include_visuals,
+        "split_top_source": str(split_top_source.expanduser().resolve()) if split_top_source else None,
+        "split_bottom_source": str(split_bottom_source.expanduser().resolve()) if split_bottom_source else None,
+        "split_top_in": split_top_in, "split_bottom_in": split_bottom_in
+    }
+    config_sha256 = hashlib.sha256(
+        json.dumps(job_settings, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    state_path = output_dir / "job-state.json"
     if output_dir.exists() and any(output_dir.iterdir()):
-        raise PipelineError("Output directory is not empty; choose a new job directory to avoid overwriting prior artifacts")
-    output_dir.mkdir(parents=True, exist_ok=True)
+        if not resume:
+            raise PipelineError("Output directory is not empty; use --resume with the original settings or choose a new job directory")
+        state = _read_json(state_path)
+        if not state or state.get("config_sha256") != config_sha256:
+            raise PipelineError("Cannot resume: job state is missing, invalid, or its source/options do not match this run")
+    else:
+        if resume:
+            raise PipelineError("Cannot resume: output directory has no existing job state")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        state = {"schema_version": "1.0", "config_sha256": config_sha256,
+                 "settings": job_settings, "source_fingerprint": None}
+        _write_json(state_path, state)
+
     stages = []
     warnings = []
 
     def save_progress(status: str, error: str | None = None) -> None:
         _write_json(output_dir / "manifest.json", {
-            "schema_version": "1.0",
-            "status": status,
-            "source": str(source),
-            "completed_stages": stages,
-            "warnings": warnings,
-            "error": error
+            "schema_version": "1.0", "status": status, "source": str(source),
+            "config_sha256": config_sha256, "completed_stages": stages,
+            "warnings": warnings, "error": error
         })
 
     save_progress("running")
