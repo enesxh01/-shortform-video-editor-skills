@@ -23,7 +23,7 @@ description: Protect local media projects through safe file handling, command co
 
 ## Licensing
 
-Before adding a model, library, codec, font, or effect, record name, version, license, source, redistribution limits, commercial-use limits, model terms, and required attribution. Flag unknown or incompatible terms; do not silently assume permissive licensing.
+Before adding a model, library, codec, font, or effect, record name, version, license, source, redistribution limits, commercial-use limits, model terms, and required attribution. The current runtime inventory is in `THIRD_PARTY_NOTICES.md`: faster-whisper/CTranslate2 are MIT, OpenCV 4.5+ is Apache-2.0, and its bundled Haar cascade has a separate Intel BSD-style notice. FFmpeg licensing depends on the exact build (LGPL/GPL); this project does not bundle it. The repository still has no root project license, which requires the owner's explicit choice.
 
 ## Provenance
 
