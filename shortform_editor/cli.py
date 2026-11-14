@@ -806,46 +806,46 @@ def command_render(args: argparse.Namespace) -> int:
         ])
         run_checked([ffmpeg, "-hide_banner", "-v", "error", "-i", str(assembled), "-f", "null", "-"])
         from .qc import add_expected_duration_check, assess_edit_quality, run_qc
-    expected_duration = sum(
-        timestamp_seconds(segment["source_out"]) - timestamp_seconds(segment["source_in"])
-        for segment in edl["segments"]
-    )
-    staged_output = None
-    try:
-        with tempfile.NamedTemporaryFile(prefix=".shortform-", suffix=output.suffix, dir=output.parent, delete=False) as handle:
-            staged_output = Path(handle.name)
-        shutil.copy2(assembled, staged_output)
-        final_probe = probe_media(staged_output)
-        actual_duration = float(final_probe.get("format", {}).get("duration") or 0)
-        # Run the full technical QC against the staged artifact. Do not publish a file
-        # that fails the same checks the CLI reports to the user.
-        qc_report = run_qc(staged_output, expected_width=width, expected_height=height, expected_fps=fps)
-        qc_report = add_expected_duration_check(
-            qc_report, actual_duration, expected_duration,
-            tolerance=max(0.1, 0.025 * len(edl["segments"]))
+        expected_duration = sum(
+            timestamp_seconds(segment["source_out"]) - timestamp_seconds(segment["source_in"])
+            for segment in edl["segments"]
         )
-        if qc_report["status"] not in {"passed", "warning"}:
-            failure_report = output.with_name(f".{output.name}.qc-failed.json")
-            try:
-                failure_report.write_text(json.dumps(qc_report, indent=2, ensure_ascii=False) + chr(10), encoding="utf-8")
-            except OSError:
-                pass
-            failures = "; ".join(qc_report.get("failures", [])) or qc_report["status"]
-            raise PipelineError(
-                f"Staged render failed technical QC ({failures}); final output was not published. "
-                f"See {failure_report} when the diagnostic report could be written."
+        staged_output = None
+        try:
+            with tempfile.NamedTemporaryFile(prefix=".shortform-", suffix=output.suffix, dir=output.parent, delete=False) as handle:
+                staged_output = Path(handle.name)
+            shutil.copy2(assembled, staged_output)
+            final_probe = probe_media(staged_output)
+            actual_duration = float(final_probe.get("format", {}).get("duration") or 0)
+            # Run the full technical QC against the staged artifact. Do not publish a file
+            # that fails the same checks the CLI reports to the user.
+            qc_report = run_qc(staged_output, expected_width=width, expected_height=height, expected_fps=fps)
+            qc_report = add_expected_duration_check(
+                qc_report, actual_duration, expected_duration,
+                tolerance=max(0.1, 0.025 * len(edl["segments"]))
             )
-        if file_stat_signature(source) != source_signature:
-            raise PipelineError("Primary source changed during rendering; refusing to publish an output from an unstable source")
-        for split_key, split_path in split_paths.items():
-            if file_stat_signature(split_path) != split_signatures[split_key]:
-                raise PipelineError(f"{split_key[1]} source changed during rendering; refusing to publish an output from an unstable source")
-        os.replace(staged_output, output)
-        qc_report["source"]["path"] = str(output)
-    except Exception:
-        if staged_output is not None:
-            staged_output.unlink(missing_ok=True)
-        raise
+            if qc_report["status"] not in {"passed", "warning"}:
+                failure_report = output.with_name(f".{output.name}.qc-failed.json")
+                try:
+                    failure_report.write_text(json.dumps(qc_report, indent=2, ensure_ascii=False) + chr(10), encoding="utf-8")
+                except OSError:
+                    pass
+                failures = "; ".join(qc_report.get("failures", [])) or qc_report["status"]
+                raise PipelineError(
+                    f"Staged render failed technical QC ({failures}); final output was not published. "
+                    f"See {failure_report} when the diagnostic report could be written."
+                )
+            if file_stat_signature(source) != source_signature:
+                raise PipelineError("Primary source changed during rendering; refusing to publish an output from an unstable source")
+            for split_key, split_path in split_paths.items():
+                if file_stat_signature(split_path) != split_signatures[split_key]:
+                    raise PipelineError(f"{split_key[1]} source changed during rendering; refusing to publish an output from an unstable source")
+            os.replace(staged_output, output)
+            qc_report["source"]["path"] = str(output)
+        except Exception:
+            if staged_output is not None:
+                staged_output.unlink(missing_ok=True)
+            raise
 
     if resume_enabled and qc_report["status"] in {"passed", "warning"}:
         shutil.rmtree(render_workdir, ignore_errors=True)
