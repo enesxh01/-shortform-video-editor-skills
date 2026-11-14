@@ -11,7 +11,7 @@ dependencies = ["jsonschema>=4.21,<5", "psutil>=5.9,<7"]
 
 [project.optional-dependencies]
 audio = ["faster-whisper>=1.1,<2"]
-visual = ["opencv-python-headless>=4.10,<5"]
+visual = ["opencv-contrib-python-headless>=4.10,<5"]
 download = ["yt-dlp>=2025.1.15,<2027"]
 
 [project.scripts]
