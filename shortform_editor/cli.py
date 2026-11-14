@@ -473,6 +473,25 @@ def command_analyze_visuals(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_generate_captions(args: argparse.Namespace) -> int:
+    from .caption_generation import generate_captions_file
+
+    result = generate_captions_file(
+        Path(args.analysis).expanduser().resolve(strict=True),
+        Path(args.candidates).expanduser().resolve(strict=True),
+        Path(args.output).expanduser().resolve(),
+        candidate_id=args.candidate_id,
+        layout=args.layout
+    )
+    print(json.dumps({
+        "output": str(Path(args.output).expanduser().resolve()),
+        "candidate_id": result["candidate_id"],
+        "caption_count": len(result["captions"]),
+        "layout": result["layout"]
+    }, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -513,6 +532,13 @@ def build_parser() -> argparse.ArgumentParser:
     visuals.add_argument("--max-frames", type=int, default=120)
     visuals.add_argument("--no-face-detection", action="store_true")
     visuals.set_defaults(func=command_analyze_visuals)
+    captions = sub.add_parser("generate-captions", help="group ASR word timings into Kino caption events")
+    captions.add_argument("analysis", help="audio-analysis JSON")
+    captions.add_argument("candidates", help="candidate JSON from find-moments")
+    captions.add_argument("-o", "--output", required=True)
+    captions.add_argument("--candidate-id")
+    captions.add_argument("--layout", default="fullscreen", choices=["fullscreen", "split_vertical", "blurred_bars_20_60_20"])
+    captions.set_defaults(func=command_generate_captions)
     render = sub.add_parser("render", help="render approved EDL segments into a vertical MP4")
     render.add_argument("source")
     render.add_argument("edl")
