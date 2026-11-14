@@ -83,9 +83,9 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 
 ## Manual ROI tracking (implemented; heuristic)
 
-- `analyze-visuals --track-roi X Y WIDTH HEIGHT` accepts a normalized 0..1 bounding box and seeds the optional OpenCV-contrib CSRT tracker. This can follow a user-selected non-face subject without a dedicated detector or model weights.
+- `analyze-visuals --track-roi X Y WIDTH HEIGHT` accepts a normalized 0..1 bounding box and seeds CSRT when OpenCV-contrib exposes it; otherwise it uses built-in KLT optical flow to follow image features inside the user-selected region.
 - The initial ROI is applied at the first sample of each analyzed region. Tracking loss is explicitly labeled and falls back to center framing; it never invents a subject location. Increase `--sample-rate` for faster movement, subject to the frame cap.
-- This is not automatic object detection, gameplay HUD recognition, semantic action understanding or a guarantee of continuous tracking. Manual selection and human review remain required.
+- KLT confidence is based on tracked feature count, not a calibrated probability. This is not automatic object detection, gameplay HUD recognition, semantic action understanding or a guarantee of continuous tracking. Manual selection and human review remain required.
 
 
 ## Per-segment resume integration test

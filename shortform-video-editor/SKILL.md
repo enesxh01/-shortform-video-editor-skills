@@ -53,7 +53,7 @@ FFmpeg and ffprobe must also be installed separately and available on PATH. Rest
 - `shortform-editor analyze-audio INPUT.mp4 -o audio.json` — audio energy/silence analysis and optional faster-whisper ASR.
 - `shortform-editor find-moments audio.json -o candidates.json` — low-confidence transcript-led candidate heuristic.
 - `shortform-editor analyze-pacing audio.json candidates.json -o pacing.json` — review-only pacing suggestions.
-- `shortform-editor analyze-visuals INPUT.mp4 -o visual.json` — optional OpenCV scene-change and face-guided crop evidence. For a human-selected non-face subject, add `--track-roi X Y WIDTH HEIGHT` (normalized 0..1) to seed CSRT tracking.
+- `shortform-editor analyze-visuals INPUT.mp4 -o visual.json` — optional OpenCV scene-change and face-guided crop evidence. For a human-selected non-face subject, add `--track-roi X Y WIDTH HEIGHT` (normalized 0..1) to seed CSRT tracking when OpenCV-contrib is available, or built-in KLT optical flow otherwise.
 - `shortform-editor analyze-project INPUT.mp4 -o JOB_DIR --visuals --visual-roi X Y WIDTH HEIGHT` — seed the same tracker in each candidate window. The ROI is part of the job fingerprint, so change it only when starting a new job rather than resuming.
 - `shortform-editor generate-captions audio.json candidates.json -o captions.json` — word-timed caption groups.
 - `shortform-editor validate-edl edit.json --probe probe.json` — JSON Schema plus semantic validation.
@@ -87,7 +87,7 @@ The `analyze-project` command is the preferred end-to-end entry point. After the
 - `split_vertical`: explicit top/bottom secondary sources stacked vertically; centered caption style.
 - `blurred_bars_20_60_20`: blurred 20% top, sharp 60% center, blurred 20% bottom.
 
-All three layouts support optional synchronized per-segment fade-in/fade-out effects and have initial FFmpeg code plus a synthetic integration test; the latest CI result is pending. Split mode requires fingerprinted `split_top` and `split_bottom` source specs in the EDL. Fullscreen rendering supports the face-guided crop keyframes produced by visual analysis, interpolating crop movement with FFmpeg. Face detection is limited to frontal Haar-cascade detections; the optional OpenCV-contrib CSRT tracker can bridge missed detections between sampled frames. It is not general object/action tracking and can lose the subject during occlusion, fast motion or scene changes, so inspect framing carefully.
+All three layouts support optional synchronized per-segment fade-in/fade-out effects and have initial FFmpeg code plus a synthetic integration test; the latest CI result is pending. Split mode requires fingerprinted `split_top` and `split_bottom` source specs in the EDL. Fullscreen rendering supports the face-guided crop keyframes produced by visual analysis, interpolating crop movement with FFmpeg. Face detection is limited to frontal Haar-cascade detections; the optional OpenCV-contrib CSRT tracker can bridge missed detections between sampled frames. A manually selected ROI falls back to built-in KLT optical flow if CSRT is unavailable; optical-flow confidence is heuristic, and feature loss or scene changes can still cause a center-frame fallback. This is not automatic general object/action tracking, so inspect framing carefully.
 
 ## Decision hierarchy
 
