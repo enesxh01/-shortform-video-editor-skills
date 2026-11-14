@@ -88,7 +88,8 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                     layout: str = "fullscreen", include_visuals: bool = False,
                     split_top_source: Path | None = None, split_bottom_source: Path | None = None,
                     split_top_in: str = "00:00:00.000",
-                    split_bottom_in: str = "00:00:00.000", resume: bool = False) -> dict[str, Any]:
+                    split_bottom_in: str = "00:00:00.000", resume: bool = False,
+                    visual_roi: tuple[float, float, float, float] | None = None) -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
     output_dir = output_dir.expanduser().resolve()
     if output_dir == source or source.is_relative_to(output_dir):
@@ -104,11 +105,20 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
     if layout == "split_vertical":
         timestamp_seconds(split_top_in)
         timestamp_seconds(split_bottom_in)
+    if visual_roi is not None:
+        if not include_visuals:
+            raise PipelineError("--visual-roi requires --visuals")
+        from .visual import validate_normalized_roi
+        try:
+            visual_roi = validate_normalized_roi(visual_roi)
+        except (TypeError, ValueError) as exc:
+            raise PipelineError(f"Invalid visual ROI: {exc}") from exc
 
     job_settings = {
         "source": str(source), "model": model, "device": device,
         "top_candidates": top_candidates, "layout": layout,
         "include_visuals": include_visuals,
+        "visual_roi": list(visual_roi) if visual_roi is not None else None,
         "split_top_source": str(split_top_source.expanduser().resolve()) if split_top_source else None,
         "split_bottom_source": str(split_bottom_source.expanduser().resolve()) if split_bottom_source else None,
         "split_top_in": split_top_in, "split_bottom_in": split_bottom_in
@@ -233,7 +243,7 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                 cached_visuals = _cached_artifact(output_dir, "visual-analysis.json", source_fingerprint, ("source", "fingerprint"), state) if resume else None
                 visuals = stage(
                     "visual_analysis",
-                    lambda: analyze_visuals(source, regions=candidate_regions, probe_report=probe),
+                    lambda: analyze_visuals(source, regions=candidate_regions, probe_report=probe, initial_roi=visual_roi),
                     cached_visuals
                 )
                 if visuals.get("source", {}).get("fingerprint") != probe["source"]["fingerprint"]:
