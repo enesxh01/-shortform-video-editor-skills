@@ -35,7 +35,7 @@ class CropGeometryTests(unittest.TestCase):
         expression = build_ffmpeg_crop_filter(keyframes, 0.0, "60/1", 640, 360)
         self.assertIn("crop=202:360", expression)
         self.assertIn("n-0", expression)
-        self.assertIn("n-60", expression)
+        self.assertIn("lt(n,60)", expression)
 
 
 if __name__ == "__main__":
