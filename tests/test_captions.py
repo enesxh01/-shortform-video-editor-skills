@@ -133,7 +133,7 @@ class CaptionTests(unittest.TestCase):
             path = Path(directory) / "top.ass"
             write_ass_subtitles(segment, "fullscreen", 0.0, path)
             content = path.read_text(encoding="utf-8")
-        self.assertIn(r"{\\an8}", content)
+        self.assertIn(r"{\an8}", content)
 
 
 if __name__ == "__main__":
