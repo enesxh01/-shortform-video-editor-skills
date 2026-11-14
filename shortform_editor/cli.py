@@ -692,7 +692,7 @@ def command_render(args: argparse.Namespace) -> int:
                 staged_output.unlink(missing_ok=True)
             raise
 
-    from .qc import add_expected_duration_check, run_qc
+    from .qc import add_expected_duration_check, assess_edit_quality, run_qc
     expected_duration = sum(
         timestamp_seconds(segment["source_out"]) - timestamp_seconds(segment["source_in"])
         for segment in edl["segments"]
@@ -703,6 +703,7 @@ def command_render(args: argparse.Namespace) -> int:
         qc_report, actual_duration, expected_duration,
         tolerance=max(0.1, 0.025 * len(edl["segments"]))
     )
+    creative_quality = assess_edit_quality(edl)
 
     print(json.dumps({
         "output": str(output),
@@ -713,6 +714,7 @@ def command_render(args: argparse.Namespace) -> int:
         "layouts": sorted({segment["layout"] for segment in edl["segments"]}),
         "captions": sum(len(segment.get("captions", [])) for segment in edl["segments"]),
         "status": "preview_rendered_and_decode_checked" if preview_mode else "rendered_and_decode_checked",
+        "creative_quality": creative_quality,
         "preview_only": preview_mode,
         "limitations": [
             "Split layout uses explicit top and bottom secondary video sources; primary source audio is retained.",
