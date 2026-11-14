@@ -74,12 +74,15 @@ def validate(edl, source_info=None):
         errors.append("Source fingerprint mismatch: EDL does not match the supplied media file")
     if not isinstance(segs,list) or not segs: errors.append("segments must be a non-empty array")
     if rnd.get("container")!="mp4": errors.append("Only MP4 output is currently supported")
-    if rnd.get("fps_mode") not in ("cfr","vfr","preserve_native"): errors.append("Invalid fps_mode")
+    if rnd.get("fps_mode") != "cfr": errors.append("This runtime currently renders CFR only; set fps_mode=cfr")
     try:
         w=int(rnd["width"]); h=int(rnd["height"])
         if w<360 or h<640 or w%2 or h%2: errors.append("Output dimensions must be even and at least 360x640")
     except Exception: errors.append("render.width/height must be valid integers")
-    if not re.fullmatch(r"\d+/\d+",str(rnd.get("fps_target",""))): errors.append("fps_target must be a rational such as 60/1")
+    try:
+        rate=Fraction(str(rnd.get("fps_target","")))
+        if rate<=0: errors.append("fps_target must be greater than zero")
+    except (ValueError,ZeroDivisionError): errors.append("fps_target must be a positive rational such as 60/1")
     if edl["approval"].get("status")=="approved" and edl["approval"].get("approved_by_user") is not True:
         errors.append("Approved EDL must have approved_by_user=true")
     for i,s in enumerate(segs):
@@ -90,6 +93,7 @@ def validate(edl, source_info=None):
             if source_info and b>source_info["duration"]+0.05: errors.append(f"{label}: source_out exceeds source duration")
         except Exception as e: errors.append(f"{label}: {e}")
         if s.get("layout") not in LAYOUTS: errors.append(f"{label}: unsupported layout")
+        if s.get("crop_keyframes"): errors.append(f"{label}: crop_keyframes are not yet supported by the renderer; do not assume subject tracking or animated reframing")
         if s.get("layout")=="split_vertical":
             for key in ("split_top","split_bottom"):
                 if not isinstance(s.get(key),dict) or not s[key].get("path"):
@@ -128,6 +132,9 @@ Format: Layer,Start,End,Style,Name,MarginL,MarginR,MarginV,Effect,Text
             a=offset+seconds(c["start"]); b=offset+seconds(c["end"])
             if a<offset-0.001 or b>end-start+offset+0.05: continue
             text=ass_escape(c["text"])
+            if seg.get("layout")=="split_vertical": text=f"{{\\an5\\pos({w//2},{h//2})}}"+text
+            elif c.get("position")=="center": text="{\\an5}"+text
+            elif c.get("position")=="bottom" or c.get("position") is None: text="{\\an2}"+text
             events.append(f"Dialogue: 0,{ass_time(a)},{ass_time(b)},Default,,0,0,0,,{text}")
         offset+=end-start
     Path(path).write_text(header+"\n".join(events)+"\n",encoding="utf-8")
