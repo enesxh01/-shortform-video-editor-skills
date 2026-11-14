@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import re
 import shutil
 import subprocess
@@ -63,10 +64,12 @@ def probe_media(source: Path) -> dict[str, Any]:
     streams = data.get("streams", [])
     if not streams or not any(s.get("codec_type") == "video" for s in streams):
         raise PipelineError("Input contains no readable video stream")
+    digest = sha256_file(source)
     data["source"] = {
         "path": str(source),
         "size_bytes": source.stat().st_size,
-        "sha256": sha256_file(source),
+        "sha256": digest,
+        "fingerprint": f"sha256:{digest}",
     }
     data["tool_versions"] = {
         "ffprobe": run_checked([ffprobe, "-version"]).stdout.splitlines()[0]
@@ -92,7 +95,7 @@ def load_schema() -> dict[str, Any]:
         raise PipelineError(f"Cannot load EDL schema at {SCHEMA_PATH}: {exc}") from exc
 
 
-def validate_edl(edl: dict[str, Any], source_duration: float | None = None) -> list[str]:
+def validate_edl(edl: dict[str, Any], source_duration: float | None = None, source_fingerprint: str | None = None) -> list[str]:
     try:
         from jsonschema import Draft202012Validator
     except ImportError as exc:
@@ -108,6 +111,8 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None) -> l
 
     render = edl["render"]
     ratio = render["width"] / render["height"]
+    if source_fingerprint is not None and edl["source"]["fingerprint"] != source_fingerprint:
+        messages.append("EDL source fingerprint does not match the supplied source media")
     if abs(ratio - (9 / 16)) > 0.002:
         messages.append("render dimensions must be portrait 9:16 (within 0.2% tolerance)")
     try:
@@ -173,7 +178,7 @@ def command_validate(args: argparse.Namespace) -> int:
             duration = float(raw_duration)
             if not math.isfinite(duration) or duration <= 0:
                 raise PipelineError("Probe report contains an invalid source duration")
-    errors = validate_edl(edl, duration)
+    errors = validate_edl(edl, duration, probe.get("source", {}).get("fingerprint"))
     if errors:
         print("EDL INVALID:")
         for error in errors:
@@ -194,11 +199,19 @@ def command_render(args: argparse.Namespace) -> int:
         raise PipelineError("--crf must be between 0 and 51")
     if any(segment.get("layout") != "fullscreen" for segment in edl.get("segments", [])):
         raise PipelineError("This MVP renderer supports fullscreen only; split_vertical and blurred_bars_20_60_20 are not implemented")
+    if edl.get("render", {}).get("fps_mode") != "cfr":
+        raise PipelineError("This MVP renderer supports fps_mode=cfr only")
+    if edl.get("render", {}).get("fps_conversion") != "duplicate_drop":
+        raise PipelineError("This MVP renderer supports fps_conversion=duplicate_drop only")
+    if edl.get("render", {}).get("video_codec") not in (None, "h264"):
+        raise PipelineError("This MVP renderer supports H.264 video only")
+    if edl.get("render", {}).get("audio_codec") not in (None, "aac"):
+        raise PipelineError("This MVP renderer supports AAC audio only")
 
     probe = probe_media(source)
     raw_duration = probe.get("format", {}).get("duration")
     duration = float(raw_duration) if raw_duration is not None else None
-    errors = validate_edl(edl, duration)
+    errors = validate_edl(edl, duration, probe.get("source", {}).get("fingerprint"))
     if errors:
         raise PipelineError("Refusing to render invalid EDL:\n- " + "\n- ".join(errors))
     if edl["approval"]["status"] != "approved" or not edl["approval"]["approved_by_user"]:
@@ -244,11 +257,18 @@ def command_render(args: argparse.Namespace) -> int:
             "-c", "copy", "-movflags", "+faststart", str(assembled)
         ])
         run_checked([ffmpeg, "-hide_banner", "-v", "error", "-i", str(assembled), "-f", "null", "-"])
-        if output.exists():
-            output.unlink()
-        shutil.copy2(assembled, output)
+        staged_output = None
+        try:
+            with tempfile.NamedTemporaryFile(prefix=".shortform-", suffix=output.suffix or ".mp4", dir=output.parent, delete=False) as handle:
+                staged_output = Path(handle.name)
+            shutil.copy2(assembled, staged_output)
+            final_probe = probe_media(staged_output)
+            os.replace(staged_output, output)
+        except Exception:
+            if staged_output is not None:
+                staged_output.unlink(missing_ok=True)
+            raise
 
-    final_probe = probe_media(output)
     print(json.dumps({
         "output": str(output),
         "source_sha256": probe["source"]["sha256"],
