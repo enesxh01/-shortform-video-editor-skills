@@ -222,6 +222,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
                         1.0 + abs((box[0] + box[2] / 2) - previous_center[0] * frame.shape[1] / width) / max(1, frame.shape[1])
                     )
                 )
+        subject_bbox_normalized = None
         if selected_face is not None:
             tracker_box = tuple(float(value) for value in selected_face)
             if callable(tracker_factory):
@@ -231,8 +232,15 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
                     face_tracker = candidate_tracker if initialized is not False else None
                 except Exception:
                     face_tracker = None
-            cx_small = float(selected_face[0] + selected_face[2] / 2)
-            cy_small = float(selected_face[1] + selected_face[3] / 2)
+            face_x, face_y, face_w, face_h = (float(value) for value in selected_face)
+            subject_bbox_normalized = {
+                "x": max(0.0, face_x / frame.shape[1]),
+                "y": max(0.0, face_y / frame.shape[0]),
+                "width": min(1.0, face_w / frame.shape[1]),
+                "height": min(1.0, face_h / frame.shape[0])
+            }
+            cx_small = face_x + face_w / 2
+            cy_small = face_y + face_h / 2
             center_x = cx_small / frame.shape[1] * width
             center_y = cy_small / frame.shape[0] * height
             confidence = 0.45
@@ -244,6 +252,12 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
                 tracking_ok, tracked_box = False, None
             if tracking_ok and tracked_box is not None:
                 x, y, box_w, box_h = tracked_box
+                subject_bbox_normalized = {
+                    "x": max(0.0, float(x) / frame.shape[1]),
+                    "y": max(0.0, float(y) / frame.shape[0]),
+                    "width": min(1.0, float(box_w) / frame.shape[1]),
+                    "height": min(1.0, float(box_h) / frame.shape[0])
+                }
                 center_x = (float(x) + float(box_w) / 2) / frame.shape[1] * width
                 center_y = (float(y) + float(box_h) / 2) / frame.shape[0] * height
                 confidence = 0.32
@@ -269,6 +283,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             "region_index": region_id,
             "scene_cut": motion_score >= 0.22,
             "subject_evidence": subject,
+            "subject_bbox_normalized": subject_bbox_normalized,
             "confidence": confidence,
             "center": {"x": round(smoothed_center[0], 2), "y": round(smoothed_center[1], 2)},
             "crop_9_16": crop,
