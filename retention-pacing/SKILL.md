@@ -48,3 +48,8 @@ Include source in/out, proposed duration, rationale, confidence, and context ris
 ## Validation
 
 Measure false cuts, missed dead air, damaged sentences, lost punchlines, timing changes, and runtime. Review the actual output, not only the decision log.
+
+
+## Pipeline integration
+
+The `analyze-project` workflow attaches each candidate's pacing decisions and repeated-word flags to the matching EDL segment under `pacing_review`. These records are advisory metadata only; the renderer ignores them and never removes source ranges automatically.
