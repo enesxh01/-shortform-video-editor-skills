@@ -27,7 +27,12 @@ def download_source(url: str, output_dir: Path, max_filesize_mb: int = 2048) -> 
     if max_filesize_mb < 1 or max_filesize_mb > 20480:
         raise PipelineError("Maximum download size must be between 1 and 20480 MB")
     output_dir = output_dir.expanduser().resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    if output_dir.exists() and not output_dir.is_dir():
+        raise PipelineError("Download output path exists but is not a directory")
+    try:
+        output_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise PipelineError(f"Cannot create download output directory: {exc}") from exc
     if any(output_dir.iterdir()):
         raise PipelineError("Download output directory must be empty")
     try:
