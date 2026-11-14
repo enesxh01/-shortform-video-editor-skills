@@ -82,7 +82,7 @@ To ingest a single URL into a new, empty folder (playlists are disabled):
 shortform-editor download-source 'https://example.com/video' --output-dir downloaded-source/ --max-filesize-mb 2048 --report download-report.json
 ```
 
-The downloader rejects embedded URL credentials and enforces its configured size cap using yt-dlp's file-size limit, observed transfer progress, and a final on-disk check. Download only media you own or are authorized to use; this is not a DRM, private-content, or access-control bypass.
+The downloader rejects embedded URL credentials and enforces its configured size cap using yt-dlp's file-size limit, cumulative observed transfer progress across separate audio/video streams, and a final on-disk check. Its destination must be a new or empty directory. Download only media you own or are authorized to use; this is not a DRM, private-content, or access-control bypass.
 
 Then run:
 
