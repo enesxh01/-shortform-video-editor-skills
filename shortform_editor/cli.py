@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from argparse import Namespace
 from contextlib import nullcontext
 import hashlib
 import json
