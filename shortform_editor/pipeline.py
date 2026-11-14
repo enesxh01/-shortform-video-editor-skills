@@ -109,7 +109,7 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                 split_probes[key] = probe_media(path)
                 split_signatures[key] = file_stat_signature(path)
 
-        audio = stage("audio", lambda: analyze_audio(source, model_size=model, device=device))
+        audio = stage("audio", lambda: analyze_audio(source, model_size=model, device=device, probe_report=probe))
         if audio.get("source", {}).get("fingerprint") != probe["source"]["fingerprint"]:
             raise PipelineError("Source media changed between initial probe and audio analysis; restart the project")
         if file_stat_signature(source) != source_signature:
@@ -147,7 +147,7 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                 ]
                 visuals = stage(
                     "visual_analysis",
-                    lambda: analyze_visuals(source, regions=candidate_regions)
+                    lambda: analyze_visuals(source, regions=candidate_regions, probe_report=probe)
                 )
                 if visuals.get("source", {}).get("fingerprint") != probe["source"]["fingerprint"]:
                     raise PipelineError("Source media changed between initial probe and visual analysis; restart the project")
