@@ -148,7 +148,7 @@ class QCTests(unittest.TestCase):
         result = assess_probe(probe(), logs)
         self.assertEqual(result["audio_loudness"]["integrated_lufs"], -14.0)
         self.assertEqual(result["audio_loudness"]["range_lu"], 4.2)
-        self.assertEqual(result["audio_loudness"]["true_peak_dbtp"], -0.8)
+        self.assertEqual(result["audio_loudness"]["true_peak_dbfs"], -0.8)
         checks = {item["name"]: item for item in result["checks"]}
         self.assertEqual(checks["integrated_loudness"]["status"], "passed")
         self.assertEqual(checks["true_peak"]["status"], "warning")
