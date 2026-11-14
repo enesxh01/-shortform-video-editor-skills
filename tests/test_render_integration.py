@@ -1,4 +1,6 @@
 import json
+import io
+from contextlib import redirect_stdout
 import shutil
 import subprocess
 import tempfile
@@ -188,6 +190,87 @@ class RenderIntegrationTests(unittest.TestCase):
         baseline = fingerprint("2", "ffmpeg version 7.1")
         self.assertNotEqual(baseline, fingerprint("3", "ffmpeg version 7.1"))
         self.assertNotEqual(baseline, fingerprint("2", "ffmpeg version 7.2"))
+
+
+
+    def test_resume_render_recovers_after_interruption_and_reuses_completed_segment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.mp4"
+            subprocess.run([
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=3",
+                "-t", "3", "-c:v", "libx264", "-preset", "ultrafast",
+                "-pix_fmt", "yuv420p", str(source)
+            ], check=True, capture_output=True)
+            source_probe = probe_media(source)
+            video_stream = next(item for item in source_probe["streams"] if item["codec_type"] == "video")
+            edl = {
+                "schema_version": "1.0",
+                "project_id": "resume-integration",
+                "source": {
+                    "fingerprint": source_probe["source"]["fingerprint"],
+                    "time_base": video_stream["time_base"],
+                    "frame_rate": "30/1",
+                    "variable_frame_rate": False
+                },
+                "render": {
+                    "width": 1080, "height": 1920, "fps_target": "60/1",
+                    "fps_mode": "cfr", "fps_conversion": "duplicate_drop",
+                    "container": "mp4", "video_codec": "h264", "audio_codec": "aac"
+                },
+                "segments": [
+                    {"id": "first", "source_in": "00:00:00.000", "source_out": "00:00:01.000",
+                     "timeline_start": "00:00:00.000", "layout": "fullscreen", "reason": "first test segment",
+                     "confidence": 0.8, "captions": []},
+                    {"id": "second", "source_in": "00:00:01.000", "source_out": "00:00:02.000",
+                     "timeline_start": "00:00:01.000", "layout": "fullscreen", "reason": "second test segment",
+                     "confidence": 0.8, "captions": []}
+                ],
+                "approval": {
+                    "status": "approved", "approved_by_user": True,
+                    "approved_at": "2026-01-01T00:00:00+00:00"
+                }
+            }
+            edl["approval"]["approved_edl_sha256"] = edl_approval_hash(edl)
+            edl_path = root / "approved.json"
+            edl_path.write_text(json.dumps(edl), encoding="utf-8")
+            output = root / "resumed.mp4"
+            args = Namespace(
+                source=str(source), edl=str(edl_path), output=str(output),
+                crf=30, preset="ultrafast", overwrite=False, resume=True,
+                encoder="libx264", nvenc_preset="p5", nvenc_cq=19
+            )
+            from shortform_editor.cli import PipelineError, run_checked
+            original_run_checked = run_checked
+
+            def interrupt_second_segment(command):
+                if command[0].endswith("ffmpeg") and str(command[-1]).endswith("part-0001.mp4"):
+                    raise PipelineError("simulated interruption after first segment")
+                return original_run_checked(command)
+
+            with patch("shortform_editor.cli.run_checked", side_effect=interrupt_second_segment):
+                with self.assertRaisesRegex(PipelineError, "simulated interruption"):
+                    command_render(args)
+
+            workdir = root / ".resumed.mp4.shortform-work"
+            state_path = workdir / "render-state.json"
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertIn("0", state["parts"])
+            self.assertNotIn("1", state["parts"])
+            self.assertFalse(output.exists())
+
+            captured = io.StringIO()
+            with redirect_stdout(captured):
+                result = command_render(args)
+            self.assertEqual(result, 0)
+            report = json.loads(captured.getvalue())
+            self.assertEqual(report["resumed_segments"], [0])
+            self.assertTrue(output.is_file())
+            self.assertFalse(workdir.exists())
+            rendered = probe_media(output)
+            video = next(item for item in rendered["streams"] if item["codec_type"] == "video")
+            self.assertEqual(video["avg_frame_rate"], "60/1")
 
 
 

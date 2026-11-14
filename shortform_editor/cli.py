@@ -688,11 +688,11 @@ def command_render(args: argparse.Namespace) -> int:
                     segment.get("crop_keyframes", []), clip_start, fps, source_width, source_height
                 )
                 if crop_filter:
-                    vf = f"fps={fps},{crop_filter},scale={width}:{height},setsar=1,format=yuv420p"
+                    vf = f"setpts=PTS-STARTPTS,fps={fps},{crop_filter},scale={width}:{height},setsar=1,format=yuv420p"
                 else:
                     vf = (
                         f"scale={width}:{height}:force_original_aspect_ratio=increase,"
-                        f"crop={width}:{height},setsar=1,fps={fps},format=yuv420p"
+                        f"crop={width}:{height},setsar=1,setpts=PTS-STARTPTS,fps={fps},format=yuv420p"
                     )
                 fade_video_filters, fade_audio_filters = _segment_fade_filters(segment, clip_duration)
                 look_filters = _segment_look_filters(segment)
@@ -707,7 +707,7 @@ def command_render(args: argparse.Namespace) -> int:
                 center_height = int(height * 0.6) // 2 * 2
                 bar_offset = (height - center_height) // 2
                 graph = (
-                    f"[0:v]split=2[bgsrc][fgsrc];"
+                    f"[0:v]setpts=PTS-STARTPTS,split=2[bgsrc][fgsrc];"
                     f"[bgsrc]scale={width}:{height}:force_original_aspect_ratio=increase,"
                     f"crop={width}:{height},boxblur=20:10[bg];"
                     f"[fgsrc]scale={width}:{center_height}:force_original_aspect_ratio=increase,"
@@ -731,9 +731,9 @@ def command_render(args: argparse.Namespace) -> int:
             elif layout == "split_vertical":
                 panel_height = height // 2
                 graph = (
-                    f"[1:v]scale={width}:{panel_height}:force_original_aspect_ratio=increase,"
+                    f"[1:v]setpts=PTS-STARTPTS,scale={width}:{panel_height}:force_original_aspect_ratio=increase,"
                     f"crop={width}:{panel_height},setsar=1[top];"
-                    f"[2:v]scale={width}:{panel_height}:force_original_aspect_ratio=increase,"
+                    f"[2:v]setpts=PTS-STARTPTS,scale={width}:{panel_height}:force_original_aspect_ratio=increase,"
                     f"crop={width}:{panel_height},setsar=1[bottom];"
                     f"[top][bottom]vstack=inputs=2,setsar=1,fps={fps},format=yuv420p[vbase]"
                 )
