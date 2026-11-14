@@ -265,3 +265,77 @@ def run_qc(source: Path, expected_width: int = 1080, expected_height: int = 1920
     }
     assessed["tool"] = run_checked([ffmpeg, "-version"]).stdout.splitlines()[0]
     return assessed
+
+
+def assess_edit_quality(edl: dict[str, Any]) -> dict[str, Any]:
+    """Produce non-blocking editorial/readability advisories from the approved EDL."""
+    checks: list[dict[str, Any]] = []
+    warnings: list[str] = []
+    segments = edl.get("segments", [])
+    from .cli import timestamp_seconds
+    for index, segment in enumerate(segments):
+        try:
+            duration = timestamp_seconds(segment["source_out"]) - timestamp_seconds(segment["source_in"])
+        except (KeyError, TypeError, ValueError):
+            checks.append({"name": "segment_timing", "segment": index, "status": "unavailable"})
+            continue
+        if duration < 6.0:
+            warnings.append(f"Segment {index + 1} is very short ({duration:.1f}s); confirm it has enough context.")
+            checks.append({"name": "segment_duration", "segment": index, "status": "review",
+                           "detail": f"{duration:.1f}s; under the 6s editorial review threshold"})
+        elif duration > 55.0:
+            warnings.append(f"Segment {index + 1} is long ({duration:.1f}s); confirm the full context earns the runtime.")
+            checks.append({"name": "segment_duration", "segment": index, "status": "review",
+                           "detail": f"{duration:.1f}s; above the 55s editorial review threshold"})
+        else:
+            checks.append({"name": "segment_duration", "segment": index, "status": "passed",
+                           "detail": f"{duration:.1f}s"})
+        captions = segment.get("captions", [])
+        if not captions:
+            warnings.append(f"Segment {index + 1} has no captions; confirm this is intentional.")
+            checks.append({"name": "caption_presence", "segment": index, "status": "review",
+                           "detail": "No captions supplied"})
+            continue
+        checks.append({"name": "caption_presence", "segment": index, "status": "passed",
+                       "detail": f"{len(captions)} caption events"})
+        for caption_index, caption in enumerate(captions):
+            try:
+                caption_duration = timestamp_seconds(caption["end"]) - timestamp_seconds(caption["start"])
+                text_value = str(caption.get("text", ""))
+                visible_chars = len(" ".join(text_value.split()))
+                cps = visible_chars / caption_duration if caption_duration > 0 else float("inf")
+            except (KeyError, TypeError, ValueError, ZeroDivisionError):
+                checks.append({"name": "caption_readability", "segment": index,
+                               "caption": caption_index, "status": "unavailable"})
+                continue
+            if cps > 25:
+                warnings.append(f"Segment {index + 1}, caption {caption_index + 1} is very fast ({cps:.1f} characters/second); shorten or retime it.")
+                status = "review"
+            elif cps > 20:
+                warnings.append(f"Segment {index + 1}, caption {caption_index + 1} may be difficult to read ({cps:.1f} characters/second).")
+                status = "warning"
+            else:
+                status = "passed"
+            checks.append({"name": "caption_readability", "segment": index,
+                           "caption": caption_index, "status": status,
+                           "detail": f"{visible_chars} visible characters over {caption_duration:.2f}s ({cps:.1f} chars/s)"})
+            if segment.get("layout") in {"split_vertical", "blurred_bars_20_60_20"} and len(text_value) > 32:
+                warnings.append(f"Segment {index + 1}, caption {caption_index + 1} is longer than 32 characters for a single-line layout; inspect horizontal scaling.")
+                checks.append({"name": "single_line_caption_length", "segment": index,
+                               "caption": caption_index, "status": "review",
+                               "detail": f"{len(text_value)} characters; recommended maximum 32"})
+            if caption_duration < 0.35:
+                warnings.append(f"Segment {index + 1}, caption {caption_index + 1} displays for less than 0.35s; check for a flash.")
+                checks.append({"name": "caption_display_time", "segment": index,
+                               "caption": caption_index, "status": "review",
+                               "detail": f"{caption_duration:.2f}s"})
+    return {
+        "status": "review_needed" if warnings else "no_obvious_flags",
+        "checks": checks,
+        "warnings": warnings,
+        "limitations": [
+            "These are deterministic editorial heuristics, not a prediction of virality or a substitute for watching the edit.",
+            "Reading-speed thresholds are guidance; names, numbers, language and viewer context can change what is comfortable.",
+            "This check does not inspect rendered pixels, caption contrast, visual obstruction, story coherence or actual audio timing."
+        ]
+    }
