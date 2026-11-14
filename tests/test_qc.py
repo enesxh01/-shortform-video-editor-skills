@@ -4,7 +4,7 @@ from pathlib import Path
 from argparse import Namespace
 from unittest.mock import patch
 
-from shortform_editor.qc import assess_probe
+from shortform_editor.qc import add_expected_duration_check, assess_probe
 from shortform_editor.cli import command_qc, command_repair
 
 
@@ -87,6 +87,14 @@ class QCTests(unittest.TestCase):
         result = assess_probe(report, "freeze_start:8.0\\nfreeze_duration:2.0")
         self.assertEqual(result["freeze_regions"], [{"start": 8.0, "end": 10.0}])
         self.assertEqual(result["status"], "fail")
+
+
+    def test_checks_rendered_duration_against_edl(self):
+        passed = add_expected_duration_check({"status": "passed", "checks": [], "failures": []}, 15.02, 15.0)
+        self.assertEqual(passed["status"], "passed")
+        failed = add_expected_duration_check({"status": "passed", "checks": [], "failures": []}, 14.5, 15.0)
+        self.assertEqual(failed["status"], "fail")
+        self.assertIn("Rendered duration does not match the EDL timeline", failed["failures"])
 
 
 if __name__ == "__main__":
