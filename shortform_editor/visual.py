@@ -319,6 +319,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             "CSRT tracking can bridge missed frontal-face detections when the opencv-contrib build exposes the tracker; it is not general object/action tracking and may fail during fast motion, occlusion or scene changes.",
             "No face detection and no valid active tracker means a safe center crop.",
             "Sampling timestamps can drift on variable-frame-rate media; verify crop keyframes against the actual export.",
+            "Face boxes can guide fullscreen caption placement away from upper/lower caption safe areas, but this is a sparse face-only heuristic, not general object/HUD collision detection.",
             "Crop plans are suggestions; no video is modified by this analysis."
         ]
     }
