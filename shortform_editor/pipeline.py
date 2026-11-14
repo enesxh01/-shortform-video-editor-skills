@@ -127,20 +127,30 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
 
     save_progress("running")
 
-    def stage(name: str, function):
+    def stage(name: str, function, cached: dict[str, Any] | None = None):
+        if cached is not None:
+            stages.append({"stage": name, "status": "reused_checkpoint", "duration_seconds": 0.0})
+            save_progress("running")
+            return cached
         started = time.perf_counter()
         result = function()
         stages.append({
-            "stage": name,
-            "status": "completed",
+            "stage": name, "status": "completed",
             "duration_seconds": round(time.perf_counter() - started, 3)
         })
         save_progress("running")
         return result
 
     try:
+        # Always re-probe and re-hash the source before trusting cached artifacts.
         probe = stage("probe", lambda: probe_media(source))
         source_signature = file_stat_signature(source)
+        source_fingerprint = probe["source"]["fingerprint"]
+        saved_fingerprint = state.get("source_fingerprint")
+        if saved_fingerprint and saved_fingerprint != source_fingerprint:
+            raise PipelineError("Cannot resume: source fingerprint changed since the original job")
+        state["source_fingerprint"] = source_fingerprint
+        _write_json(state_path, state)
         _write_json(output_dir / "probe.json", probe)
 
         split_probes = {}
@@ -155,14 +165,20 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                 split_probes[key] = probe_media(path)
                 split_signatures[key] = file_stat_signature(path)
 
-        audio = stage("audio", lambda: analyze_audio(source, model_size=model, device=device, probe_report=probe))
-        if audio.get("source", {}).get("fingerprint") != probe["source"]["fingerprint"]:
+        cached_audio = _cached_artifact(output_dir, "audio-analysis.json", source_fingerprint, ("source", "fingerprint")) if resume else None
+        audio = stage("audio", lambda: analyze_audio(source, model_size=model, device=device, probe_report=probe), cached_audio)
+        if audio.get("source", {}).get("fingerprint") != source_fingerprint:
             raise PipelineError("Source media changed between initial probe and audio analysis; restart the project")
         if file_stat_signature(source) != source_signature:
             raise PipelineError("Source media changed during audio analysis; restart the project")
         _write_json(output_dir / "audio-analysis.json", audio)
 
-        candidates = stage("moment_detection", lambda: detect_moments(audio, limit=top_candidates))
+        cached_candidates = _cached_artifact(output_dir, "candidates.json", source_fingerprint, ("source_fingerprint",)) if resume else None
+        if cached_candidates is not None:
+            candidates = stage("moment_detection", lambda: None, cached_candidates)
+            candidates = stage("performance_feedback", lambda: candidates, candidates)
+        else:
+            candidates = stage("moment_detection", lambda: detect_moments(audio, limit=top_candidates))
 
         def apply_local_feedback():
             try:
@@ -177,10 +193,14 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                 }
                 return result
 
-        candidates = stage("performance_feedback", apply_local_feedback)
+        if cached_candidates is None:
+            candidates = stage("performance_feedback", apply_local_feedback)
+        candidates["source_fingerprint"] = source_fingerprint
         _write_json(output_dir / "candidates.json", candidates)
 
-        pacing = stage("retention_pacing", lambda: analyze_pacing(audio, candidates))
+        cached_pacing = _cached_artifact(output_dir, "pacing.json", source_fingerprint, ("source_fingerprint",)) if resume else None
+        pacing = stage("retention_pacing", lambda: analyze_pacing(audio, candidates), cached_pacing)
+        pacing["source_fingerprint"] = source_fingerprint
         _write_json(output_dir / "pacing.json", pacing)
         pacing_by_id = {item.get("candidate_id"): item for item in pacing.get("candidates", [])}
 
@@ -191,9 +211,11 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                     (item["source_in_seconds"], item["source_out_seconds"])
                     for item in candidates["candidates"]
                 ]
+                cached_visuals = _cached_artifact(output_dir, "visual-analysis.json", source_fingerprint, ("source", "fingerprint")) if resume else None
                 visuals = stage(
                     "visual_analysis",
-                    lambda: analyze_visuals(source, regions=candidate_regions, probe_report=probe)
+                    lambda: analyze_visuals(source, regions=candidate_regions, probe_report=probe),
+                    cached_visuals
                 )
                 if visuals.get("source", {}).get("fingerprint") != probe["source"]["fingerprint"]:
                     raise PipelineError("Source media changed between initial probe and visual analysis; restart the project")
