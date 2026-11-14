@@ -19,14 +19,14 @@ This file describes repository evidence, not intended behavior. A documented des
 | Human approval | Partial | EDL approval flag gates final rendering. No preview UI or interactive approval tool. |
 | Resource management | Design-only | Hardware-aware scheduling policy is documented; no runtime GPU/RAM/VRAM scheduler or benchmarks. |
 | Performance feedback and learning | Excluded by project scope | YouTube Analytics, channel metrics and analytics-driven optimization are intentionally out of scope. |
-| Installers | Implemented, CI pending | Linux and PowerShell installers stage skill folders, package referenced docs and preserve prior versions in backups. Cross-platform CI has been added but has not yet reported a run. |
+| Installers | Implemented, CI-tested | Linux and PowerShell installers stage skill folders, package referenced docs and preserve prior versions in backups. A full Linux/Windows CI run passed; the latest rerun has passed Linux and is still completing Windows. |
 
 ## Automated coverage added
 
 - EDL schema validation and semantic unit tests.
 - Cross-platform CI workflow intended to run unit tests, CLI startup and isolated installer checks.
 
-Current verified test result: **not yet available**. Do not treat configured CI as a passing test.
+Current verified test result: **8 EDL unit tests passed on Linux and Windows in CI run 16; Linux tests and installer smoke check also passed in CI run 21. The Windows job for run 21 is still in progress.** No real-footage render test has run.
 
 ## Known limitations and risks
 
