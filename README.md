@@ -115,10 +115,10 @@ shortform-editor apply-feedback job-output/candidates.json -o ranked.json
 - Audio has ASR and energy/silence analysis, but no diarization, overlap, laughter/emotion classification or multi-mic separation.
 - Visual analysis detects scene-change candidates and frontal faces only; it does not understand arbitrary objects, actions, sports or gameplay HUDs.
 - Pacing trims are advisory and never automatically remove content.
-- Captions use ASS/libass and word karaoke; advanced motion presets, custom font packaging and safe-area preview are not implemented.
+- Captions use ASS/libass and word karaoke; advanced motion presets, custom font packaging and safe-area preview are not implemented. Optional per-clip fade-in/fade-out transitions now support synchronized video and source-audio fades (0–2 seconds each). These fade to/from black; cross-dissolves and motion transitions remain unimplemented.
 - QC checks stream metadata, codec, dimensions, FPS, black/frozen intervals, sample peak and stream timing metadata. It is not full creative QC or listening-based lip-sync analysis.
 - Technical repair writes a new normalized H.264/AAC file; it cannot repair missing/black/frozen content or clipping.
-- Rendering currently uses CPU libx264; the RTX 3060 is used only when faster-whisper successfully selects CUDA. No target-machine benchmark or NVENC path has been completed.
+- Rendering now prefers NVIDIA H.264 NVENC automatically when the FFmpeg build exposes it, with a CPU libx264 fallback if NVENC fails to initialize. `--encoder libx264` forces CPU; `--encoder h264_nvenc` requires NVENC. The RTX 3060 can accelerate encoding, but no target-machine benchmark has been completed.
 - 60 fps CFR output may duplicate/drop frames; it does not create native 60 fps motion from lower-frame-rate footage.
 
 See `IMPLEMENTATION_STATUS.md` for feature-by-feature evidence and `THIRD_PARTY_NOTICES.md` for licensing. The repository has no root `LICENSE`; the owner must choose one before redistribution rights can be assumed.
