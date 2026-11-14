@@ -411,10 +411,10 @@ def command_render(args: argparse.Namespace) -> int:
                         f"crop={width}:{height},setsar=1,fps={fps},format=yuv420p"
                     )
                 fade_video_filters, fade_audio_filters = _segment_fade_filters(segment, clip_duration)
-                if fade_video_filters:
-                    vf += "," + ",".join(fade_video_filters)
                 if subtitle_filter:
                     vf += f",{subtitle_filter}"
+                if fade_video_filters:
+                    vf += "," + ",".join(fade_video_filters)
                 cmd += ["-map", "0:v:0", "-map", "0:a?", "-vf", vf]
             elif layout == "blurred_bars_20_60_20":
                 center_height = int(height * 0.6) // 2 * 2
@@ -429,13 +429,13 @@ def command_render(args: argparse.Namespace) -> int:
                 )
                 fade_video_filters, fade_audio_filters = _segment_fade_filters(segment, clip_duration)
                 graph_input = "vbase"
-                if fade_video_filters:
-                    graph += f";[vbase]{','.join(fade_video_filters)}[vfade]"
-                    graph_input = "vfade"
                 if subtitle_filter:
-                    graph += f";[{graph_input}]{subtitle_filter}[vout]"
-                else:
-                    graph += f";[{graph_input}]null[vout]"
+                    graph += f";[vbase]{subtitle_filter}[vcap]"
+                    graph_input = "vcap"
+                if fade_video_filters:
+                    graph += f";[{graph_input}]{','.join(fade_video_filters)}[vfade]"
+                    graph_input = "vfade"
+                graph += f";[{graph_input}]null[vout]"
                 cmd += ["-filter_complex", graph, "-map", "[vout]", "-map", "0:a?"]
             elif layout == "split_vertical":
                 panel_height = height // 2
@@ -448,13 +448,13 @@ def command_render(args: argparse.Namespace) -> int:
                 )
                 fade_video_filters, fade_audio_filters = _segment_fade_filters(segment, clip_duration)
                 graph_input = "vbase"
-                if fade_video_filters:
-                    graph += f";[vbase]{','.join(fade_video_filters)}[vfade]"
-                    graph_input = "vfade"
                 if subtitle_filter:
-                    graph += f";[{graph_input}]{subtitle_filter}[vout]"
-                else:
-                    graph += f";[{graph_input}]null[vout]"
+                    graph += f";[vbase]{subtitle_filter}[vcap]"
+                    graph_input = "vcap"
+                if fade_video_filters:
+                    graph += f";[{graph_input}]{','.join(fade_video_filters)}[vfade]"
+                    graph_input = "vfade"
+                graph += f";[{graph_input}]null[vout]"
                 cmd += ["-filter_complex", graph, "-map", "[vout]", "-map", "0:a?"]
             else:
                 raise PipelineError(f"Unsupported layout: {layout}")
