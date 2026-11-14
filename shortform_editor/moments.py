@@ -28,7 +28,7 @@ def _text(segments: list[dict[str, Any]]) -> str:
 
 
 def _has_cue(text: str, cue: str) -> bool:
-    return re.search(r"(?<!\\w)" + re.escape(cue.lower()) + r"(?!\\w)", text.lower()) is not None
+    return re.search(r"(?<!\w)" + re.escape(cue.lower()) + r"(?!\w)", text.lower()) is not None
 
 
 def _has_any_cue(text: str, cues: tuple[str, ...]) -> bool:
