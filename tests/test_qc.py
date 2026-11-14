@@ -167,5 +167,52 @@ class QCTests(unittest.TestCase):
         self.assertEqual(result["audio_loudness"]["integrated_lufs"], -22.0)
 
 
+    def test_editorial_quality_reports_fast_and_overlong_single_line_captions_without_blocking(self):
+        from shortform_editor.qc import assess_edit_quality
+        edl = {"segments": [{
+            "source_in": "00:00:00.000", "source_out": "00:00:10.000",
+            "layout": "split_vertical",
+            "captions": [{
+                "start": "00:00:01.000", "end": "00:00:02.000",
+                "text": "This caption is intentionally much too long for the single line"
+            }]
+        }]}
+        report = assess_edit_quality(edl)
+        self.assertEqual(report["status"], "review_needed")
+        self.assertTrue(any("characters/second" in warning for warning in report["warnings"]))
+        self.assertTrue(any("horizontal scaling" in warning for warning in report["warnings"]))
+        self.assertTrue(any(check["name"] == "caption_readability" and check["status"] == "review"
+                            for check in report["checks"]))
+
+    def test_editorial_quality_flags_short_segments_missing_captions_and_flash_captions(self):
+        from shortform_editor.qc import assess_edit_quality
+        edl = {"segments": [
+            {"source_in": "00:00:00.000", "source_out": "00:00:04.000",
+             "layout": "fullscreen", "captions": []},
+            {"source_in": "00:00:04.000", "source_out": "00:00:08.000",
+             "layout": "fullscreen", "captions": [{
+                 "start": "00:00:04.000", "end": "00:00:04.200", "text": "Flash"
+             }]}
+        ]}
+        report = assess_edit_quality(edl)
+        self.assertEqual(report["status"], "review_needed")
+        self.assertTrue(any("very short" in warning for warning in report["warnings"]))
+        self.assertTrue(any("no captions" in warning for warning in report["warnings"]))
+        self.assertTrue(any("less than 0.35s" in warning for warning in report["warnings"]))
+
+    def test_editorial_quality_clean_edl_has_no_obvious_flags(self):
+        from shortform_editor.qc import assess_edit_quality
+        edl = {"segments": [{
+            "source_in": "00:00:00.000", "source_out": "00:00:20.000",
+            "layout": "fullscreen", "captions": [{
+                "start": "00:00:01.000", "end": "00:00:03.000", "text": "A readable caption"
+            }]
+        }]}
+        report = assess_edit_quality(edl)
+        self.assertEqual(report["status"], "no_obvious_flags")
+        self.assertFalse(report["warnings"])
+
+
+
 if __name__ == "__main__":
     unittest.main()
