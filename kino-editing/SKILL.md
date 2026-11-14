@@ -57,3 +57,8 @@ Run safe-area and readability checks at phone-size preview dimensions.
 - Sharpening is optional and bounded (0–1.5). Use a low amount (typically 0.2–0.5) only when the source is genuinely soft; do not sharpen compression noise, ringing, skin texture, or already-crisp footage.
 - Defaults are neutral and sharpening is off. Never apply a one-size-fits-all grade to every source. Avoid clipping highlights/shadows or oversaturating skin.
 - This is deterministic FFmpeg correction, not scene-referred color management, RAW grading, LUT emulation, or a calibrated display workflow. Inspect representative frames before final approval.
+
+
+## Caption safe areas and motion presets
+
+The EDL supports per-caption `font_size` (28–100), vertical safe-area margin `margin_v` (0–600), and optional `animation` (`none`, `fade`, `pop`, `pop_fade`). Keep split-layout captions centered and single-line in the divider. For fullscreen, choose a bottom margin that clears platform UI and faces; inspect at phone size. Use short, restrained pop/fade entrances only when they help emphasis; avoid animating every word or causing jitter. Defaults preserve the existing static/Kino treatment.
