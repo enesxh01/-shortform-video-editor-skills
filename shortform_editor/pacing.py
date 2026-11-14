@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +39,8 @@ def analyze_pacing(analysis: dict[str, Any], candidates: dict[str, Any],
         raise PipelineError("Pacing analysis requires a completed transcript")
     if long_pause_seconds < 0.5 or long_pause_seconds > 8:
         raise PipelineError("Long-pause threshold must be between 0.5 and 8 seconds")
+    if candidates.get("source_fingerprint") != analysis.get("source", {}).get("fingerprint"):
+        raise PipelineError("Candidate and audio-analysis source fingerprints do not match")
     segments = transcript.get("segments", [])
     silence_regions = analysis.get("analysis", {}).get("audio_metrics", {}).get("silence_regions", [])
     output_candidates = []
