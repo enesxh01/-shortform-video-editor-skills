@@ -197,6 +197,84 @@ class PipelineOrchestrationTests(unittest.TestCase):
                 with self.assertRaisesRegex(PipelineError, "changed between initial probe and audio analysis"):
                     analyze_project(source, root / "job")
 
+    def test_resume_reuses_only_matching_fingerprinted_analysis_checkpoints(self):
+        fingerprint = "sha256:" + ("c" * 64)
+        candidate = {
+            "candidate_id": "resume-moment",
+            "source_fingerprint": fingerprint,
+            "source_in_seconds": 2.0,
+            "source_out_seconds": 18.0,
+            "family": "story_or_commentary",
+            "transcript_excerpt": "Resume test moment",
+            "confidence": 0.4
+        }
+        probe = {
+            "source": {"path": "source.mp4", "sha256": "c" * 64, "fingerprint": fingerprint},
+            "format": {"duration": "30.0"},
+            "streams": [{"codec_type": "video", "time_base": "1/90000", "avg_frame_rate": "30/1"}]
+        }
+        audio = {
+            "source": {"fingerprint": fingerprint},
+            "analysis": {"transcription": {"status": "completed"}}
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.mp4"
+            source.write_bytes(b"resume source")
+            output = root / "resume-job"
+            with patch("shortform_editor.pipeline.probe_media", return_value=probe), \
+                 patch("shortform_editor.pipeline.analyze_audio", return_value=audio) as audio_mock, \
+                 patch("shortform_editor.pipeline.detect_moments", return_value={"candidates": [candidate]}) as moments_mock, \
+                 patch("shortform_editor.pipeline.analyze_pacing", return_value={"candidates": []}) as pacing_mock, \
+                 patch("shortform_editor.pipeline.generate_captions", return_value={"captions": []}):
+                analyze_project(source, output, top_candidates=1)
+                self.assertEqual(audio_mock.call_count, 1)
+                resumed = analyze_project(source, output, top_candidates=1, resume=True)
+                self.assertEqual(audio_mock.call_count, 1)
+                self.assertEqual(moments_mock.call_count, 1)
+                self.assertEqual(pacing_mock.call_count, 1)
+            reused = {
+                item["stage"] for item in resumed["stages"]
+                if item["status"] == "reused_checkpoint"
+            }
+            self.assertTrue({"audio", "moment_detection", "performance_feedback", "retention_pacing"}.issubset(reused))
+
+    def test_resume_rejects_changed_options_and_source_fingerprint(self):
+        fingerprint = "sha256:" + ("d" * 64)
+        candidate = {
+            "candidate_id": "resume-guard",
+            "source_fingerprint": fingerprint,
+            "source_in_seconds": 2.0,
+            "source_out_seconds": 18.0,
+            "family": "story_or_commentary",
+            "transcript_excerpt": "Resume guard",
+            "confidence": 0.4
+        }
+        probe = {
+            "source": {"path": "source.mp4", "sha256": "d" * 64, "fingerprint": fingerprint},
+            "format": {"duration": "30.0"},
+            "streams": [{"codec_type": "video", "time_base": "1/90000", "avg_frame_rate": "30/1"}]
+        }
+        audio = {"source": {"fingerprint": fingerprint}, "analysis": {"transcription": {"status": "completed"}}}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.mp4"
+            source.write_bytes(b"resume guard source")
+            output = root / "guard-job"
+            with patch("shortform_editor.pipeline.probe_media", return_value=probe), \
+                 patch("shortform_editor.pipeline.analyze_audio", return_value=audio), \
+                 patch("shortform_editor.pipeline.detect_moments", return_value={"candidates": [candidate]}), \
+                 patch("shortform_editor.pipeline.analyze_pacing", return_value={"candidates": []}), \
+                 patch("shortform_editor.pipeline.generate_captions", return_value={"captions": []}):
+                analyze_project(source, output, top_candidates=1)
+                with self.assertRaisesRegex(PipelineError, "source/options do not match"):
+                    analyze_project(source, output, top_candidates=2, resume=True)
+                changed_probe = dict(probe)
+                changed_probe["source"] = dict(probe["source"], fingerprint="sha256:" + ("e" * 64), sha256="e" * 64)
+                with patch("shortform_editor.pipeline.probe_media", return_value=changed_probe):
+                    with self.assertRaisesRegex(PipelineError, "source fingerprint changed"):
+                        analyze_project(source, output, top_candidates=1, resume=True)
+
 
 if __name__ == "__main__":
     unittest.main()
