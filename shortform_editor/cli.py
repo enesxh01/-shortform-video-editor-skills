@@ -145,7 +145,7 @@ def render(edl_path, output):
     rnd=edl["render"]; w,h=int(rnd["width"]),int(rnd["height"])
     fps=str(rnd["fps_target"]); target=Path(output).expanduser().resolve()
     target.parent.mkdir(parents=True,exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix="shortform-") as td:
+    with tempfile.TemporaryDirectory(prefix=".shortform-",dir=target.parent) as td:
         td=Path(td); ass=td/"captions.ass"; make_ass(edl,ass)
         inputs=["-i",str(source)]
         filters=[]; labels=[]
@@ -194,7 +194,7 @@ def render(edl_path, output):
         expected=Fraction(fps)
         if actual!=expected: raise EditorError(f"QC failed: expected {expected} fps, got {actual}")
         run(["ffmpeg","-v","error","-i",str(tmp),"-f","null","-"],capture=True)
-        shutil.move(str(tmp),str(target))
+        os.replace(str(tmp),str(target))
         manifest={"status":"technical_qc_passed_human_visual_review_required","output":str(target),
           "output_sha256":sha256(target),"source":info,"output_probe":qc,"ffmpeg_version":run(["ffmpeg","-version"]).splitlines()[0],
           "render_profile":rnd,"segments":len(edl["segments"])}
