@@ -154,6 +154,15 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
                         messages.append(f"segments[{index}].{split_key}.source_out must be greater than source_in")
                     if abs((split_end - split_start) - (end - start)) > 0.1:
                         messages.append(f"segments[{index}].{split_key} duration must match the primary segment within 100 ms")
+            crop_keyframes = segment.get("crop_keyframes", [])
+            if crop_keyframes and segment["layout"] != "fullscreen":
+                messages.append(f"segments[{index}].crop_keyframes are currently supported only for fullscreen layout")
+            previous_crop_time = -1.0
+            for crop_index, keyframe in enumerate(crop_keyframes):
+                crop_time = float(keyframe["time_seconds"])
+                if crop_time < start or crop_time > end or crop_time < previous_crop_time:
+                    messages.append(f"segments[{index}].crop_keyframes[{crop_index}] time must be ordered and inside the segment")
+                previous_crop_time = crop_time
             for caption_index, caption in enumerate(segment.get("captions", [])):
                 caption_start = timestamp_seconds(caption["start"])
                 caption_end = timestamp_seconds(caption["end"])
