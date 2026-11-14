@@ -513,6 +513,39 @@ def command_qc(args: argparse.Namespace) -> int:
     return 0 if report["status"] == "passed" else 1
 
 
+def command_record_feedback(args: argparse.Namespace) -> int:
+    from .feedback import DEFAULT_FEEDBACK_PATH, record_feedback
+
+    candidates = json.loads(Path(args.candidates).expanduser().resolve(strict=True).read_text(encoding="utf-8"))
+    feedback_path = Path(args.feedback_file).expanduser().resolve() if args.feedback_file else DEFAULT_FEEDBACK_PATH
+    record = record_feedback(candidates, args.candidate_id, args.decision, feedback_path, args.reason)
+    print(json.dumps({
+        "feedback_file": str(feedback_path),
+        "candidate_id": record["candidate_id"],
+        "decision": record["decision"],
+        "stored": True
+    }, indent=2))
+    return 0
+
+
+def command_apply_feedback(args: argparse.Namespace) -> int:
+    from .feedback import DEFAULT_FEEDBACK_PATH, apply_feedback_file
+
+    feedback_path = Path(args.feedback_file).expanduser().resolve() if args.feedback_file else DEFAULT_FEEDBACK_PATH
+    result = apply_feedback_file(
+        Path(args.candidates).expanduser().resolve(strict=True),
+        feedback_path,
+        Path(args.output).expanduser().resolve(),
+        min_observations=args.min_observations
+    )
+    print(json.dumps({
+        "output": str(Path(args.output).expanduser().resolve()),
+        "records_used": result.get("feedback_learning", {}).get("records_used", 0),
+        "status": result.get("feedback_learning", {}).get("status")
+    }, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -567,6 +600,19 @@ def build_parser() -> argparse.ArgumentParser:
     qc.add_argument("--height", type=int, default=1920)
     qc.add_argument("--fps", default="60/1")
     qc.set_defaults(func=command_qc)
+    feedback = sub.add_parser("record-feedback", help="store a local human editorial decision for a candidate")
+    feedback.add_argument("candidates")
+    feedback.add_argument("--candidate-id", required=True)
+    feedback.add_argument("--decision", required=True, choices=["approve", "edited", "reject"])
+    feedback.add_argument("--reason", default="")
+    feedback.add_argument("--feedback-file")
+    feedback.set_defaults(func=command_record_feedback)
+    learn = sub.add_parser("apply-feedback", help="apply learned local category preferences to candidate ranking")
+    learn.add_argument("candidates")
+    learn.add_argument("-o", "--output", required=True)
+    learn.add_argument("--feedback-file")
+    learn.add_argument("--min-observations", type=int, default=3)
+    learn.set_defaults(func=command_apply_feedback)
     render = sub.add_parser("render", help="render approved EDL segments into a vertical MP4")
     render.add_argument("source")
     render.add_argument("edl")
