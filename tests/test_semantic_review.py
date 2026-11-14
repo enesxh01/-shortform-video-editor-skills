@@ -77,6 +77,17 @@ class SemanticReviewTests(unittest.TestCase):
         errors = validate_semantic_review(review)
         self.assertTrue(any("cannot appear in final ranking" in error for error in errors))
 
+    def test_requires_descending_final_rank_order(self):
+        review = review_fixture()
+        review["final_ranked_candidates"].append({
+            "candidate_id": "moment-baseline-1",
+            "score": 95,
+            "confidence": "high",
+            "rationale": "Higher score should rank first."
+        })
+        errors = validate_semantic_review(review)
+        self.assertTrue(any("not ordered by descending score" in error for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()
