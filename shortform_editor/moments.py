@@ -12,15 +12,25 @@ from .cli import PipelineError
 HOOK_CUES = (
     "but", "however", "until", "suddenly", "turns out", "the truth", "the reason",
     "what happened", "i realized", "you need to", "here is why", "here's why",
-    "the problem", "the secret", "nobody", "never", "always"
+    "the problem", "the secret", "nobody", "never", "always",
+    # Common Albanian, Spanish, French and German narrative turns.
+    "mirëpo", "derisa", "papritur", "doli që", "e vërteta", "arsyeja",
+    "çfarë ndodhi", "problemi", "sekreti", "askush", "kurrë",
+    "sin embargo", "de repente", "resulta que", "la verdad", "el problema", "nadie", "nunca",
+    "pourtant", "soudain", "la vérité", "le problème", "personne", "jamais",
+    "allerdings", "plötzlich", "die wahrheit", "der grund", "das problem", "niemand", "nie"
 )
 PAYOFF_CUES = (
     "because", "that's why", "so that's", "in the end", "finally", "which means",
-    "the answer", "it worked", "it failed", "that was", "therefore", "as a result"
+    "the answer", "it worked", "it failed", "that was", "therefore", "as a result",
+    "sepse", "kjo është arsyeja", "në fund", "më në fund", "që do të thotë", "përgjigjja", "funksionoi", "dështoi", "prandaj",
+    "porque", "por eso", "al final", "la respuesta", "funcionó", "falló", "por lo tanto",
+    "parce que", "c'est pourquoi", "à la fin", "la réponse", "ça a marché",
+    "weil", "deshalb", "am ende", "die antwort", "es hat funktioniert"
 )
-COMEDY_CUES = ("laugh", "laughter", "funny", "joke", "kidding", "haha", "lol")
-KNOWLEDGE_CUES = ("how to", "the reason", "for example", "means that", "you can", "the difference")
-CONFLICT_CUES = ("wrong", "disagree", "no way", "you're wrong", "you are wrong", "argue", "fight")
+COMEDY_CUES = ("laugh", "laughter", "funny", "joke", "kidding", "haha", "lol", "shaka", "qesh", "hahaha", "chiste", "broma", "rire", "blague", "witz", "lustig")
+KNOWLEDGE_CUES = ("how to", "the reason", "for example", "means that", "you can", "the difference", "si të", "për shembull", "do të thotë", "mund të", "cómo", "por ejemplo", "significa", "comment", "par exemple", "bedeutet", "zum beispiel")
+CONFLICT_CUES = ("wrong", "disagree", "no way", "you're wrong", "you are wrong", "argue", "fight", "gabim", "nuk pajtohem", "s'ke të drejtë", "no tienes razón", "equivocado", "pas d'accord", "falsch", "ich stimme nicht zu")
 
 
 def _text(segments: list[dict[str, Any]]) -> str:
@@ -195,7 +205,7 @@ def detect_moments(analysis: dict[str, Any], min_duration: float = 12.0,
         "candidates": candidates[:limit],
         "limitations": [
             "This is a transparent baseline, not a trained viral-moment model and not a probability of virality.",
-            "Text cue rules are English-biased; multilingual/code-switched transcripts need human review.",
+            "Text cues include common English, Albanian, Spanish, French and German expressions; other languages and code-switching still need human review.",
             "Audio energy is supporting evidence only and does not equal excitement or quality.",
             "No candidate is approved automatically; check context, opening, payoff, rights and privacy."
         ]
