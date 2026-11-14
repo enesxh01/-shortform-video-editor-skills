@@ -1,6 +1,6 @@
 import unittest
 
-from shortform_editor.visual import compute_crop_box
+from shortform_editor.visual import build_ffmpeg_crop_filter, compute_crop_box
 
 
 class CropGeometryTests(unittest.TestCase):
@@ -20,6 +20,16 @@ class CropGeometryTests(unittest.TestCase):
     def test_rejects_invalid_geometry(self):
         with self.assertRaises(ValueError):
             compute_crop_box(0, 1080, 540, 540)
+
+    def test_builds_interpolated_crop_expression(self):
+        keyframes = [
+            {"time_seconds": 0.0, "crop_9_16": {"x": 20, "y": 0, "width": 202.5, "height": 360}},
+            {"time_seconds": 1.0, "crop_9_16": {"x": 100, "y": 0, "width": 202.5, "height": 360}}
+        ]
+        expression = build_ffmpeg_crop_filter(keyframes, 0.0, "60/1", 640, 360)
+        self.assertIn("crop=202:360", expression)
+        self.assertIn("n-0", expression)
+        self.assertIn("n-60", expression)
 
 
 if __name__ == "__main__":
