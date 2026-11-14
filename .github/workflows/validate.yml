@@ -73,20 +73,20 @@ jobs:
           python -m pip install --no-deps --target wheel-test dist/*.whl
           cd wheel-test
           python -c "from shortform_editor.cli import load_schema; assert load_schema(); print('Installed wheel loads packaged EDL schema')"
-      - name: Install skills to isolated directory (Linux)
+      - name: Run complete setup script (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          bash scripts/install.sh "$RUNNER_TEMP/opencode-skills"
-          test -f "$RUNNER_TEMP/opencode-skills/shortform-video-editor/references/viral-scoring.md"
-          test -f "$RUNNER_TEMP/opencode-skills/shortform-video-editor/references/export-and-fps.md"
-          test -f "$RUNNER_TEMP/opencode-skills/edit-decision-list/schemas/edit-decision-list.schema.json"
-      - name: Install skills to isolated directory (Windows)
+          bash scripts/setup.sh "$RUNNER_TEMP/opencode-setup-skills"
+          test -f "$RUNNER_TEMP/opencode-setup-skills/shortform-video-editor/references/viral-scoring.md"
+          test -f "$RUNNER_TEMP/opencode-setup-skills/shortform-video-editor/references/export-and-fps.md"
+          test -f "$RUNNER_TEMP/opencode-setup-skills/edit-decision-list/schemas/edit-decision-list.schema.json"
+      - name: Run complete setup script (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $destination = Join-Path $env:RUNNER_TEMP "opencode-skills"
-          & ./scripts/install.ps1 $destination
+          $destination = Join-Path $env:RUNNER_TEMP "opencode-setup-skills"
+          & ./scripts/setup.ps1 $destination
           if (-not (Test-Path (Join-Path $destination "shortform-video-editor/references/viral-scoring.md"))) { throw "Missing viral scoring reference" }
           if (-not (Test-Path (Join-Path $destination "shortform-video-editor/references/export-and-fps.md"))) { throw "Missing FPS reference" }
           if (-not (Test-Path (Join-Path $destination "edit-decision-list/schemas/edit-decision-list.schema.json"))) { throw "Missing EDL schema" }

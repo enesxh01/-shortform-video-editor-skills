@@ -21,30 +21,24 @@ You are the lead editor and technical director for a local-first short-form vide
 
 ## Executable foundation
 
-When the repository's Python package is installed with `python -m pip install -e .`, use the `shortform-editor` CLI.
-
-### Complete setup (run from the cloned repository root)
-
-The OpenCode skill installer and Python package installer do different jobs. The skill installer copies the instruction folders into OpenCode; it does **not** install the Python CLI or its dependencies.
+Use the combined setup script from the cloned repository root. It installs the editable Python CLI plus the audio, visual and download extras, installs the OpenCode skills with backups, and runs the environment doctor.
 
 Windows PowerShell:
 
 ```powershell
-py -m pip install --upgrade pip
-py -m pip install -e ".[audio,visual,download]"
-.\scripts\install.ps1
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\setup.ps1
 ```
 
 Linux/macOS:
 
 ```bash
-python3 -m pip install --upgrade pip
-python3 -m pip install -e ".[audio,visual,download]"
-bash scripts/install.sh
+bash scripts/setup.sh
 ```
 
-FFmpeg and ffprobe must also be installed separately and available on PATH. Restart the terminal and OpenCode after installation so the CLI and newly installed skills are discoverable. Then run `shortform-editor doctor`; it reports missing required tools, optional extras and whether FFmpeg advertises NVENC (driver initialization is still verified only during a render). The `audio`, `visual`, and `download` extras enable faster-whisper ASR, OpenCV analysis, and optional public-URL ingestion respectively.
+FFmpeg and ffprobe remain separate system requirements and are not silently installed or added to PATH by the setup scripts. Install an FFmpeg build that includes ffprobe, libx264 (or NVENC) and the subtitles filter, then rerun setup. Restart the terminal and OpenCode after installation. The doctor reports missing required tools, optional extras and whether FFmpeg advertises NVENC (driver initialization is still verified only during a render). The `audio`, `visual`, and `download` extras enable faster-whisper ASR, OpenCV analysis, and optional public-URL ingestion respectively.
 
+Use the `shortform-editor` command for CLI operations. If its console-script folder is not on PATH, invoke the same CLI through `py -3 -m shortform_editor.cli SUBCOMMAND` on Windows or `python3 -m shortform_editor.cli SUBCOMMAND` on Linux/macOS.
 
 - `shortform-editor analyze-project INPUT.mp4 -o JOB_DIR` — orchestrate probe, audio/ASR, candidate ranking, pacing, optional visual analysis, caption generation and draft EDL creation. It never approves or renders automatically.
 - If analysis is interrupted, rerun the exact same command with `--resume`. Resume re-probes and fingerprints the source, requires identical options, and reuses only cached analysis artifacts whose SHA-256 digest and source fingerprint still match. Changed, missing or corrupted checkpoints are recomputed. Do not change model, device, layout, candidate count, visual option or split-source settings when resuming.
