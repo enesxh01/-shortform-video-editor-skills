@@ -12,10 +12,13 @@ from .cli import PipelineError
 HOOK_CUES = (
     "but", "however", "until", "suddenly", "turns out", "the truth", "the reason",
     "what happened", "i realized", "you need to", "here is why", "here's why",
+    "watch what happens", "here is what", "here's what", "the moment when",
     "the problem", "the secret", "nobody", "never", "always",
     # Common Albanian, Spanish, French and German narrative turns.
     "mirëpo", "derisa", "papritur", "doli që", "e vërteta", "arsyeja",
     "çfarë ndodhi", "problemi", "sekreti", "askush", "kurrë",
+    "ja pse", "në fakt", "a e din", "nuk e priste", "kush e mendonte",
+    "në atë moment", "dhe pastaj", "nuk do ta besosh", "u zbulua",
     "sin embargo", "de repente", "resulta que", "la verdad", "el problema", "nadie", "nunca",
     "pourtant", "soudain", "la vérité", "le problème", "personne", "jamais",
     "allerdings", "plötzlich", "die wahrheit", "der grund", "das problem", "niemand", "nie"
@@ -24,6 +27,7 @@ PAYOFF_CUES = (
     "because", "that's why", "so that's", "in the end", "finally", "which means",
     "the answer", "it worked", "it failed", "that was", "therefore", "as a result",
     "sepse", "kjo është arsyeja", "në fund", "më në fund", "që do të thotë", "përgjigjja", "funksionoi", "dështoi", "prandaj",
+    "kështu që", "për këtë arsye", "dhe ja", "në fund fare", "doli e vërtetë",
     "porque", "por eso", "al final", "la respuesta", "funcionó", "falló", "por lo tanto",
     "parce que", "c'est pourquoi", "à la fin", "la réponse", "ça a marché",
     "weil", "deshalb", "am ende", "die antwort", "es hat funktioniert"
@@ -115,7 +119,37 @@ def _make_candidate(source_id: str, segments: list[dict[str, Any]], audio_window
     total = sum(scores.values())
     identity = hashlib.sha1(f"{source_id}:{start:.3f}:{end:.3f}".encode()).hexdigest()[:12]
     family = _candidate_family(text)
+    segment_logprobs = [
+        float(item["avg_logprob"]) for item in chosen
+        if item.get("avg_logprob") is not None
+    ]
+    segment_no_speech = [
+        float(item["no_speech_prob"]) for item in chosen
+        if item.get("no_speech_prob") is not None
+    ]
+    word_probabilities = [
+        float(word["probability"])
+        for item in chosen for word in item.get("words", [])
+        if word.get("probability") is not None
+    ]
+    transcript_diagnostics = {
+        "mean_segment_logprob": round(sum(segment_logprobs) / len(segment_logprobs), 4) if segment_logprobs else None,
+        "mean_no_speech_probability": round(sum(segment_no_speech) / len(segment_no_speech), 4) if segment_no_speech else None,
+        "mean_word_probability": round(sum(word_probabilities) / len(word_probabilities), 4) if word_probabilities else None,
+        "quality_flag": "insufficient_asr_evidence"
+    }
+    if segment_logprobs or word_probabilities:
+        weak_logprob = bool(segment_logprobs and transcript_diagnostics["mean_segment_logprob"] < -0.8)
+        weak_words = bool(word_probabilities and transcript_diagnostics["mean_word_probability"] < 0.55)
+        high_no_speech = bool(segment_no_speech and transcript_diagnostics["mean_no_speech_probability"] > 0.35)
+        transcript_diagnostics["quality_flag"] = (
+            "review_transcript" if weak_logprob or weak_words or high_no_speech else "no_obvious_asr_warning"
+        )
     risks = []
+    if transcript_diagnostics["quality_flag"] == "review_transcript":
+        risks.append("ASR confidence indicators are weak; verify the transcript against the source audio before editing.")
+    if transcript_diagnostics["quality_flag"] == "insufficient_asr_evidence":
+        risks.append("ASR confidence metadata is unavailable; transcript accuracy has not been assessed.")
     if hook < 5:
         risks.append("No strong textual hook cue detected; manual opening review required.")
     if payoff < 5:
@@ -134,6 +168,7 @@ def _make_candidate(source_id: str, segments: list[dict[str, Any]], audio_window
         "transcript_excerpt": text,
         "score": total,
         "score_breakdown": scores,
+        "transcript_diagnostics": transcript_diagnostics,
         "confidence": 0.35,
         "confidence_note": "Low-confidence heuristic ranking; no semantic model or labeled training set is used.",
         "risks": risks,
