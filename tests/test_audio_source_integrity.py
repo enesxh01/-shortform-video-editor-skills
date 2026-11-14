@@ -29,7 +29,8 @@ class AudioSourceIntegrityTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / "source.mp4"
             source.write_bytes(b"placeholder")
-            with patch("shortform_editor.audio.probe_media", side_effect=[first, second]), \
+            with patch("shortform_editor.audio.probe_media", return_value=first), \
+                 patch("shortform_editor.audio.file_stat_signature", side_effect=[(1, 1, 1, 1), (2, 2, 2, 2)]), \
                  patch("shortform_editor.audio._extract_mono_wav", side_effect=write_wav):
                 with self.assertRaisesRegex(PipelineError, "changed during audio analysis"):
                     analyze_audio(source, transcribe=False)
