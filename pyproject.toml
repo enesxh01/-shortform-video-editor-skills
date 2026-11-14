@@ -11,6 +11,7 @@ dependencies = ["jsonschema>=4.21,<5"]
 
 [project.optional-dependencies]
 audio = ["faster-whisper>=1.1,<2"]
+visual = ["opencv-python-headless>=4.10,<5"]
 
 [project.scripts]
 shortform-editor = "shortform_editor.cli:main"
