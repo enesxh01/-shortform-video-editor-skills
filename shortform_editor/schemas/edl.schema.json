@@ -306,9 +306,16 @@
                   "enum": [
                     "auto",
                     "center",
-                    "bottom"
-,
-                    "top"                  ]
+                    "bottom",
+                    "top"
+                  ]
+                },
+                "position_reason": {
+                  "type": "string",
+                  "enum": [
+                    "face_overlap_with_lower_caption_safe_area",
+                    "face_overlap_with_upper_caption_safe_area"
+                  ]
                 },
                 "font_size": {"type": "integer", "minimum": 28, "maximum": 100},
                 "margin_v": {"type": "integer", "minimum": 0, "maximum": 600},
