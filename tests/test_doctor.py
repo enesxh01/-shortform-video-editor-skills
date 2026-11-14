@@ -9,7 +9,7 @@ from unittest.mock import patch
 from shortform_editor.cli import command_doctor
 
 
-FILTERS = "\\n".join([
+FILTERS = "\n".join([
     " T.. subtitles", " T.. fps", " T.. scale", " T.. crop", " T.. setpts",
     " T.. setsar", " T.. format", " T.. aresample", " T.. blackdetect",
     " T.. freezedetect", " T.. volumedetect", " T.. ebur128"
@@ -61,7 +61,7 @@ class DoctorTests(unittest.TestCase):
 
     def test_reports_missing_required_filter_instead_of_false_ready(self):
         output = StringIO()
-        filters = "\\n".join(line for line in FILTERS.splitlines() if "ebur128" not in line)
+        filters = "\n".join(line for line in FILTERS.splitlines() if "ebur128" not in line)
         which, run, find_spec = self._mock_environment(filters)
         with patch("shortform_editor.cli.shutil.which", side_effect=which), patch("shortform_editor.cli.run_checked", side_effect=run), patch("importlib.util.find_spec", side_effect=find_spec), redirect_stdout(output):
             result = command_doctor(Namespace())
