@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from shortform_editor.approval import approve_edl_file, edl_approval_hash
-from shortform_editor.cli import PipelineError
+from shortform_editor.cli import PipelineError, command_render
 
 
 def make_edl(fingerprint):
@@ -77,6 +77,33 @@ class ApprovalTests(unittest.TestCase):
         approved_hash = edl_approval_hash(edl)
         edl["segments"][0]["reason"] = "Changed after approval"
         self.assertNotEqual(approved_hash, edl_approval_hash(edl))
+
+
+    def test_final_render_rejects_edl_modified_after_approval(self):
+        fingerprint = "sha256:" + "a" * 64
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.mp4"
+            edl_path = root / "edit.json"
+            source.write_bytes(b"source")
+            edl = make_edl(fingerprint)
+            edl["approval"] = {
+                "status": "approved",
+                "approved_by_user": True,
+                "approved_edl_sha256": edl_approval_hash(edl),
+                "approved_at": "2026-01-01T00:00:00+00:00"
+            }
+            edl["segments"][0]["reason"] = "Edited after approval"
+            edl_path.write_text(json.dumps(edl), encoding="utf-8")
+            with patch("shortform_editor.cli.probe_media", return_value={
+                "source": {"fingerprint": fingerprint},
+                "format": {"duration": "30.0"}
+            }):
+                with self.assertRaisesRegex(PipelineError, "content changed after approval"):
+                    command_render(Namespace(
+                        source=str(source), edl=str(edl_path), output=str(root / "final.mp4"),
+                        crf=18, preset="medium", overwrite=False
+                    ))
 
 
 if __name__ == "__main__":
