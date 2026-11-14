@@ -50,10 +50,11 @@ class FrameTimingDiagnosticsTests(unittest.TestCase):
             with patch("shortform_editor.cli.run_checked", return_value=SimpleNamespace(
                 stdout=json.dumps({"frames": timestamps})
             )) as runner:
-                report = probe_frame_timing(source, "ffprobe", sample_frames=40)
+                report = probe_frame_timing(source, "ffprobe", duration_seconds=100.0, sample_frames=40, sample_windows=4)
         self.assertEqual(report["status"], "likely_cfr")
+        self.assertEqual(report["sample_windows"], 4)
         args = runner.call_args.args[0]
-        self.assertIn("%+#40", args)
+        self.assertIn("0%+#10,32.333%+#10,64.667%+#10,97.0%+#10", args)
         self.assertIn("best_effort_timestamp_time", args)
         self.assertEqual(args[-1], str(source))
 
@@ -72,6 +73,13 @@ class FrameTimingDiagnosticsTests(unittest.TestCase):
         report = analyze_frame_timestamps(timestamps)
         self.assertEqual(report["status"], "likely_vfr")
         self.assertGreater(report["non_monotonic_intervals"], 0)
+
+    def test_sampling_gaps_are_not_counted_as_frame_intervals(self):
+        timestamps = [index / 30 for index in range(20)]
+        timestamps += [10 + index / 30 for index in range(20)]
+        report = analyze_frame_timestamps(timestamps, sample_window_starts=[0, 10])
+        self.assertEqual(report["status"], "likely_cfr")
+        self.assertEqual(report["sampled_intervals"], 38)
 
 
 if __name__ == "__main__":
