@@ -1,6 +1,6 @@
 # Shortform Video Editor Skills
 
-A local-first OpenCode skill suite for building and operating a quality-focused short-form video clipping and editing pipeline.
+A local-first OpenCode skill suite and early executable foundation for building a quality-focused short-form video clipping and editing pipeline.
 
 ## Project goals
 
@@ -20,39 +20,45 @@ A local-first OpenCode skill suite for building and operating a quality-focused 
 
 ## Visual layouts
 
-The editing system supports exactly three primary layouts:
-
-1. **Fullscreen** — vertical 9:16 composition with careful subject-aware reframing and editorial captions.
-2. **Vertical split** — two panels stacked top/bottom, never side-by-side; one caption line centered in the divider.
-3. **Blurred bars (20/60/20)** — vertical 9:16 composition with a blurred 20% top region, 60% sharp main footage, and blurred 20% bottom region, derived from relevant footage.
-
-Layout changes must be motivated by the content, not used as arbitrary visual variety.
+The design supports exactly three primary layouts: fullscreen, top/bottom vertical split, and blurred bars with a 20/60/20 top/main/bottom composition. **The current renderer implements fullscreen center-crop only.** Split-screen, blurred bars, smart tracking and caption rendering are not implemented yet.
 
 ## Skill suite
 
 - `shortform-video-editor` — end-to-end orchestrator
 - `video-editor-architecture` — module boundaries and contracts
 - `media-ingestion` — safe source inspection and staging
-- `audio-intelligence` — ASR, word timing, VAD, speaker-turn evidence
-- `viral-moment-detection` — full-source candidate discovery and scoring
-- `visual-storytelling` — subject/action analysis and framing
-- `retention-pacing` — context-safe tightening
+- `audio-intelligence` — ASR, word timing, VAD, speaker-turn evidence (design-only)
+- `viral-moment-detection` — full-source candidate discovery and scoring (design-only)
+- `visual-storytelling` — subject/action analysis and framing (design-only)
+- `retention-pacing` — context-safe tightening (design-only)
 - `editing-director` — conflict resolution and EDL authoring
 - `edit-decision-list` — versioned timeline contract
-- `kino-editing` — captions, motion, and the three approved layouts
+- `kino-editing` — captions, motion, and the three approved layouts (design-only)
 - `ffmpeg-rendering` — deterministic rendering and 60 FPS policy
-- `resource-management` — CPU/GPU/RAM/VRAM/disk scheduling
-- `job-orchestration` — progress, cancellation, and recovery
-- `quality-assurance` — technical and visual QC
-- `preview-approval` — human review gates
+- `resource-management` — CPU/GPU/RAM/VRAM/disk scheduling (design-only)
+- `job-orchestration` — progress, cancellation, and recovery (design-only)
+- `quality-assurance` — technical and visual QC (partial)
+- `preview-approval` — human review gates (design-only)
 - `video-editor-testing` — unit, integration, benchmark, and footage matrix
 - `security-provenance` — safe handling and license/provenance checks
 - `observability` — structured logs and diagnostics
 - `project-memory` — explicit preferences only
 
-Detailed references live in `references/`; the EDL contract is in `schemas/`; installation scripts are in `scripts/`.
+## Executable foundation (early MVP)
 
-## Install
+Requirements: Python 3.10+, FFmpeg/ffprobe on PATH.
+
+```bash
+python -m pip install -e .
+shortform-editor probe input.mp4 -o probe.json
+shortform-editor validate-edl edit.json --probe probe.json
+shortform-editor render input.mp4 edit.json output.mp4
+python -m unittest discover -s tests -v
+```
+
+The current CLI provides source probing and SHA-256 fingerprinting, EDL schema/semantic validation, and an approved-EDL FFmpeg renderer. The renderer currently supports only fullscreen center-crop and sequential segment concatenation. It does not perform ASR, viral detection, diarization, smart crop/tracking, captions, split-screen, blurred bars, automatic repair, or visual QC. The 60 fps output policy is not a claim of native 60 fps motion from lower-frame-rate footage.
+
+## Install OpenCode skills
 
 Windows PowerShell:
 
@@ -66,12 +72,8 @@ Linux/macOS:
 bash scripts/install.sh
 ```
 
-Both scripts install skill folders containing `SKILL.md` into OpenCode's global skills directory by default. Pass a destination path to override it.
+Both installers stage skills before replacing existing installations, preserve prior skill directories in timestamped backups, and package each skill's referenced support files inside that skill directory.
 
 ## Quality policy
 
 A feature is not considered verified merely because code or documentation exists. Verification status must distinguish implemented-and-tested behavior from unverified implementation, partial work, design-only work, and blocked work. Technical QC does not replace human review of the actual exported video.
-
-## Repository status
-
-This repository is being built in stages. See the skill directories and project documentation for current implementation guidance and validation status.
