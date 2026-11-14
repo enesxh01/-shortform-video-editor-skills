@@ -642,6 +642,18 @@ def command_validate_semantic_review(args: argparse.Namespace) -> int:
     return 0 if report["status"] == "valid" else 2
 
 
+def command_approve_edl(args: argparse.Namespace) -> int:
+    from .approval import approve_edl_file
+
+    result = approve_edl_file(
+        Path(args.edl).expanduser().resolve(strict=True),
+        Path(args.source).expanduser().resolve(strict=True),
+        confirm=args.confirm
+    )
+    print(json.dumps(result, indent=2, ensure_ascii=False))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -737,6 +749,11 @@ def build_parser() -> argparse.ArgumentParser:
     semantic.add_argument("--probe")
     semantic.add_argument("--candidates")
     semantic.set_defaults(func=command_validate_semantic_review)
+    approve = sub.add_parser("approve-edl", help="mark an EDL approved after explicit human confirmation")
+    approve.add_argument("edl")
+    approve.add_argument("--source", required=True, help="primary source media used for fingerprint and duration validation")
+    approve.add_argument("--confirm", action="store_true", help="explicitly confirm human review of this EDL")
+    approve.set_defaults(func=command_approve_edl)
     render = sub.add_parser("render", help="render approved EDL segments into a vertical MP4")
     render.add_argument("source")
     render.add_argument("edl")
