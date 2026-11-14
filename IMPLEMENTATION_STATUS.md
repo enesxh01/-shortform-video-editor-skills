@@ -17,7 +17,7 @@ This file describes repository evidence, not intended behavior. A documented des
 | Rendering | Partial, unverified | FFmpeg CLI renders approved segments to portrait 9:16 fullscreen center-crop MP4 with H.264/AAC and 60 fps CFR target. Split-screen, blurred bars, captions, tracking, transitions and GPU encoding are not implemented. |
 | Automatic QC and repair | Partial, unverified | Renderer decodes the assembled output before publishing. No independent video/audio/visual QC departments or automated repair loop. |
 | Human approval | Partial | EDL approval flag gates final rendering. No preview UI or interactive approval tool. |
-| Resource management | Design-only | Hardware-aware scheduling policy is documented; no runtime GPU/RAM/VRAM scheduler or benchmarks. |
+| Resource management | Partial implementation, unit tests pending CI | psutil RAM and nvidia-smi VRAM preflight chooses CUDA only above per-model reserve, otherwise CPU int8; refuses inference below 2.5 GB available RAM. No queue, concurrency manager, disk reservation, live peak sampling or OOM retry. |
 | Performance feedback and learning | Excluded by project scope | YouTube Analytics, channel metrics and analytics-driven optimization are intentionally out of scope. |
 | Installers | Implemented, CI-tested | Linux and PowerShell installers stage skill folders, package referenced docs and preserve prior versions in backups. A full Linux/Windows CI run passed; the latest rerun has passed Linux and is still completing Windows. |
 
