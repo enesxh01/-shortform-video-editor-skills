@@ -13,7 +13,10 @@ from .cli import PipelineError, probe_media, validate_edl
 
 
 def edl_approval_hash(edl: dict[str, Any]) -> str:
-    payload = {key: value for key, value in edl.items() if key != "approval"}
+    payload = dict(edl)
+    approval = dict(payload.get("approval", {}))
+    approval.pop("approved_edl_sha256", None)
+    payload["approval"] = approval
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     return f"sha256:{digest}"
@@ -40,9 +43,9 @@ def approve_edl_file(edl_path: Path, source_path: Path, confirm: bool = False) -
     edl["approval"] = {
         "status": "approved",
         "approved_by_user": True,
-        "approved_edl_sha256": edl_approval_hash(edl),
         "approved_at": datetime.now(timezone.utc).isoformat()
     }
+    edl["approval"]["approved_edl_sha256"] = edl_approval_hash(edl)
     errors = validate_edl(edl, duration, probe["source"]["fingerprint"])
     if errors:
         raise PipelineError("Approved EDL failed validation:\n- " + "\n- ".join(errors))
