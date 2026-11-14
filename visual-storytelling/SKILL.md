@@ -9,7 +9,7 @@ Use computer vision to support editorial decisions, not to replace understanding
 
 ## Executable baseline
 
-Install the optional visual dependency with `python -m pip install -e ".[visual]"`, then run `shortform-editor analyze-visuals SOURCE -o visual-analysis.json`. The current module samples frames, estimates scene-change candidates from frame differences, detects frontal faces with OpenCV's bundled Haar cascade when enabled, smooths face-center positions, and emits conservative 9:16 crop keyframes. It uses CPU OpenCV; no CUDA model is loaded.
+Install the optional visual dependency with `python -m pip install -e ".[visual]"`, then run `shortform-editor analyze-visuals SOURCE -o visual-analysis.json`. The current module samples frames (the orchestrator prioritizes selected candidate windows and respects a frame budget), estimates scene-change candidates from frame differences, detects frontal faces with OpenCV's bundled Haar cascade when enabled, smooths face-center positions, and emits conservative 9:16 crop keyframes. It uses CPU OpenCV; no CUDA model is loaded.
 
 This is not general subject tracking or scene understanding. It cannot detect gameplay HUDs, sports objects, hands, arbitrary products or actions. When a face is not detected it falls back to center framing. When `analyze-project --visuals` is enabled, detected face keyframes are attached to fullscreen draft EDLs and interpolated by FFmpeg during render. Keyframes are still low-confidence and must be reviewed; no face detection means center crop. Blurred-bars and split layouts do not yet consume these crop keyframes. Treat all crop plans as review-required.
 
