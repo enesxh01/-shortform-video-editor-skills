@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Any
 
 from .cli import PipelineError, timestamp_seconds
@@ -138,6 +139,9 @@ def write_ass_subtitles(segment: dict[str, Any], layout: str, clip_start: float,
         caption_font_size = int(caption.get("font_size", font_size))
         if not 28 <= caption_font_size <= 100:
             raise PipelineError("Caption font_size must be between 28 and 100")
+        font_name = str(caption.get("font_name", "Arial"))
+        if not re.fullmatch(r"[A-Za-z0-9 _-]{1,64}", font_name):
+            raise PipelineError("Caption font_name must contain only letters, numbers, spaces, underscores or hyphens (1-64 characters)")
         caption_margin_v = int(caption.get("margin_v", margin_v))
         if not 0 <= caption_margin_v <= 600:
             raise PipelineError("Caption margin_v must be between 0 and 600")
