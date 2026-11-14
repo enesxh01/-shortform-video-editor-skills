@@ -1,6 +1,6 @@
 import unittest
 
-from shortform_editor.moments import _has_cue, detect_moments
+from shortform_editor.moments import _has_cue, detect_moments, select_diverse_candidates
 from shortform_editor.cli import PipelineError
 
 
@@ -43,6 +43,30 @@ class MomentDetectionTests(unittest.TestCase):
         self.assertEqual(sum(candidate["score_breakdown"].values()), candidate["score"])
         self.assertTrue(candidate["human_review_required"])
         self.assertEqual(candidate["confidence"], 0.35)
+
+    def test_candidate_shortlist_limits_family_dominance_before_filling(self):
+        candidates = [
+            {"candidate_id": f"comedy-{index}", "family": "comedy_or_reaction", "score": 100 - index, "confidence": 0.35}
+            for index in range(5)
+        ] + [
+            {"candidate_id": "knowledge-1", "family": "useful_explanation", "score": 80, "confidence": 0.35},
+            {"candidate_id": "story-1", "family": "story_or_commentary", "score": 70, "confidence": 0.35}
+        ]
+        selected = select_diverse_candidates(candidates, limit=5, max_per_family=2)
+        families = [item["family"] for item in selected]
+        self.assertEqual(families.count("comedy_or_reaction"), 2)
+        self.assertIn("useful_explanation", families)
+        self.assertIn("story_or_commentary", families)
+        self.assertEqual(len(selected), 5)
+
+    def test_candidate_shortlist_preserves_score_order_within_family(self):
+        candidates = [
+            {"candidate_id": "low", "family": "story", "score": 30, "confidence": 0.3},
+            {"candidate_id": "high", "family": "story", "score": 90, "confidence": 0.3},
+            {"candidate_id": "mid", "family": "story", "score": 60, "confidence": 0.3}
+        ]
+        selected = select_diverse_candidates(candidates, limit=3, max_per_family=2)
+        self.assertEqual([item["candidate_id"] for item in selected], ["high", "mid", "low"])
 
     def test_cue_matching_uses_word_boundaries(self):
         self.assertTrue(_has_cue("But then it happened", "but"))
