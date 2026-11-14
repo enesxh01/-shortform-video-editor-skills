@@ -79,7 +79,7 @@ def analyze_pacing(analysis: dict[str, Any], candidates: dict[str, Any],
             right_text = str(next_segment.get("text", "")).lower()
             context_text = left_text[-40:]
             meaningful = any(
-                re.search(rf"(?<!\\w){re.escape(cue)}(?!\\w)", context_text)
+                re.search(rf"(?<!\w){re.escape(cue)}(?!\w)", context_text)
                 for cue in MEANINGFUL_PAUSE_CUES
             )
             silence_ratio = _overlap_ratio(gap_start, gap_end, silence_regions)
