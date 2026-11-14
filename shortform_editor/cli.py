@@ -553,7 +553,7 @@ def command_qc(args: argparse.Namespace) -> int:
         destination.write_text(output, encoding="utf-8")
     else:
         print(output, end="")
-    return 0 if report["status"] == "passed" else 1
+    return 0 if report["status"] in {"passed", "warning"} else 1
 
 
 def command_record_feedback(args: argparse.Namespace) -> int:
@@ -603,7 +603,7 @@ def command_repair(args: argparse.Namespace) -> int:
         overwrite=args.overwrite
     )
     print(json.dumps(result, indent=2, ensure_ascii=False))
-    return 0 if result["qc_after_repair"]["status"] == "passed" else 1
+    return 0 if result["qc_after_repair"]["status"] in {"passed", "warning"} else 1
 
 
 def command_analyze_project(args: argparse.Namespace) -> int:
