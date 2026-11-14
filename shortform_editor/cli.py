@@ -332,6 +332,24 @@ def command_find_moments(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_analyze_pacing(args: argparse.Namespace) -> int:
+    from .pacing import analyze_pacing_files
+
+    result = analyze_pacing_files(
+        Path(args.analysis).expanduser().resolve(strict=True),
+        Path(args.candidates).expanduser().resolve(strict=True),
+        Path(args.output).expanduser().resolve(),
+        long_pause_seconds=args.long_pause
+    )
+    print(json.dumps({
+        "output": str(Path(args.output).expanduser().resolve()),
+        "candidate_count": result["candidate_count"],
+        "method": result["method"],
+        "automatic_edits": False
+    }, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -359,6 +377,12 @@ def build_parser() -> argparse.ArgumentParser:
     moments.add_argument("--max-duration", type=float, default=55.0)
     moments.add_argument("--limit", type=int, default=10)
     moments.set_defaults(func=command_find_moments)
+    pacing = sub.add_parser("analyze-pacing", help="propose context-safe pacing decisions for ranked candidates")
+    pacing.add_argument("analysis", help="audio-analysis JSON")
+    pacing.add_argument("candidates", help="candidate JSON from find-moments")
+    pacing.add_argument("-o", "--output", required=True)
+    pacing.add_argument("--long-pause", type=float, default=1.8)
+    pacing.set_defaults(func=command_analyze_pacing)
     render = sub.add_parser("render", help="render approved EDL segments into a vertical MP4")
     render.add_argument("source")
     render.add_argument("edl")
