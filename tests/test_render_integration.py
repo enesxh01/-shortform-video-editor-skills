@@ -49,6 +49,8 @@ class RenderIntegrationTests(unittest.TestCase):
                     "source_in": "00:00:00.000",
                     "source_out": "00:00:02.000",
                     "layout": layout,
+                    "fade_in_seconds": 0.15,
+                    "fade_out_seconds": 0.15,
                     "captions": [{
                         "start": "00:00:00.200",
                         "end": "00:00:01.500",
