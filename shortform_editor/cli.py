@@ -44,7 +44,7 @@ def probe(path):
       "video":{"codec":v.get("codec_name"),"width":v.get("width"),"height":v.get("height"),
         "pixel_format":v.get("pix_fmt"),"frame_rate":rat(v.get("avg_frame_rate")),
         "nominal_frame_rate":rat(v.get("r_frame_rate")),"time_base":rat(v.get("time_base")),
-        "start_time":float(v.get("start_time",0) or 0)},
+        "start_time":float(v.get("start_time",0) or 0),"frame_count":int(v["nb_frames"]) if str(v.get("nb_frames","")).isdigit() else None},
       "audio":[{"codec":s.get("codec_name"),"channels":s.get("channels"),
         "sample_rate":s.get("sample_rate"),"time_base":rat(s.get("time_base")),
         "start_time":float(s.get("start_time",0) or 0)}
@@ -245,6 +245,13 @@ def render(edl_path, output):
         actual=Fraction(qc["video"]["frame_rate"] or "0/1")
         expected=Fraction(fps)
         if actual!=expected: raise EditorError(f"QC failed: expected {expected} fps, got {actual}")
+        expected_duration=sum(seconds(s["source_out"])-seconds(s["source_in"]) for s in edl["segments"])
+        if abs(qc["duration"]-expected_duration)>max(0.1,2/float(expected)):
+            raise EditorError("QC failed: expected about %.3fs, got %.3fs" % (expected_duration,qc["duration"]))
+        expected_frames=round(expected_duration*float(expected))
+        actual_frames=qc["video"].get("frame_count")
+        if actual_frames is not None and abs(actual_frames-expected_frames)>1:
+            raise EditorError("QC failed: expected about %d frames, got %d" % (expected_frames,actual_frames))
         run(["ffmpeg","-v","error","-i",str(tmp),"-f","null","-"],capture=True)
         os.replace(str(tmp),str(target))
         manifest={"status":"technical_qc_passed_human_visual_review_required","output":str(target),
