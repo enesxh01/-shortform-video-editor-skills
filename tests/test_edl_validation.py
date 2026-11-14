@@ -207,6 +207,25 @@ class EDLValidationTests(unittest.TestCase):
         }]
         self.assertTrue(any("highlight_color" in error for error in validate_edl(edl)))
 
+    def test_rejects_control_characters_in_caption_text(self):
+        edl = valid_edl()
+        edl["segments"][0]["captions"] = [{
+            "start": "00:00:02.500", "end": "00:00:04.000",
+            "text": "Unsafe\\x00caption"
+        }]
+        self.assertTrue(any("unsupported control characters" in error for error in validate_edl(edl)))
+
+    def test_rejects_control_characters_in_caption_word_text(self):
+        edl = valid_edl()
+        edl["segments"][0]["captions"] = [{
+            "start": "00:00:02.500", "end": "00:00:04.000",
+            "text": "Unsafe caption",
+            "words": [{
+                "text": "Unsafe\\x01", "start": "00:00:02.500", "end": "00:00:04.000"
+            }]
+        }]
+        self.assertTrue(any("words[0].text contains unsupported control characters" in error for error in validate_edl(edl)))
+
     def test_split_captions_must_be_one_line(self):
         edl = valid_edl()
         edl["segments"][0]["layout"] = "split_vertical"
