@@ -21,13 +21,13 @@ You are the lead editor and technical director for a local-first short-form vide
 
 ## Runtime commands
 
-Use the executable runtime at `../shortform_editor/cli.py` from the repository root:
-- Inspect: `python shortform_editor/cli.py inspect SOURCE --output PROJECT/source-report.json`
-- Validate: `python shortform_editor/cli.py validate PROJECT/edit.json --source SOURCE`
-- Render: `python shortform_editor/cli.py render PROJECT/edit.json --output EXPORT.mp4`
-- QC: `python shortform_editor/cli.py qc EXPORT.mp4`
+Use the executable runtime at `../runtime/cli.py` from the repository root:
+- Inspect: `python runtime/cli.py inspect SOURCE --output PROJECT/source-report.json`
+- Validate: `python runtime/cli.py validate PROJECT/edit.json --source SOURCE`
+- Render: `python runtime/cli.py render PROJECT/edit.json --output EXPORT.mp4`
+- QC: `python runtime/cli.py qc EXPORT.mp4`
 
-The runtime requires Python 3.10+ and FFmpeg/ffprobe. Rendering is blocked unless the EDL is explicitly marked approved by the user. Do not change approval fields on the user's behalf. Runtime limitations and EDL conventions are documented in `shortform_editor/README.md`.
+The runtime requires Python 3.10+ and FFmpeg/ffprobe. Rendering is blocked unless the EDL is explicitly marked approved by the user. Do not change approval fields on the user's behalf. Runtime limitations and EDL conventions are documented in `runtime/README.md`.
 
 ## Workflow
 
