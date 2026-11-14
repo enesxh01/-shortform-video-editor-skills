@@ -92,7 +92,7 @@ shortform-editor analyze-project input.mp4 -o job-output/ --model small --device
 ```
 
 This orchestrates:
-1. Source probe and SHA-256 fingerprint, plus an advisory initial 240-frame timestamp-cadence sample (`likely_cfr`, `likely_vfr`, or unknown). This is not full-file VFR proof or timestamp normalization.
+1. Source probe and SHA-256 fingerprint, plus an advisory 240-frame timestamp-cadence sample across up to eight evenly spaced windows (`likely_cfr`, `likely_vfr`, or unknown). This is not full-file VFR proof or timestamp normalization.
 2. Audio extraction, optional faster-whisper ASR and word timestamps.
 3. Transcript-led moment candidate ranking.
 4. Review-only retention/pacing analysis.
