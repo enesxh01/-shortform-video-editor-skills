@@ -68,5 +68,22 @@ class CropGeometryTests(unittest.TestCase):
         self.assertIn("lt(n,60)", expression)
 
 
+    def test_validates_normalized_manual_tracking_roi(self):
+        from shortform_editor.visual import validate_normalized_roi, normalized_roi_to_pixels
+        roi = validate_normalized_roi((0.2, 0.1, 0.3, 0.4))
+        self.assertEqual(roi, (0.2, 0.1, 0.3, 0.4))
+        self.assertEqual(normalized_roi_to_pixels(roi, 640, 360), (128.0, 36.0, 192.0, 144.0))
+
+    def test_rejects_invalid_manual_tracking_roi(self):
+        from shortform_editor.visual import validate_normalized_roi
+        for roi in ((-0.1, 0.1, 0.2, 0.2), (0.8, 0.8, 0.3, 0.3),
+                    (0.1, 0.1, 0, 0.2), (0.1, float("nan"), 0.2, 0.2),
+                    (0.1, 0.2, 0.3)):
+            with self.subTest(roi=roi):
+                with self.assertRaises(ValueError):
+                    validate_normalized_roi(roi)
+
+
+
 if __name__ == "__main__":
     unittest.main()
