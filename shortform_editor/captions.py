@@ -44,7 +44,15 @@ def _karaoke_text(caption: dict[str, Any]) -> str:
         token = str(word["text"]).strip()
         if _needs_space(previous_text, token):
             pieces.append(" ")
+        highlight = word.get("highlight_color")
+        if highlight is not None:
+            if not isinstance(highlight, str) or not re.fullmatch(r"#[0-9A-Fa-f]{6}", highlight):
+                raise PipelineError("Word highlight_color must be a #RRGGBB hex color")
+            red, green, blue = highlight[1:3], highlight[3:5], highlight[5:7]
+            pieces.append(r"{\\c&H00" + blue + green + red + "&}")
         pieces.append(f"{{\\kf{duration}}}{_escape_ass(token)}")
+        if highlight is not None:
+            pieces.append(r"{\\c}")
         previous_text = token
         previous_end = end
     return "".join(pieces) if pieces else _escape_ass(caption["text"])
