@@ -74,7 +74,7 @@ class CaptionTests(unittest.TestCase):
             path = Path(directory) / "captions.ass"
             write_ass_subtitles(segment, "fullscreen", 1.0, path)
             content = path.read_text(encoding="utf-8")
-        self.assertIn(r"First line\\NSecond line", content)
+        self.assertIn(r"First line\NSecond line", content)
 
 
 if __name__ == "__main__":
