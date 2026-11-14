@@ -15,8 +15,8 @@ class FeedbackTests(unittest.TestCase):
             ]
         }
         records = (
-            [{"family": "comedy_or_reaction", "decision": "approve"} for _ in range(3)] +
-            [{"family": "conflict_or_debate", "decision": "reject"} for _ in range(3)]
+            [{"candidate_id": f"comedy-{i}", "source_fingerprint": "source-a", "family": "comedy_or_reaction", "decision": "approve"} for i in range(3)] +
+            [{"candidate_id": f"conflict-{i}", "source_fingerprint": "source-a", "family": "conflict_or_debate", "decision": "reject"} for i in range(3)]
         )
         result = apply_feedback(candidates, records)
         self.assertEqual(result["candidates"][0]["candidate_id"], "a")
@@ -26,8 +26,8 @@ class FeedbackTests(unittest.TestCase):
     def test_requires_minimum_observations_before_adjusting(self):
         candidates = {"candidates": [{"candidate_id": "a", "family": "story", "score": 50}]}
         result = apply_feedback(candidates, [
-            {"family": "story", "decision": "approve"},
-            {"family": "story", "decision": "approve"}
+            {"candidate_id": "story-1", "family": "story", "decision": "approve"},
+            {"candidate_id": "story-2", "family": "story", "decision": "approve"}
         ])
         self.assertEqual(result["candidates"][0]["feedback_adjustment"], 0.0)
 
@@ -44,6 +44,18 @@ class FeedbackTests(unittest.TestCase):
             self.assertTrue(path.exists())
             with self.assertRaises(PipelineError):
                 record_feedback(candidates, "missing", "approve", path)
+
+
+    def test_repeated_reviews_of_same_candidate_count_only_once(self):
+        candidates = {"candidates": [{"candidate_id": "next", "family": "comedy_or_reaction", "score": 50}]}
+        records = [
+            {"candidate_id": "same", "source_fingerprint": "source-a", "family": "comedy_or_reaction", "decision": "reject"},
+            {"candidate_id": "same", "source_fingerprint": "source-a", "family": "comedy_or_reaction", "decision": "approve"},
+            {"candidate_id": "other", "source_fingerprint": "source-a", "family": "comedy_or_reaction", "decision": "approve"},
+        ]
+        result = apply_feedback(candidates, records, min_observations=3)
+        self.assertEqual(result["feedback_learning"]["records_used"], 2)
+        self.assertEqual(result["candidates"][0]["feedback_adjustment"], 0.0)
 
 
 if __name__ == "__main__":
