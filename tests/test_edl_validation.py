@@ -211,7 +211,7 @@ class EDLValidationTests(unittest.TestCase):
         edl = valid_edl()
         edl["segments"][0]["captions"] = [{
             "start": "00:00:02.500", "end": "00:00:04.000",
-            "text": "Unsafe\\x00caption"
+            "text": "Unsafe\x00caption"
         }]
         self.assertTrue(any("unsupported control characters" in error for error in validate_edl(edl)))
 
@@ -221,7 +221,7 @@ class EDLValidationTests(unittest.TestCase):
             "start": "00:00:02.500", "end": "00:00:04.000",
             "text": "Unsafe caption",
             "words": [{
-                "text": "Unsafe\\x01", "start": "00:00:02.500", "end": "00:00:04.000"
+                "text": "Unsafe\x01", "start": "00:00:02.500", "end": "00:00:04.000"
             }]
         }]
         self.assertTrue(any("words[0].text contains unsupported control characters" in error for error in validate_edl(edl)))
