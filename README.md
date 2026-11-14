@@ -20,7 +20,7 @@ A local-first OpenCode skill suite and early executable foundation for building 
 
 ## Visual layouts
 
-The design supports exactly three primary layouts: fullscreen, top/bottom vertical split, and blurred bars with a 20/60/20 top/main/bottom composition. **The current renderer implements fullscreen center-crop only.** Split-screen, blurred bars, smart tracking and caption rendering are not implemented yet.
+The design supports exactly three primary layouts: fullscreen, top/bottom vertical split, and blurred bars with a 20/60/20 top/main/bottom composition. **The current renderer implements all three layouts.** Split-screen requires explicit top and bottom secondary source files; blurred bars use a sharp 60% center panel; captions are ASS-based with optional word karaoke.
 
 ## Skill suite
 
@@ -33,9 +33,9 @@ The design supports exactly three primary layouts: fullscreen, top/bottom vertic
 - `retention-pacing` — transcript-bound pacing proposals and review-only silence trimming (baseline implementation)
 - `editing-director` — conflict resolution and EDL authoring
 - `edit-decision-list` — versioned timeline contract
-- `kino-editing` — captions, motion, and the three approved layouts (design-only)
+- `kino-editing` — ASS/Kino captions and layout-specific placement (partial implementation; advanced motion presets remain design-only)
 - `ffmpeg-rendering` — deterministic rendering and 60 FPS policy
-- `resource-management` — CPU/GPU/RAM/VRAM/disk scheduling (design-only)
+- `resource-management` — RAM/VRAM preflight and ASR backend selection (partial implementation; job scheduling remains design-only)
 - `job-orchestration` — progress, cancellation, and recovery (design-only)
 - `quality-assurance` — technical and visual QC (partial)
 - `preview-approval` — human review gates (design-only)
@@ -54,7 +54,7 @@ shortform-editor probe input.mp4 -o probe.json
 shortform-editor analyze-audio input.mp4 -o audio-analysis.json
 shortform-editor find-moments audio-analysis.json -o candidates.json
 shortform-editor analyze-pacing audio-analysis.json candidates.json -o pacing.json
-# Optional OpenCV: python -m pip install -e '.[visual]'
+# Optional extras: python -m pip install -e '.[audio,visual]' (or install only what you need)
 shortform-editor analyze-visuals input.mp4 -o visual-analysis.json
 # Optional ASR: python -m pip install -e '.[audio]'
 shortform-editor validate-edl edit.json --probe probe.json
