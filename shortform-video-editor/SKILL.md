@@ -23,7 +23,7 @@ You are the lead editor and technical director for a local-first short-form vide
 
 When the repository's Python package is installed with `python -m pip install -e .`, use the `shortform-editor` CLI:
 
-- `shortform-editor probe INPUT.mp4 -o probe.json` — ffprobe inspection and SHA-256 fingerprint.
+- `shortform-editor analyze-project INPUT.mp4 -o JOB_DIR` — orchestrate probe, audio/ASR, candidate ranking, pacing, optional visual analysis, caption generation and draft EDL creation. It never approves or renders automatically.\n- `shortform-editor probe INPUT.mp4 -o probe.json` — ffprobe inspection and SHA-256 fingerprint.
 - `shortform-editor analyze-audio INPUT.mp4 -o audio.json` — audio energy/silence analysis and optional faster-whisper ASR.
 - `shortform-editor find-moments audio.json -o candidates.json` — low-confidence transcript-led candidate heuristic.
 - `shortform-editor analyze-pacing audio.json candidates.json -o pacing.json` — review-only pacing suggestions.
@@ -37,7 +37,7 @@ When the repository's Python package is installed with `python -m pip install -e
 
 ASR and OpenCV are optional extras: `pip install -e ".[audio,visual]"`. ASR defaults to the small model and records CUDA/CPU selection after RAM/VRAM preflight.
 
-The current implementation is an early, partial pipeline. Candidate scoring is an English-biased heuristic, visual detection is frontal-face-only, pacing trims are review-only, caption styles are basic ASS/Kino, and technical QC is not creative QA. No real-footage end-to-end validation or target-machine benchmark has been completed. Never imply unverified behavior is production-ready.
+The `analyze-project` command is the preferred end-to-end entry point. It requires the `[audio]` extra and creates one draft EDL per candidate; the user must inspect and explicitly approve each EDL before rendering. Optional visual analysis requires `[visual]`. The current implementation is an early, partial pipeline. Candidate scoring is an English-biased heuristic, visual detection is frontal-face-only, pacing trims are review-only, caption styles are basic ASS/Kino, and technical QC is not creative QA. No real-footage end-to-end validation or target-machine benchmark has been completed. Never imply unverified behavior is production-ready.
 
 ## Workflow
 
