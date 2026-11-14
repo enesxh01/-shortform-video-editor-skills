@@ -24,10 +24,10 @@ You are the lead editor and technical director for a local-first short-form vide
 1. **Clarify only essential constraints.** Determine source, target platform/aspect, clip count or duration if specified, language, layout preferences, and requested optional elements. Do not ask for preferences already established in project memory.
 2. **Inspect source.** Read metadata, streams, frame-rate mode, time base, dimensions, audio layout, duration, and integrity. Record source checksum and probe output.
 3. **Analyze audio and visuals.** Produce word-level transcript/timestamps, conservative speech regions, speaker-turn estimates, scene changes, visual subjects/actions, and uncertainty notes. Treat model outputs as evidence, not truth.
-4. **Find candidate moments.** Search the full source, rank candidates with the rubric in `references/viral-scoring.md`, and retain context around every candidate.
+4. **Find candidate moments.** Search the full source, rank candidates with the rubric in `../references/viral-scoring.md`, and retain context around every candidate.
 5. **Review candidate boundaries.** Ensure the opening is understandable and the payoff is complete. Keep meaningful reactions and pauses. Reject weak or misleading candidates rather than padding the batch.
 6. **Plan the edit.** Use the EDL as the single source of truth. Choose one of the three approved layouts only when it improves comprehension or impact. Specify caption timing, safe areas, reframing, motion, and transitions with reasons.
-7. **Render.** Use the original source for final-quality output. Generate proxies only for analysis/preview. Default target: 1080x1920, 60 fps, high-quality H.264 MP4 unless the user or platform specifies otherwise. See `references/export-and-fps.md`.
+7. **Render.** Use the original source for final-quality output. Generate proxies only for analysis/preview. Default target: 1080x1920, 60 fps, high-quality H.264 MP4 unless the user or platform specifies otherwise. See `../references/export-and-fps.md`.
 8. **Run QC.** Perform technical and visual checks. Repair only safe, understood defects; rerender and recheck. Never conceal critical failures behind an average score.
 9. **Present for approval.** Show candidate rationale, export settings, QC report, uncertainties, and preview paths. Do not claim an edit is finished until the file exists and validation passed.
 10. **Record explicit corrections.** Update project memory only for clearly persistent preferences; distinguish one-time instructions from permanent changes.
