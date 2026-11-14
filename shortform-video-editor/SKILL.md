@@ -27,7 +27,7 @@ Use the executable runtime at `../runtime/cli.py` from the repository root:
 - Render: `python runtime/cli.py render PROJECT/edit.json --output EXPORT.mp4`
 - QC: `python runtime/cli.py qc EXPORT.mp4`
 
-The runtime requires Python 3.10+ and FFmpeg/ffprobe. Rendering is blocked unless the EDL is explicitly marked approved by the user. Do not change approval fields on the user's behalf. Runtime limitations and EDL conventions are documented in `runtime/README.md`.
+The runtime requires Python 3.10+ and FFmpeg/ffprobe. It currently renders CFR only; do not author unsupported crop_keyframes. Use blurred-bars when center cropping risks losing important action. Rendering is blocked unless the EDL is explicitly marked approved by the user. Do not change approval fields on the user's behalf. Runtime limitations and EDL conventions are documented in `runtime/README.md`.
 
 ## Workflow
 
@@ -44,7 +44,7 @@ The runtime requires Python 3.10+ and FFmpeg/ffprobe. Rendering is blocked unles
 
 ## Three supported layouts
 
-- `fullscreen`: 9:16 composition; subject-aware crop/reframe; premium Kino-style captions up to three lines.
+- `fullscreen`: 9:16 composition; current renderer uses a centered crop (no subject tracking or crop-keyframe execution yet); premium Kino-style captions up to three lines.
 - `split_vertical`: two panels stacked top/bottom, never side-by-side; one caption line centered in the divider; synchronize panels.
 - `blurred_bars_20_60_20`: 9:16 with 20% blurred top, 60% sharp main footage, 20% blurred bottom. Blur must derive from relevant footage, not black bars.
 
