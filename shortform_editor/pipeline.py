@@ -52,9 +52,21 @@ def _read_json(path: Path) -> dict[str, Any] | None:
     return value if isinstance(value, dict) else None
 
 
+def _record_checkpoint(path: Path, state: dict[str, Any], state_path: Path) -> None:
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    state.setdefault("artifact_sha256", {})[path.name] = digest
+    _write_json(state_path, state)
+
+
 def _cached_artifact(output_dir: Path, filename: str, source_fingerprint: str,
-                     fingerprint_path: tuple[str, ...]) -> dict[str, Any] | None:
-    value = _read_json(output_dir / filename)
+                     fingerprint_path: tuple[str, ...], state: dict[str, Any]) -> dict[str, Any] | None:
+    path = output_dir / filename
+    expected_digest = state.get("artifact_sha256", {}).get(filename)
+    if not expected_digest or not path.is_file():
+        return None
+    if hashlib.sha256(path.read_bytes()).hexdigest() != expected_digest:
+        return None
+    value = _read_json(path)
     if value is None:
         return None
     current: Any = value
@@ -165,15 +177,16 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                 split_probes[key] = probe_media(path)
                 split_signatures[key] = file_stat_signature(path)
 
-        cached_audio = _cached_artifact(output_dir, "audio-analysis.json", source_fingerprint, ("source", "fingerprint")) if resume else None
+        cached_audio = _cached_artifact(output_dir, "audio-analysis.json", source_fingerprint, ("source", "fingerprint"), state) if resume else None
         audio = stage("audio", lambda: analyze_audio(source, model_size=model, device=device, probe_report=probe), cached_audio)
         if audio.get("source", {}).get("fingerprint") != source_fingerprint:
             raise PipelineError("Source media changed between initial probe and audio analysis; restart the project")
         if file_stat_signature(source) != source_signature:
             raise PipelineError("Source media changed during audio analysis; restart the project")
         _write_json(output_dir / "audio-analysis.json", audio)
+        _record_checkpoint(output_dir / "audio-analysis.json", state, state_path)
 
-        cached_candidates = _cached_artifact(output_dir, "candidates.json", source_fingerprint, ("source_fingerprint",)) if resume else None
+        cached_candidates = _cached_artifact(output_dir, "candidates.json", source_fingerprint, ("source_fingerprint",), state) if resume else None
         if cached_candidates is not None:
             candidates = stage("moment_detection", lambda: None, cached_candidates)
             candidates = stage("performance_feedback", lambda: candidates, candidates)
@@ -197,11 +210,13 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
             candidates = stage("performance_feedback", apply_local_feedback)
         candidates["source_fingerprint"] = source_fingerprint
         _write_json(output_dir / "candidates.json", candidates)
+        _record_checkpoint(output_dir / "candidates.json", state, state_path)
 
-        cached_pacing = _cached_artifact(output_dir, "pacing.json", source_fingerprint, ("source_fingerprint",)) if resume else None
+        cached_pacing = _cached_artifact(output_dir, "pacing.json", source_fingerprint, ("source_fingerprint",), state) if resume else None
         pacing = stage("retention_pacing", lambda: analyze_pacing(audio, candidates), cached_pacing)
         pacing["source_fingerprint"] = source_fingerprint
         _write_json(output_dir / "pacing.json", pacing)
+        _record_checkpoint(output_dir / "pacing.json", state, state_path)
         pacing_by_id = {item.get("candidate_id"): item for item in pacing.get("candidates", [])}
 
         visuals = None
@@ -211,7 +226,7 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                     (item["source_in_seconds"], item["source_out_seconds"])
                     for item in candidates["candidates"]
                 ]
-                cached_visuals = _cached_artifact(output_dir, "visual-analysis.json", source_fingerprint, ("source", "fingerprint")) if resume else None
+                cached_visuals = _cached_artifact(output_dir, "visual-analysis.json", source_fingerprint, ("source", "fingerprint"), state) if resume else None
                 visuals = stage(
                     "visual_analysis",
                     lambda: analyze_visuals(source, regions=candidate_regions, probe_report=probe),
@@ -222,6 +237,7 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                 if file_stat_signature(source) != source_signature:
                     raise PipelineError("Source media changed during visual analysis; restart the project")
                 _write_json(output_dir / "visual-analysis.json", visuals)
+                _record_checkpoint(output_dir / "visual-analysis.json", state, state_path)
             except PipelineError as exc:
                 warnings.append(f"Visual analysis unavailable: {exc}")
 
