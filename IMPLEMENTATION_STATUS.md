@@ -105,3 +105,9 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 - Candidate reports now expose word-confidence coverage, low-confidence word count/ratio and up to eight contiguous low-confidence timestamp spans.
 - A candidate is flagged for transcript review when average ASR confidence is weak or at least three words and 25% of confidence-scored words are below the advisory 0.55 threshold.
 - The heuristic does not change the candidate's ranking score; it surfaces where a human should verify spelling/names against the original audio. ASR probabilities are model estimates, not calibrated truth.
+
+
+## One-command setup (implemented; CI pending)
+
+- `scripts/setup.sh` and `scripts/setup.ps1` install the editable CLI package with audio, visual and download extras, install the OpenCode skills with timestamped backups, and run the environment doctor.
+- They intentionally do not silently install system FFmpeg packages or alter PATH. If FFmpeg/ffprobe are missing, setup leaves the Python package and skills installed, prints OS-specific guidance and exits non-zero until the required FFmpeg build is available.

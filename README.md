@@ -78,23 +78,24 @@ All three layouts and ASS captions have synthetic FFmpeg integration coverage. T
 
 Requirements: Python 3.10+, FFmpeg and ffprobe on PATH.
 
-From the cloned repository root, install the CLI and all optional workflow extras.
+**One-command setup from the cloned repository root:**
 
 Windows PowerShell:
 
 ```powershell
-py -m pip install --upgrade pip
-py -m pip install -e ".[audio,visual,download]"
+Set-ExecutionPolicy -Scope Process Bypass
+.\scripts\setup.ps1
 ```
 
 Linux/macOS:
 
 ```bash
-python3 -m pip install --upgrade pip
-python3 -m pip install -e ".[audio,visual,download]"
+bash scripts/setup.sh
 ```
 
-The extras enable faster-whisper ASR, OpenCV visual analysis, and optional authorized HTTP(S) URL ingestion. FFmpeg and ffprobe are separate system requirements; install them with your OS package manager or an official FFmpeg build and confirm both commands work on PATH. Then run `shortform-editor doctor` to verify the required executables, core Python modules, subtitle filter, H.264 encoder and optional extras before processing footage.
+These setup scripts install the editable CLI package plus the audio, visual and download extras, install the OpenCode skills with backups, and run `shortform-editor doctor`. They do not silently install system packages or change your OS PATH. If FFmpeg is missing, install an FFmpeg build that includes ffprobe, libx264 (or NVENC) and the subtitles filter, then rerun setup. The scripts print an OS-appropriate installation hint where possible.
+
+For a skills-only update after the CLI is already installed, use `bash scripts/install.sh` or `powershell -ExecutionPolicy Bypass -File scripts/install.ps1`.
 
 To ingest a single URL into a new, empty folder (playlists are disabled):
 
