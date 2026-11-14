@@ -307,7 +307,8 @@
                     "auto",
                     "center",
                     "bottom"
-                  ]
+,
+                    "top"                  ]
                 },
                 "font_size": {"type": "integer", "minimum": 28, "maximum": 100},
                 "margin_v": {"type": "integer", "minimum": 0, "maximum": 600},
