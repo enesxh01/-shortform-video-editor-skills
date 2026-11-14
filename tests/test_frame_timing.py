@@ -66,6 +66,13 @@ class FrameTimingDiagnosticsTests(unittest.TestCase):
         self.assertEqual(report["status"], "insufficient_samples")
         self.assertIsNone(report["variable_frame_rate"])
 
+    def test_non_monotonic_presentation_timestamps_are_not_hidden(self):
+        timestamps = [index / 30 for index in range(30)]
+        timestamps[15] = timestamps[14] - 0.1
+        report = analyze_frame_timestamps(timestamps)
+        self.assertEqual(report["status"], "likely_vfr")
+        self.assertGreater(report["non_monotonic_intervals"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()
