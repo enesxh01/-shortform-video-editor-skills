@@ -332,6 +332,9 @@
                       "exclusiveMinimum": 0
                     }
                   }
+                },
+                "scene_cut": {
+                  "type": "boolean"
                 }
               }
             }
