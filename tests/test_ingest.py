@@ -21,7 +21,7 @@ class URLIngestionTests(unittest.TestCase):
                 report=str(source)
             )
             report = {"source_path": str(source), "probe": {}}
-            with patch("shortform_editor.cli.download_source", return_value=report):
+            with patch("shortform_editor.ingest.download_source", return_value=report):
                 with self.assertRaisesRegex(PipelineError, "must not overwrite"):
                     command_download_source(args)
             self.assertEqual(source.read_bytes(), b"keep media bytes")
