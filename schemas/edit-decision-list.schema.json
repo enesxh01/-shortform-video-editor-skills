@@ -61,8 +61,15 @@
         "approved_by_user": {"type": "boolean"}
       },
       "allOf": [
-        {"if": {"properties": {"status": {"const": "approved"}}, "required": ["status"]},
-         "then": {"properties": {"approved_by_user": {"const": true}}}
+        {
+          "if": {
+            "properties": {"status": {"const": "approved"}},
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {"approved_by_user": {"const": true}}
+          }
+        }
       ]
     }
   }
