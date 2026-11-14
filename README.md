@@ -30,7 +30,43 @@ Layout changes must be motivated by the content, not used as arbitrary visual va
 
 ## Skill suite
 
-The repository will contain an orchestrator skill and specialist skills for architecture, media ingestion, audio intelligence, viral-moment detection, visual storytelling, pacing, Kino-style editing, timeline/EDL, rendering, resource management, quality assurance, testing, and project memory.
+- `shortform-video-editor` — end-to-end orchestrator
+- `video-editor-architecture` — module boundaries and contracts
+- `media-ingestion` — safe source inspection and staging
+- `audio-intelligence` — ASR, word timing, VAD, speaker-turn evidence
+- `viral-moment-detection` — full-source candidate discovery and scoring
+- `visual-storytelling` — subject/action analysis and framing
+- `retention-pacing` — context-safe tightening
+- `editing-director` — conflict resolution and EDL authoring
+- `edit-decision-list` — versioned timeline contract
+- `kino-editing` — captions, motion, and the three approved layouts
+- `ffmpeg-rendering` — deterministic rendering and 60 FPS policy
+- `resource-management` — CPU/GPU/RAM/VRAM/disk scheduling
+- `job-orchestration` — progress, cancellation, and recovery
+- `quality-assurance` — technical and visual QC
+- `preview-approval` — human review gates
+- `video-editor-testing` — unit, integration, benchmark, and footage matrix
+- `security-provenance` — safe handling and license/provenance checks
+- `observability` — structured logs and diagnostics
+- `project-memory` — explicit preferences only
+
+Detailed references live in `references/`; the EDL contract is in `schemas/`; installation scripts are in `scripts/`.
+
+## Install
+
+Windows PowerShell:
+
+```powershell
+.\\scripts\\install.ps1
+```
+
+Linux/macOS:
+
+```bash
+bash scripts/install.sh
+```
+
+Both scripts install skill folders containing `SKILL.md` into OpenCode's global skills directory by default. Pass a destination path to override it.
 
 ## Quality policy
 
