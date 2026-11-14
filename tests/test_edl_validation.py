@@ -8,7 +8,7 @@ def valid_edl():
         "schema_version": "1.0",
         "project_id": "test-project",
         "source": {
-            "fingerprint": "sha256:abc123",
+            "fingerprint": "sha256:" + ("a" * 64),
             "time_base": "1/90000",
             "frame_rate": "30/1",
             "variable_frame_rate": False
@@ -73,6 +73,11 @@ class EDLValidationTests(unittest.TestCase):
 
     def test_rejects_segment_beyond_source_duration(self):
         self.assertTrue(validate_edl(valid_edl(), source_duration=5.0))
+
+    def test_rejects_wrong_source_fingerprint(self):
+        self.assertTrue(any("fingerprint does not match" in e for e in validate_edl(
+            valid_edl(), source_fingerprint="sha256:" + ("b" * 64)
+        )))
 
 
 if __name__ == "__main__":
