@@ -15,6 +15,28 @@ def get_face_tracker_factory(cv2: Any):
     return factory if callable(factory) else None
 
 
+
+def validate_normalized_roi(roi: tuple[float, float, float, float] | list[float]) -> tuple[float, float, float, float]:
+    """Validate an initial tracking box expressed as normalized x, y, width, height."""
+    import math
+    if len(roi) != 4:
+        raise ValueError("Tracking ROI must contain normalized x, y, width and height")
+    x, y, width, height = (float(value) for value in roi)
+    if not all(math.isfinite(value) for value in (x, y, width, height)):
+        raise ValueError("Tracking ROI values must be finite")
+    if x < 0 or y < 0 or width <= 0 or height <= 0 or x + width > 1 or y + height > 1:
+        raise ValueError("Tracking ROI must be a positive normalized box fully inside the frame")
+    return x, y, width, height
+
+
+def normalized_roi_to_pixels(roi: tuple[float, float, float, float],
+                             frame_width: int, frame_height: int) -> tuple[float, float, float, float]:
+    if frame_width <= 0 or frame_height <= 0:
+        raise ValueError("Frame dimensions must be positive")
+    x, y, width, height = validate_normalized_roi(roi)
+    return (x * frame_width, y * frame_height, width * frame_width, height * frame_height)
+
+
 def compute_crop_box(width: int, height: int, center_x: float, center_y: float,
                      target_aspect: float = 9 / 16) -> dict[str, float]:
     if width <= 0 or height <= 0 or target_aspect <= 0:
@@ -130,7 +152,8 @@ def sample_region_timestamps(regions: list[tuple[float, float]], duration: float
 def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 120,
                     detect_faces: bool = True,
                     regions: list[tuple[float, float]] | None = None,
-                    probe_report: dict[str, Any] | None = None) -> dict[str, Any]:
+                    probe_report: dict[str, Any] | None = None,
+                    initial_roi: tuple[float, float, float, float] | None = None) -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
     report = probe_report if probe_report is not None else probe_media(source)
     reported_path = Path(report.get("source", {}).get("path", source)).expanduser().resolve()
@@ -164,6 +187,10 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
         detector = cv2.CascadeClassifier(str(cascade_path))
         if detector.empty():
             raise PipelineError("OpenCV face cascade could not be loaded")
+    try:
+        tracking_roi = validate_normalized_roi(initial_roi) if initial_roi is not None else None
+    except (TypeError, ValueError) as exc:
+        raise PipelineError(f"Invalid manual tracking ROI: {exc}") from exc
 
     capture = cv2.VideoCapture(str(source))
     if not capture.isOpened():
@@ -174,7 +201,7 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
 
     samples = []
     face_tracker = None
-    tracker_factory = get_face_tracker_factory(cv2) if detect_faces else None
+    tracker_factory = get_face_tracker_factory(cv2) if (detect_faces or tracking_roi is not None) else None
     previous_gray = None
     previous_center = (width / 2.0, height / 2.0)
     smoothed_center = previous_center
@@ -184,12 +211,14 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
         if regions is not None else [(item, 0) for item in sample_timestamps(duration, sample_rate, max_frames)]
     )
     previous_region = None
+    roi_seeded = False
     for frame_index, (timestamp, region_id) in enumerate(timestamp_items):
         if region_id != previous_region:
             previous_gray = None
             previous_center = (width / 2.0, height / 2.0)
             smoothed_center = previous_center
             face_tracker = None
+            roi_seeded = False
             previous_region = region_id
         capture.set(cv2.CAP_PROP_POS_MSEC, timestamp * 1000.0)
         ok, frame = capture.read()
@@ -223,7 +252,50 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
                     )
                 )
         subject_bbox_normalized = None
-        if selected_face is not None:
+        if tracking_roi is not None and not roi_seeded:
+            roi_box = normalized_roi_to_pixels(tracking_roi, frame.shape[1], frame.shape[0])
+            if callable(tracker_factory):
+                try:
+                    candidate_tracker = tracker_factory()
+                    initialized = candidate_tracker.init(frame, roi_box)
+                    face_tracker = candidate_tracker if initialized is not False else None
+                except Exception:
+                    face_tracker = None
+            x, y, box_w, box_h = roi_box
+            subject_bbox_normalized = {"x": tracking_roi[0], "y": tracking_roi[1],
+                                       "width": tracking_roi[2], "height": tracking_roi[3]}
+            center_x = (x + box_w / 2) / frame.shape[1] * width
+            center_y = (y + box_h / 2) / frame.shape[0] * height
+            confidence = 0.55 if face_tracker is not None else 0.25
+            subject = "manual_roi_tracking_seed" if face_tracker is not None else "manual_roi_seed_only"
+            roi_seeded = True
+        elif tracking_roi is not None and face_tracker is not None:
+            try:
+                tracking_ok, tracked_box = face_tracker.update(frame)
+            except Exception:
+                tracking_ok, tracked_box = False, None
+            if tracking_ok and tracked_box is not None:
+                x, y, box_w, box_h = (float(value) for value in tracked_box)
+                subject_bbox_normalized = {
+                    "x": max(0.0, x / frame.shape[1]),
+                    "y": max(0.0, y / frame.shape[0]),
+                    "width": min(1.0, box_w / frame.shape[1]),
+                    "height": min(1.0, box_h / frame.shape[0])
+                }
+                center_x = (x + box_w / 2) / frame.shape[1] * width
+                center_y = (y + box_h / 2) / frame.shape[0] * height
+                confidence = 0.4
+                subject = "manual_roi_tracking"
+            else:
+                face_tracker = None
+                center_x, center_y = width / 2.0, height / 2.0
+                confidence = 0.05
+                subject = "manual_roi_tracking_lost"
+        elif tracking_roi is not None:
+            center_x, center_y = width / 2.0, height / 2.0
+            confidence = 0.05
+            subject = "manual_roi_tracking_lost"
+        elif selected_face is not None:
             tracker_box = tuple(float(value) for value in selected_face)
             if callable(tracker_factory):
                 try:
@@ -309,14 +381,15 @@ def analyze_visuals(source: Path, sample_rate: float = 1.0, max_frames: int = 12
             "requested_sample_rate_fps": sample_rate,
             "effective_sample_rate_fps": round(len(samples) / duration, 4),
             "sampled_frames": len(samples),
+            "manual_tracking_roi_normalized": list(tracking_roi) if tracking_roi is not None else None,
             "sampling_regions": regions if regions is not None else [[0.0, duration]],
             "scene_change_candidates": scene_changes,
             "crop_keyframes": samples
         },
         "limitations": [
-            "This baseline detects scene-change candidates and frontal faces only; it does not understand objects, actions, gameplay HUDs, hands or sports context.",
+            "This baseline detects scene-change candidates and frontal faces. An optional user-supplied normalized ROI can seed CSRT tracking for a visible object, character or gameplay subject, but it does not automatically detect arbitrary objects, actions, HUDs, hands or sports context.",
             "Haar face detections are not identity recognition and are not reliable for every angle, lighting condition or demographic.",
-            "CSRT tracking can bridge missed frontal-face detections when the opencv-contrib build exposes the tracker; it is not general object/action tracking and may fail during fast motion, occlusion or scene changes.",
+            "CSRT tracking can bridge missed frontal-face detections or follow a user-seeded ROI when the opencv-contrib build exposes the tracker; it may fail during fast motion, occlusion, large appearance changes or scene cuts. A lost manual ROI falls back to center framing.",
             "No face detection and no valid active tracker means a safe center crop.",
             "Sampling timestamps can drift on variable-frame-rate media; verify crop keyframes against the actual export.",
             "Face boxes can guide fullscreen caption placement away from upper/lower caption safe areas, but this is a sparse face-only heuristic, not general object/HUD collision detection.",
