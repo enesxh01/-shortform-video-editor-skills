@@ -69,6 +69,18 @@ class MomentDetectionTests(unittest.TestCase):
         self.assertEqual(candidate["transcript_diagnostics"]["quality_flag"], "insufficient_asr_evidence")
         self.assertTrue(any("metadata is unavailable" in risk for risk in candidate["risks"]))
 
+    def test_ignores_malformed_asr_confidence_metadata(self):
+        report = analysis_report()
+        for segment in report["analysis"]["transcription"]["segments"]:
+            segment["avg_logprob"] = "not-a-number"
+            segment["no_speech_prob"] = float("nan")
+            for word in segment["words"]:
+                word["probability"] = 2.0
+        candidate = detect_moments(report, min_duration=12, max_duration=35, limit=5)["candidates"][0]
+        self.assertEqual(candidate["transcript_diagnostics"]["quality_flag"], "insufficient_asr_evidence")
+        self.assertIsNone(candidate["transcript_diagnostics"]["mean_segment_logprob"])
+        self.assertIsNone(candidate["transcript_diagnostics"]["mean_word_probability"])
+
     def test_adds_kosovar_albanian_hook_and_payoff_cues(self):
         self.assertTrue(_has_cue("Ja pse kjo ndodhi papritur", "ja pse"))
         self.assertTrue(_has_cue("Kështu që gjithçka funksionoi", "kështu që"))
