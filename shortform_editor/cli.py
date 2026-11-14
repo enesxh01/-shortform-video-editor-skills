@@ -330,7 +330,7 @@ def command_render(args: argparse.Namespace) -> int:
                     segment.get("crop_keyframes", []), clip_start, fps, source_width, source_height
                 )
                 if crop_filter:
-                    vf = f"{crop_filter},scale={width}:{height},setsar=1,fps={fps},format=yuv420p"
+                    vf = f"fps={fps},{crop_filter},scale={width}:{height},setsar=1,format=yuv420p"
                 else:
                     vf = (
                         f"scale={width}:{height}:force_original_aspect_ratio=increase,"
