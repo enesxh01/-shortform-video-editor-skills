@@ -57,6 +57,8 @@ def choose_inference_device(model_size: str, requested: str = "auto",
     resources = snapshot or resource_snapshot()
     notes = []
     available_ram = float(resources.get("ram_available_gb", 0))
+    if available_ram < 2.5:
+        raise RuntimeError(f"Only {available_ram:.1f} GB RAM is available; close other applications before inference.")
     gpu = resources.get("gpu", {})
     gpu_free_gb = float(gpu.get("memory_free_mb") or 0) / 1024
     required_vram = MODEL_VRAM_GB[model_size]
