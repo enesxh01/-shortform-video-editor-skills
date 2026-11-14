@@ -144,5 +144,23 @@ class RenderIntegrationTests(unittest.TestCase):
             self.assertEqual(repair_report["qc_after_repair"]["status"], "passed")
 
 
+    def test_resume_render_reuses_only_hash_valid_decodable_segments(self):
+        from shortform_editor.cli import _render_part_is_reusable, sha256_file
+        with tempfile.TemporaryDirectory() as directory:
+            part = Path(directory) / "part.mp4"
+            part.write_bytes(b"encoded-segment")
+            record = {"sha256": sha256_file(part)}
+            with patch("shortform_editor.cli.run_checked") as run:
+                run.return_value.stdout = json.dumps({"streams": [{
+                    "codec_type": "video", "codec_name": "h264", "width": 1080,
+                    "height": 1920, "avg_frame_rate": "60/1"
+                }]})
+                self.assertTrue(_render_part_is_reusable(part, record, "ffmpeg", "ffprobe", 1080, 1920, "60/1"))
+                self.assertEqual(run.call_count, 2)
+            self.assertFalse(_render_part_is_reusable(part, {"sha256": "0" * 64}, "ffmpeg", "ffprobe", 1080, 1920, "60/1"))
+            self.assertFalse(_render_part_is_reusable(part, record, "ffmpeg", "ffprobe", 720, 1280, "60/1"))
+
+
+
 if __name__ == "__main__":
     unittest.main()
