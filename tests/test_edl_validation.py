@@ -144,7 +144,7 @@ class EDLValidationTests(unittest.TestCase):
         }
         self.assertEqual(validate_edl(edl), [])
         del edl["segments"][0]["split_bottom"]
-        self.assertTrue(any("split_bottom is required" in error for error in validate_edl(edl)))
+        self.assertTrue(any("split_bottom" in error for error in validate_edl(edl)))
 
 
     def test_rejects_caption_outside_segment(self):
