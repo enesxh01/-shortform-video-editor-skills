@@ -413,6 +413,9 @@ def command_render(args: argparse.Namespace) -> int:
                 staged_output.unlink(missing_ok=True)
             raise
 
+    from .qc import run_qc
+    qc_report = run_qc(output, expected_width=width, expected_height=height, expected_fps=fps)
+
     print(json.dumps({
         "output": str(output),
         "source_sha256": probe["source"]["sha256"],
@@ -432,7 +435,7 @@ def command_render(args: argparse.Namespace) -> int:
             "Decode success is not a substitute for human visual and audio review."
         ]
     }, indent=2))
-    return 0
+    return 0 if qc_report["status"] in {"passed", "warning"} else 1
 
 
 def command_analyze_audio(args: argparse.Namespace) -> int:
