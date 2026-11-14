@@ -51,15 +51,16 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 - Exact transitive dependency and model-weight terms must be checked before redistribution. See `THIRD_PARTY_NOTICES.md`.
 - The repository has no root `LICENSE`; the owner must explicitly choose one before reuse/redistribution rights can be assumed.
 
-## Next implementation gates
+## Remaining gates (not claimed complete)
 
-1. Get the latest Linux and Windows CI green; fix syntax, unit, installer and FFmpeg integration failures.
-2. Run `analyze-project` on a short user-owned sample and inspect candidate quality, captions, crop behavior, every layout, audio sync and QC output.
-3. Benchmark small-model ASR on the target desktop, recording runtime, RAM, VRAM, CUDA/cuDNN compatibility and transcript/timestamp quality.
-4. Build a labeled human-reviewed candidate set; improve semantic moment scoring and non-English behavior before raising confidence.
-5. Implement audio diarization/events, more general visual subject/action detection, transitions/motion, preview/approval UI, robust VFR handling and resumable jobs.
-6. Complete visual/caption/audio QC and safe repair, including caption OCR/readability, safe-area and perceptual checks. Keep YouTube Analytics excluded unless the owner explicitly changes scope.
-\n\n## Disk-space preflight (implemented)\n\n- Added `check_disk_space` with an explicit safety reserve and actionable insufficient-space error.\n- Render preflight checks both output and system temporary volumes before expensive encoding.\n- Uses a conservative duration-based working-set estimate; it is not an exact output-size prediction.\n- Unit tests cover adequate and inadequate free-space cases.\n
+1. **Target-PC validation:** run the one-command setup and `shortform-editor doctor` on the user's Windows desktop; verify actual RTX 3060 NVENC initialization and CUDA/cuDNN ASR availability. CI verifies Windows/Linux compatibility but cannot validate that machine's drivers.
+2. **Real-footage editorial review:** analyze a short user-owned streamer/gameplay sample; inspect moment boundaries, context/payoff, captions, the 20/60/20 layout, crop movement, audio sync and final QC. Synthetic media cannot establish creative quality.
+3. **Human-labeled evaluation:** collect reviewed good/bad moment examples across gaming, podcasts, interviews, non-English and code-switched footage; tune scoring only against this evidence. Current candidate scores remain explainable heuristics, not calibrated virality predictions.
+4. **Advanced optional intelligence:** diarization/overlapping-speaker handling, general object/action/HUD/OCR detection and model-backed subject tracking need deliberate model/license selection, weights and target-hardware evaluation. Manual ROI/KLT tracking and advisory acoustic event cues are available now; automatic semantic object tracking is not.
+5. **Creative finishing:** cross-dissolves, richer motion/keyframe effects, audio mixing/ducking and rendered-pixel caption/visual QA remain outside the current supported EDL/render contract. Existing fades, crop keyframes, captions, color correction, sharpening and technical QC are implemented.
+6. **Release/legal choices:** the repository has no root project license. The owner must choose one; exact transitive dependency, FFmpeg build and downloaded model-weight terms must be reviewed before redistribution.
+
+The latest four-platform CI matrix is green, resumable analysis/rendering is implemented, and final MP4 publication is gated by technical QC. These remaining gates depend on the target machine/footage, require owner licensing decisions, or are explicitly future capabilities—not hidden claims of readiness.\n\n## Disk-space preflight (implemented)\n\n- Added `check_disk_space` with an explicit safety reserve and actionable insufficient-space error.\n- Render preflight checks both output and system temporary volumes before expensive encoding.\n- Uses a conservative duration-based working-set estimate; it is not an exact output-size prediction.\n- Unit tests cover adequate and inadequate free-space cases.\n
 
 ## Editorial quality advisory (implemented; heuristic)
 
