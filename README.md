@@ -60,7 +60,7 @@ All three layouts and ASS captions have synthetic FFmpeg integration coverage. T
 - `shortform-video-editor` — end-to-end orchestrator
 - `video-editor-architecture` — module boundaries and contracts
 - `media-ingestion` — source inspection and staging policy
-- `audio-intelligence` — FFmpeg extraction, energy/silence evidence, optional faster-whisper ASR
+- `audio-intelligence` — FFmpeg extraction, energy/silence and generic transient/rise evidence, optional faster-whisper ASR
 - `viral-moment-detection` — transcript-led candidate ranking (low-confidence heuristic)
 - `retention-pacing` — review-only silence trimming and repetition flags
 - `visual-storytelling` — scene-change evidence and frontal-face crop suggestions

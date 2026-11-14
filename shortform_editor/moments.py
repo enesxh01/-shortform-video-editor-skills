@@ -215,10 +215,19 @@ def _make_candidate(source_id: str, segments: list[dict[str, Any]], audio_window
         except (KeyError, TypeError, ValueError):
             continue
         if event_end > start and event_start < end:
+            signal_metrics = {}
+            for metric in ("rise_db", "crest_factor_db", "rms_dbfs", "peak_dbfs"):
+                try:
+                    value = float(event[metric])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if math.isfinite(value):
+                    signal_metrics[metric] = round(value, 2)
             event_evidence.append({
                 "type": str(event.get("type", "unknown")),
-                "start": max(start, event_start),
-                "end": min(end, event_end),
+                "start": round(max(start, event_start), 3),
+                "end": round(min(end, event_end), 3),
+                "signal_metrics": signal_metrics,
                 "evidence": "Generic acoustic energy cue; not a laughter, emotion or semantic event classification."
             })
     return {

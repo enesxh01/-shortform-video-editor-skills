@@ -139,7 +139,7 @@ Tests have been added and passed for normalized manual ROI tracking, analyze-pro
 ## Generic acoustic event cues (implemented; advisory)
 
 - Audio analysis reports timestamped energy-rise and transient-energy cues using rolling RMS baselines and peak-to-RMS crest factor.
-- Candidate reports attach overlapping cues as evidence without changing candidate ranking scores. Labels are intentionally acoustic, not claims of laughter, excitement, emotion, speaker identity or semantic events.
+- Candidate reports attach overlapping cues, timestamps and measured rise/crest/peak metrics as evidence without changing candidate ranking scores. Labels are intentionally acoustic, not claims of laughter, excitement, emotion, speaker identity or semantic events.
 - Unit tests cover energy rise, transient detection and score invariance. Human review remains required.
 
 

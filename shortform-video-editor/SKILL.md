@@ -44,7 +44,7 @@ Use the `shortform-editor` command for CLI operations. If its console-script fol
 - If analysis is interrupted, rerun the exact same command with `--resume`. Resume re-probes and fingerprints the source, requires identical options, and reuses only cached analysis artifacts whose SHA-256 digest and source fingerprint still match. Changed, missing or corrupted checkpoints are recomputed. Do not change model, device, layout, candidate count, visual option or split-source settings when resuming.
 - `shortform-editor doctor` — check FFmpeg/FFprobe, core Python dependencies, optional extras and NVENC encoder availability.
 - `shortform-editor probe INPUT.mp4 -o probe.json` — ffprobe inspection and SHA-256 fingerprint.
-- `shortform-editor analyze-audio INPUT.mp4 -o audio.json` — audio energy/silence analysis and optional faster-whisper ASR.
+- `shortform-editor analyze-audio INPUT.mp4 -o audio.json` — audio energy/silence analysis, generic energy-rise/transient cues and optional faster-whisper ASR.
 - `shortform-editor find-moments audio.json -o candidates.json` — low-confidence transcript-led candidate heuristic.
 - `shortform-editor analyze-pacing audio.json candidates.json -o pacing.json` — review-only pacing suggestions.
 - `shortform-editor analyze-visuals INPUT.mp4 -o visual.json` — optional OpenCV scene-change and face-guided crop evidence. For a human-selected non-face subject, add `--track-roi X Y WIDTH HEIGHT` (normalized 0..1) to seed CSRT tracking when OpenCV-contrib is available, or built-in KLT optical flow otherwise.
