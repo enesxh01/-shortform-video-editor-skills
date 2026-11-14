@@ -1130,8 +1130,10 @@ def command_doctor(args: argparse.Namespace) -> int:
                 result = run_checked([executable, "-version"] if name != "nvidia-smi" else [
                     executable, "--query-gpu=name,memory.total", "--format=csv,noheader"
                 ])
+                item["version_check_passed"] = True
                 item["version_or_device"] = (result.stdout or result.stderr).splitlines()[0]
             except PipelineError as exc:
+                item["version_check_passed"] = False
                 item["diagnostic"] = str(exc)
         report["executables"][name] = item
 
@@ -1151,23 +1153,36 @@ def command_doctor(args: argparse.Namespace) -> int:
 
     ffmpeg_path = report["executables"]["ffmpeg"]["path"]
     nvenc_available = False
+    encoders_text = ""
+    filters_text = ""
     if ffmpeg_path:
         try:
-            encoders = run_checked([ffmpeg_path, "-hide_banner", "-encoders"]).stdout
-            nvenc_available = "h264_nvenc" in encoders
+            encoders_result = run_checked([ffmpeg_path, "-hide_banner", "-encoders"])
+            encoders_text = encoders_result.stdout + encoders_result.stderr
+            nvenc_available = "h264_nvenc" in encoders_text
         except PipelineError as exc:
             report["accelerators"]["ffmpeg_encoder_check"] = str(exc)
+        try:
+            filters_result = run_checked([ffmpeg_path, "-hide_banner", "-filters"])
+            filters_text = filters_result.stdout + filters_result.stderr
+        except PipelineError as exc:
+            report["accelerators"]["ffmpeg_filter_check"] = str(exc)
     report["accelerators"]["h264_nvenc"] = {
         "available": nvenc_available,
         "note": "FFmpeg build advertises NVENC; actual driver/device initialization is only confirmed during a render."
     }
+    report["accelerators"]["libx264"] = {"available": "libx264" in encoders_text}
+    report["accelerators"]["subtitles_filter"] = {"available": "subtitles" in filters_text}
     required_missing = [
         name for name in ("ffmpeg", "ffprobe")
         if not report["executables"][name]["available"]
+        or not report["executables"][name].get("version_check_passed", False)
     ] + [
         name for name in ("jsonschema", "psutil")
         if not report["python_modules"][name]["available"]
     ]
+    if not report["accelerators"]["libx264"]["available"] and not nvenc_available:
+        required_missing.append("ffmpeg_h264_encoder")
     report["missing_required"] = required_missing
     report["missing_optional"] = [
         name for name in ("faster_whisper", "cv2", "yt_dlp")
