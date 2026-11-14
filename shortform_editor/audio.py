@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import json
 import math
-import shutil
 import struct
-import subprocess
 import tempfile
 import wave
 from array import array
 from pathlib import Path
 from typing import Any
 
-from .cli import PipelineError, file_stat_signature, probe_media, require_tool, run_checked, sha256_file
+from .cli import PipelineError, file_stat_signature, probe_media, require_tool, run_checked
 
 
 def _audio_stream(report: dict[str, Any]) -> dict[str, Any]:
