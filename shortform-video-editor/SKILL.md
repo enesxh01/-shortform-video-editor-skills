@@ -74,3 +74,8 @@ All three layouts have initial FFmpeg code and a synthetic integration test; the
 ## Status vocabulary
 
 Use: implemented-and-verified, implemented-unverified, partial, design-only, missing, or blocked. Never fabricate clips, metrics, test results, or virality guarantees.
+
+
+## URL source ingestion
+
+If the user supplies a public media URL rather than a local file, first use `shortform-editor download-source URL -o source-job/` (install `.[download]` first). This accepts HTTP(S) only, disables playlists, enforces an output-size limit, probes the downloaded media and records its SHA-256 fingerprint. Never bypass access controls, cookies, DRM or platform restrictions. Confirm the user owns the media or has permission to use it. Then pass the resulting local file to `analyze-project`.
