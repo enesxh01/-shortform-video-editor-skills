@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import math
+import statistics
 import os
 import re
 import shutil
@@ -71,6 +72,51 @@ def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
     return digest.hexdigest()
 
 
+def analyze_frame_timestamps(timestamps: list[Any], min_samples: int = 12) -> dict[str, Any]:
+    """Classify sampled frame cadence; this is a diagnostic, not full-file VFR proof."""
+    values = []
+    for item in timestamps:
+        try:
+            value = float(item)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(value):
+            values.append(value)
+    values = sorted(set(values))
+    intervals = [right - left for left, right in zip(values, values[1:]) if right > left]
+    if len(intervals) < min_samples - 1:
+        return {"status": "insufficient_samples", "variable_frame_rate": None,
+                "sampled_frames": len(values), "sampled_intervals": len(intervals),
+                "irregular_interval_ratio": None, "median_interval_seconds": None,
+                "scope": "initial_frame_sample_only"}
+    median_interval = statistics.median(intervals)
+    tolerance = max(0.002, median_interval * 0.03)
+    irregular = sum(abs(interval - median_interval) > tolerance for interval in intervals)
+    ratio = irregular / len(intervals)
+    is_vfr = ratio > 0.05
+    return {"status": "likely_vfr" if is_vfr else "likely_cfr",
+            "variable_frame_rate": is_vfr, "sampled_frames": len(values),
+            "sampled_intervals": len(intervals), "irregular_interval_ratio": round(ratio, 4),
+            "median_interval_seconds": round(median_interval, 6),
+            "tolerance_seconds": round(tolerance, 6), "scope": "initial_frame_sample_only",
+            "limitation": "A short initial sample can miss later cadence changes; this is advisory and does not normalize timestamps."}
+
+def probe_frame_timing(source: Path, ffprobe: str, sample_frames: int = 240) -> dict[str, Any]:
+    """Sample initial decoded frame timestamps to flag probable variable cadence."""
+    result = run_checked([
+        ffprobe, "-v", "error", "-select_streams", "v:0",
+        "-read_intervals", "%+#" + str(sample_frames),
+        "-show_frames", "-show_entries", "frame=best_effort_timestamp_time",
+        "-of", "json", str(source)
+    ])
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return analyze_frame_timestamps([])
+    timestamps = [frame.get("best_effort_timestamp_time")
+                  for frame in payload.get("frames", []) if isinstance(frame, dict)]
+    return analyze_frame_timestamps(timestamps)
+
 def probe_media(source: Path) -> dict[str, Any]:
     source = source.expanduser().resolve(strict=True)
     if not source.is_file():
@@ -99,6 +145,14 @@ def probe_media(source: Path) -> dict[str, Any]:
         "sha256": digest,
         "fingerprint": f"sha256:{digest}",
     }
+    try:
+        data["frame_timing"] = probe_frame_timing(source, ffprobe)
+    except (PipelineError, OSError) as exc:
+        data["frame_timing"] = {
+            "status": "unavailable", "variable_frame_rate": None,
+            "sampled_frames": 0, "scope": "initial_frame_sample_only",
+            "warning": f"Frame-timing sample unavailable: {type(exc).__name__}: {exc}"
+        }
     data["tool_versions"] = {
         "ffprobe": run_checked([ffprobe, "-version"]).stdout.splitlines()[0]
     }
