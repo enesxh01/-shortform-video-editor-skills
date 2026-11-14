@@ -52,6 +52,19 @@ Layout changes must be motivated by the content, not used as arbitrary visual va
 
 Detailed references live in `references/`; the EDL contract is in `schemas/`; installation scripts are in `scripts/`.
 
+## Executable runtime
+
+The repository now includes a Python/FFmpeg runtime in `shortform_editor/` for source inspection, EDL validation, approved EDL rendering, and full-decode export QC. See [runtime documentation](shortform_editor/README.md). Core commands require Python 3.10+ and FFmpeg/ffprobe; no third-party Python package is needed.
+
+```powershell
+python .\shortform_editor\cli.py inspect "D:\media\source.mp4" --output project\source-report.json
+python .\shortform_editor\cli.py validate project\edit.json --source "D:\media\source.mp4"
+python .\shortform_editor\cli.py render project\edit.json --output exports\clip-01.mp4
+python .\shortform_editor\cli.py qc exports\clip-01.mp4
+```
+
+The AI skill suite still performs semantic interpretation and authors the EDL; the runtime does not pretend deterministic heuristics can replace ASR, diarization, tracking, or human editorial judgment.
+
 ## Install
 
 Windows PowerShell:
