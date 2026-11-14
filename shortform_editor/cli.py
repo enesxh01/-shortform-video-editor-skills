@@ -827,7 +827,7 @@ def command_render(args: argparse.Namespace) -> int:
         if qc_report["status"] not in {"passed", "warning"}:
             failure_report = output.with_name(f".{output.name}.qc-failed.json")
             try:
-                failure_report.write_text(json.dumps(qc_report, indent=2, ensure_ascii=False) + "\\n", encoding="utf-8")
+                failure_report.write_text(json.dumps(qc_report, indent=2, ensure_ascii=False) + chr(10), encoding="utf-8")
             except OSError:
                 pass
             failures = "; ".join(qc_report.get("failures", [])) or qc_report["status"]
