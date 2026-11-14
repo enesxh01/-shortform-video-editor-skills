@@ -307,6 +307,32 @@ def _segment_fade_filters(segment: dict[str, Any], duration: float) -> tuple[lis
     return video_filters, audio_filters
 
 
+def _segment_look_filters(segment: dict[str, Any]) -> list[str]:
+    """Build bounded, optional color-correction and sharpening filters."""
+    grade = segment.get("color_grade") or {}
+    if not isinstance(grade, dict):
+        raise PipelineError("color_grade must be an object")
+    defaults = {"brightness": 0.0, "contrast": 1.0, "saturation": 1.0, "gamma": 1.0, "sharpen": 0.0}
+    values = {key: float(grade.get(key, default)) for key, default in defaults.items()}
+    bounds = {
+        "brightness": (-0.2, 0.2), "contrast": (0.5, 2.0),
+        "saturation": (0.0, 2.0), "gamma": (0.5, 2.0), "sharpen": (0.0, 1.5)
+    }
+    for key, value in values.items():
+        low, high = bounds[key]
+        if not math.isfinite(value) or value < low or value > high:
+            raise PipelineError(f"color_grade.{key} must be between {low} and {high}")
+    filters = []
+    if any(abs(values[key] - defaults[key]) > 1e-9 for key in ("brightness", "contrast", "saturation", "gamma")):
+        filters.append(
+            "eq=" + ":".join(f"{key}={values[key]:.4f}" for key in ("brightness", "contrast", "saturation", "gamma"))
+        )
+    if values["sharpen"] > 0:
+        amount = values["sharpen"]
+        filters.append(f"unsharp=5:5:{amount:.3f}:5:5:0")
+    return filters
+
+
 def command_render(args: argparse.Namespace) -> int:
     edl_path = Path(args.edl).expanduser().resolve(strict=True)
     edl = json.loads(edl_path.read_text(encoding="utf-8"))
@@ -411,6 +437,9 @@ def command_render(args: argparse.Namespace) -> int:
                         f"crop={width}:{height},setsar=1,fps={fps},format=yuv420p"
                     )
                 fade_video_filters, fade_audio_filters = _segment_fade_filters(segment, clip_duration)
+                look_filters = _segment_look_filters(segment)
+                if look_filters:
+                    vf += "," + ",".join(look_filters)
                 if subtitle_filter:
                     vf += f",{subtitle_filter}"
                 if fade_video_filters:
@@ -428,9 +457,13 @@ def command_render(args: argparse.Namespace) -> int:
                     f"[bg][fg]overlay=0:{bar_offset},setsar=1,fps={fps},format=yuv420p[vbase]"
                 )
                 fade_video_filters, fade_audio_filters = _segment_fade_filters(segment, clip_duration)
+                look_filters = _segment_look_filters(segment)
                 graph_input = "vbase"
+                if look_filters:
+                    graph += f";[vbase]{','.join(look_filters)}[vlook]"
+                    graph_input = "vlook"
                 if subtitle_filter:
-                    graph += f";[vbase]{subtitle_filter}[vcap]"
+                    graph += f";[{graph_input}]{subtitle_filter}[vcap]"
                     graph_input = "vcap"
                 if fade_video_filters:
                     graph += f";[{graph_input}]{','.join(fade_video_filters)}[vfade]"
