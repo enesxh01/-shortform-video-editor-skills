@@ -2,6 +2,12 @@
 
 A local-first OpenCode skill suite with an early executable Python/FFmpeg foundation for short-form video analysis and editing.
 
+> **Important:** The current implementation is on branch `implementation/foundation-and-install-fixes`. Until that branch is merged into `main`, clone that branch explicitly rather than the default branch.
+
+```bash
+git clone --branch implementation/foundation-and-install-fixes https://github.com/enesxh01/-shortform-video-editor-skills.git
+```
+
 ## Goals
 
 - Find self-contained, compelling moments in long-form video.
