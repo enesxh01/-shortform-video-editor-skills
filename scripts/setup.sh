@@ -10,6 +10,11 @@ if ! command -v "$PYTHON" >/dev/null 2>&1; then
   exit 2
 fi
 
+if ! "$PYTHON" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)'; then
+  echo "Python 3.10 or newer is required. Selected interpreter: $("$PYTHON" --version 2>&1)" >&2
+  exit 2
+fi
+
 echo "Installing the shortform-editor CLI and audio/visual/download extras..."
 "$PYTHON" -m pip install --upgrade pip
 "$PYTHON" -m pip install -e "${ROOT}[audio,visual,download]"

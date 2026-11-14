@@ -5,6 +5,13 @@ param(
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 
+$PythonVersionText = & $PythonCommand @PythonPrefix -c "import sys; print('.'.join(map(str, sys.version_info[:3])))"
+if ($LASTEXITCODE -ne 0) { throw "Could not determine the selected Python version." }
+$PythonVersion = [version]$PythonVersionText
+if ($PythonVersion -lt [version]"3.10") {
+    throw "Python 3.10 or newer is required; selected version is $PythonVersionText. Install Python 3.10+ and rerun setup."
+}
+
 $Launcher = Get-Command py -ErrorAction SilentlyContinue
 if ($Launcher) {
     $PythonCommand = "py"

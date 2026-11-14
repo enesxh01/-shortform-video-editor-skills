@@ -15,6 +15,7 @@ class SetupScriptTests(unittest.TestCase):
         self.assertIn('shortform_editor.cli doctor', script)
         self.assertIn("ffmpeg", script)
         self.assertIn("ffprobe", script)
+        self.assertIn("3.10", script)
         bash = shutil.which("bash")
         if bash:
             subprocess.run([bash, "-n", str(ROOT / "scripts" / "setup.sh")], check=True)
@@ -26,6 +27,7 @@ class SetupScriptTests(unittest.TestCase):
         self.assertIn('shortform_editor.cli doctor', script)
         self.assertIn('Get-Command ffmpeg', script)
         self.assertIn('Get-Command ffprobe', script)
+        self.assertIn('[version]"3.10"', script)
 
 
 if __name__ == "__main__":
