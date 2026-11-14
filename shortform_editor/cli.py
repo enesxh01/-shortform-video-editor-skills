@@ -141,7 +141,7 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
         messages.append("frame rate and time_base values must be valid positive rational numbers")
 
     ids: set[str] = set()
-    previous_timeline_start = -1.0
+    expected_timeline_start = 0.0
     for index, segment in enumerate(edl["segments"]):
         if segment["id"] in ids:
             messages.append(f"segments[{index}].id duplicates {segment['id']!r}")
@@ -156,9 +156,12 @@ def validate_edl(edl: dict[str, Any], source_duration: float | None = None, sour
             timeline = segment.get("timeline_start")
             if timeline is not None:
                 timeline_value = timestamp_seconds(timeline)
-                if timeline_value < previous_timeline_start:
-                    messages.append(f"segments[{index}].timeline_start must be nondecreasing")
-                previous_timeline_start = timeline_value
+                if abs(timeline_value - expected_timeline_start) > 0.05:
+                    messages.append(
+                        f"segments[{index}].timeline_start must equal the sequential render position "
+                        f"({expected_timeline_start:.3f}s); gaps, overlaps and transitions are not supported"
+                    )
+            expected_timeline_start += max(0.0, end - start)
             for split_key in ("split_top", "split_bottom"):
                 split_source = segment.get(split_key)
                 if split_source:
