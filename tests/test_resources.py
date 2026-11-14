@@ -53,6 +53,12 @@ class ResourceSelectionTests(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             choose_inference_device("medium", "cuda", snapshot)
 
+    def test_honors_explicit_empty_resource_snapshot_without_live_probe(self):
+        from unittest.mock import patch
+        with patch("shortform_editor.resources.resource_snapshot", side_effect=AssertionError("unexpected live probe")):
+            with self.assertRaises(RuntimeError):
+                choose_inference_device("small", "auto", {})
+
     def test_rejects_unknown_device(self):
         with self.assertRaises(ValueError):
             choose_inference_device("small", "tpu", {"ram_available_gb": 8.0, "gpu": {}})
