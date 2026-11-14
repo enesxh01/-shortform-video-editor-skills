@@ -97,7 +97,7 @@ Linux/macOS:
 bash scripts/setup.sh
 ```
 
-These setup scripts install the editable CLI package plus the audio, visual and download extras, install the OpenCode skills with backups, and run `shortform-editor doctor`. They do not silently install system packages or change your OS PATH. If FFmpeg is missing, install an FFmpeg build that includes ffprobe, libx264 (or NVENC) and the subtitles filter, then rerun setup. The scripts print an OS-appropriate installation hint where possible.
+These setup scripts install the editable CLI package plus the audio, visual and download extras, install the OpenCode skills with backups, and run `shortform-editor doctor`, which checks the FFmpeg filters and H.264 encoder required by rendering and QC. They do not silently install system packages or change your OS PATH. If FFmpeg is missing, install an FFmpeg build that includes ffprobe, libx264 (or NVENC) and the subtitles filter, then rerun setup. The scripts print an OS-appropriate installation hint where possible.
 
 For a skills-only update after the CLI is already installed, use `bash scripts/install.sh` or `powershell -ExecutionPolicy Bypass -File scripts/install.ps1`.
 
@@ -119,7 +119,7 @@ shortform-editor analyze-project input.mp4 -o job-output/ --model small --device
 ```
 
 This orchestrates:
-1. Source probe and SHA-256 fingerprint, plus an advisory 240-frame timestamp-cadence sample across up to eight evenly spaced windows (`likely_cfr`, `likely_vfr`, or unknown). This is not full-file VFR proof or timestamp normalization.
+1. Source probe and SHA-256 fingerprint, plus an advisory 240-frame timestamp-cadence sample across up to eight evenly spaced windows (`likely_cfr`, `likely_vfr`, or unknown). This is not full-file VFR proof. The renderer rebases each segment's video PTS, converts to CFR, and resamples audio timestamps to compensate for ordinary clock drift; arbitrary damaged timestamps still need human sync review.
 2. Audio extraction, optional faster-whisper ASR and word timestamps.
 3. Transcript-led moment candidate ranking.
 4. Review-only retention/pacing analysis.
