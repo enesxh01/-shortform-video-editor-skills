@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 from argparse import Namespace
 from unittest.mock import patch
 
@@ -59,17 +61,23 @@ class QCTests(unittest.TestCase):
 
     def test_qc_warning_is_nonfatal_for_optional_missing_audio(self):
         report = {"status": "warning", "checks": [], "failures": [], "warnings": ["No audio stream"]}
-        with patch("shortform_editor.qc.run_qc", return_value=report):
-            result = command_qc(Namespace(source="unused.mp4", width=1080, height=1920, fps="60/1", output=None))
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.mp4"
+            source.write_bytes(b"placeholder")
+            with patch("shortform_editor.qc.run_qc", return_value=report):
+                result = command_qc(Namespace(source=str(source), width=1080, height=1920, fps="60/1", output=None))
         self.assertEqual(result, 0)
 
     def test_repair_warning_is_nonfatal(self):
         report = {"qc_after_repair": {"status": "warning"}}
-        with patch("shortform_editor.repair.repair_technical_export", return_value=report):
-            result = command_repair(Namespace(
-                source="unused.mp4", output="unused-out.mp4", width=1080, height=1920,
-                fps="60/1", crf=18, preset="medium", overwrite=False
-            ))
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "source.mp4"
+            source.write_bytes(b"placeholder")
+            with patch("shortform_editor.repair.repair_technical_export", return_value=report):
+                result = command_repair(Namespace(
+                    source=str(source), output=str(Path(directory) / "unused-out.mp4"), width=1080, height=1920,
+                    fps="60/1", crf=18, preset="medium", overwrite=False
+                ))
         self.assertEqual(result, 0)
 
 
