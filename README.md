@@ -81,6 +81,10 @@ bash scripts/install.sh
 
 Both scripts install skill folders containing `SKILL.md` into OpenCode's global skills directory by default. Pass a destination path to override it.
 
+## Current implementation status
+
+See [implementation status](docs/implementation-status.md) for what has passed automated verification and what still needs real-footage or local-machine testing. The repository is ready for a controlled first install, not yet a fully production-proven autonomous editor.
+
 ## Quality policy
 
 A feature is not considered verified merely because code or documentation exists. Verification status must distinguish implemented-and-tested behavior from unverified implementation, partial work, design-only work, and blocked work. Technical QC does not replace human review of the actual exported video.
