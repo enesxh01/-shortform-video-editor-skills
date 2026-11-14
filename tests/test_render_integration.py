@@ -6,7 +6,7 @@ import unittest
 from argparse import Namespace
 from pathlib import Path
 
-from shortform_editor.cli import command_render, probe_media
+from shortform_editor.cli import command_render, command_render_preview, probe_media
 from shortform_editor.repair import repair_technical_export
 
 
@@ -41,6 +41,7 @@ class RenderIntegrationTests(unittest.TestCase):
             time_base = next(s["time_base"] for s in source_probe["streams"] if s["codec_type"] == "video")
 
             layouts = ["fullscreen", "blurred_bars_20_60_20", "split_vertical"]
+            fullscreen_edl_path = None
             for layout in layouts:
                 segment = {
                     "id": layout,
@@ -93,6 +94,8 @@ class RenderIntegrationTests(unittest.TestCase):
                 }
                 edl_path = root / f"{layout}.json"
                 edl_path.write_text(json.dumps(edl), encoding="utf-8")
+                if layout == "fullscreen":
+                    fullscreen_edl_path = edl_path
                 output = root / f"{layout}.mp4"
                 result = command_render(Namespace(
                     source=str(source), edl=str(edl_path), output=str(output),
@@ -106,6 +109,20 @@ class RenderIntegrationTests(unittest.TestCase):
                 self.assertEqual(video["codec_name"], "h264")
                 self.assertEqual(video["avg_frame_rate"], "60/1")
                 self.assertTrue(any(s["codec_type"] == "audio" for s in rendered["streams"]))
+
+            preview_edl = json.loads(fullscreen_edl_path.read_text(encoding="utf-8"))
+            preview_edl["approval"] = {"status": "draft", "approved_by_user": False}
+            draft_path = root / "preview-draft.json"
+            draft_path.write_text(json.dumps(preview_edl), encoding="utf-8")
+            preview_output = root / "preview.mp4"
+            preview_result = command_render_preview(Namespace(
+                source=str(source), edl=str(draft_path), output=str(preview_output), overwrite=False
+            ))
+            self.assertEqual(preview_result, 0)
+            self.assertEqual(json.loads(draft_path.read_text(encoding="utf-8"))["approval"]["status"], "draft")
+            preview_probe = probe_media(preview_output)
+            preview_video = next(s for s in preview_probe["streams"] if s["codec_type"] == "video")
+            self.assertEqual(preview_video["avg_frame_rate"], "30/1")
 
             repaired = root / "repaired.mp4"
             repair_report = repair_technical_export(
