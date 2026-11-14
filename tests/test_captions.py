@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from shortform_editor.captions import _ass_time, ffmpeg_subtitles_filter, write_ass_subtitles
+from shortform_editor.cli import PipelineError
 
 
 class CaptionTests(unittest.TestCase):
@@ -60,7 +61,7 @@ class CaptionTests(unittest.TestCase):
             "margin_v": 900
         }]}
         with tempfile.TemporaryDirectory() as directory:
-            with self.assertRaises(Exception):
+            with self.assertRaises(PipelineError):
                 write_ass_subtitles(segment, "fullscreen", 0.0, Path(directory) / "bad.ass")
 
     def test_filter_path_escapes_windows_drive_colon(self):
