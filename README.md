@@ -74,7 +74,7 @@ python3 -m pip install --upgrade pip
 python3 -m pip install -e ".[audio,visual,download]"
 ```
 
-The extras enable faster-whisper ASR, OpenCV visual analysis, and optional authorized HTTP(S) URL ingestion. FFmpeg and ffprobe are separate system requirements; install them with your OS package manager or an official FFmpeg build and confirm both commands work on PATH.
+The extras enable faster-whisper ASR, OpenCV visual analysis, and optional authorized HTTP(S) URL ingestion. FFmpeg and ffprobe are separate system requirements; install them with your OS package manager or an official FFmpeg build and confirm both commands work on PATH. Then run `shortform-editor doctor` to verify the required executables, core Python modules, subtitle filter, H.264 encoder and optional extras before processing footage.
 
 To ingest a single URL into a new, empty folder (playlists are disabled):
 
