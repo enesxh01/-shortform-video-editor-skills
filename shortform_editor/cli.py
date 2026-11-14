@@ -720,6 +720,9 @@ def main() -> int:
         if getattr(args, "silence_dbfs", -38.0) < -80 or getattr(args, "silence_dbfs", -38.0) > -10:
             raise PipelineError("--silence-dbfs must be between -80 and -10 dBFS")
         return args.func(args)
+    except KeyboardInterrupt:
+        print("Cancelled. Temporary artifacts are cleaned; source media is preserved.", file=sys.stderr)
+        return 130
     except (PipelineError, OSError, ValueError, json.JSONDecodeError) as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 2
