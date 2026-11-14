@@ -209,7 +209,7 @@ def analyze_project(source: Path, output_dir: Path, model: str = "small",
                 ]
                 if any(item["subject_evidence"] == "face_detection" for item in crop_frames):
                     segment_edl["crop_keyframes"] = [
-                        {"time_seconds": item["time_seconds"], "crop_9_16": item["crop_9_16"]}
+                        {"time_seconds": item["time_seconds"], "crop_9_16": item["crop_9_16"], "scene_cut": item.get("scene_cut", False)}
                         for item in crop_frames
                     ]
 
