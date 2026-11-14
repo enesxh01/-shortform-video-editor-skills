@@ -59,3 +59,6 @@ A successful process exit is insufficient. Probe and decode the output, verify e
 
 
 After assembling and decode-checking the final MP4, the `render` command automatically runs the independent technical QC pass and includes its report in the JSON result. A failed QC result returns a non-zero exit code while preserving the rendered file for inspection. Warnings (for example, a source with no audio stream) remain non-fatal.
+
+
+Multi-segment EDLs are concatenated in array order. Timeline gaps/overlaps and transitions are intentionally unsupported; semantic validation rejects a non-sequential `timeline_start` rather than rendering a misleading timeline.
