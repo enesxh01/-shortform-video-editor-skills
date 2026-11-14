@@ -27,7 +27,7 @@ This file records repository evidence, not design intent. A feature is not verif
 
 Tests have been added for EDL validation, subprocess cancellation, audio metrics, CUDA-to-CPU fallback, moment ranking, pacing, crop geometry/keyframe expressions, caption grouping/ASS punctuation, resource selection, QC, deduplicated local feedback, pipeline orchestration and FFmpeg render/repair integration.
 
-**Important:** The last confirmed Linux/Windows CI run passed before most of these new modules and integration tests were added. The branch now has a Linux/Windows, Python 3.10/3.12 CI matrix configured; the current workflow runs are queued and have not yet reported results. Do not treat the new tests as passing until Actions runs them. The FFmpeg integration test generates synthetic videos and exercises all three layouts, ASS captions, dynamic crop keyframes and technical repair; it is not a substitute for testing the user's real footage.
+**Important:** The last confirmed Linux/Windows CI run passed before most of these new modules and integration tests were added. The branch now has a Linux/Windows, Python 3.10/3.12 CI matrix configured; the current workflow runs have not yet reported results. Do not treat the new tests as passing until Actions runs them. The FFmpeg integration test generates synthetic videos and exercises all three layouts, ASS captions, dynamic crop keyframes and technical repair; it is not a substitute for testing the user's real footage.
 
 ## Hardware and model policy
 
