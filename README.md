@@ -113,7 +113,7 @@ shortform-editor apply-feedback job-output/candidates.json -o ranked.json
 
 - The Python moment detector is an English-biased heuristic and deliberately reports low confidence. The OpenCode skill adds a separate LLM semantic review pass over the full timestamped transcript, but that prompt-driven review has not been benchmarked or evaluated on a labeled set; neither stage predicts virality.
 - Audio has ASR and energy/silence analysis, but no diarization, overlap, laughter/emotion classification or multi-mic separation.
-- Visual analysis detects scene-change candidates and frontal faces only; it does not understand arbitrary objects, actions, sports or gameplay HUDs.
+- Visual analysis detects scene changes and frontal faces, then uses optional OpenCV-contrib CSRT to track a detected face between sampled frames when possible. It still does not understand arbitrary objects, actions, sports or gameplay HUDs.
 - Pacing trims are advisory and never automatically remove content.
 - Captions use ASS/libass and word karaoke; advanced motion presets, custom font packaging and safe-area preview are not implemented. Optional per-clip fade-in/fade-out transitions now support synchronized video and source-audio fades (0–2 seconds each). These fade to/from black; cross-dissolves and motion transitions remain unimplemented.
 - QC checks stream metadata, codec, dimensions, FPS, black/frozen intervals, sample peak and stream timing metadata. It is not full creative QC or listening-based lip-sync analysis.
