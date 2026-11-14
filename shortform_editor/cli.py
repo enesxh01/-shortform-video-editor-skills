@@ -277,6 +277,19 @@ def _resolve_edl_path(edl_path: Path, raw_path: str) -> Path:
     return candidate.resolve(strict=True)
 
 
+def choose_video_encoder(ffmpeg: str, requested: str = "auto") -> str:
+    if requested not in {"auto", "libx264", "h264_nvenc"}:
+        raise PipelineError(f"Unsupported video encoder: {requested}")
+    if requested == "libx264":
+        return "libx264"
+    encoder_result = run_checked([ffmpeg, "-hide_banner", "-encoders"])
+    encoder_listing = (encoder_result.stdout or "") + (encoder_result.stderr or "")
+    has_nvenc = "h264_nvenc" in encoder_listing
+    if requested == "h264_nvenc" and not has_nvenc:
+        raise PipelineError("h264_nvenc was requested but this FFmpeg build does not list the encoder")
+    return "h264_nvenc" if has_nvenc else "libx264"
+
+
 def _segment_fade_filters(segment: dict[str, Any], duration: float) -> tuple[list[str], list[str]]:
     fade_in = float(segment.get("fade_in_seconds", 0.0))
     fade_out = float(segment.get("fade_out_seconds", 0.0))
@@ -449,12 +462,7 @@ def command_render(args: argparse.Namespace) -> int:
             encoder = getattr(args, "_selected_encoder", None)
             if encoder is None:
                 requested_encoder = getattr(args, "encoder", "auto")
-                encoder_result = run_checked([ffmpeg, "-hide_banner", "-encoders"])
-                encoder_listing = (encoder_result.stdout or "") + (encoder_result.stderr or "")
-                has_nvenc = "h264_nvenc" in encoder_listing
-                if requested_encoder == "h264_nvenc" and not has_nvenc:
-                    raise PipelineError("h264_nvenc was requested but this FFmpeg build does not list the encoder")
-                encoder = "h264_nvenc" if requested_encoder in {"auto", "h264_nvenc"} and has_nvenc else "libx264"
+                encoder = choose_video_encoder(ffmpeg, requested_encoder)
                 args._selected_encoder = encoder
 
             def encode_with(codec: str) -> None:
