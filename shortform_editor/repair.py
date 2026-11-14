@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from fractions import Fraction
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,13 @@ def repair_technical_export(source: Path, output: Path, width: int = 1080,
         raise PipelineError("Repair dimensions must be even and at least 360x640")
     if not 0 <= crf <= 51:
         raise PipelineError("CRF must be between 0 and 51")
+    try:
+        frame_rate = Fraction(str(fps))
+    except (ValueError, ZeroDivisionError):
+        raise PipelineError("FPS must be a positive rational number, for example 60/1") from None
+    if frame_rate <= 0 or frame_rate > 240:
+        raise PipelineError("FPS must be greater than 0 and no more than 240")
+    fps = f"{frame_rate.numerator}/{frame_rate.denominator}"
     if preset not in {"ultrafast", "fast", "medium", "slow", "veryslow"}:
         raise PipelineError("Unsupported x264 preset")
     if output.exists() and not overwrite:
