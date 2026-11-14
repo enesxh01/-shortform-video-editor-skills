@@ -73,3 +73,9 @@ Tests have been added for resumable render-part hash/decode validation, resumabl
 - Cache identity includes the primary source fingerprint, exact EDL hash, secondary split-source fingerprints, output path, render profile, preview mode and encoder-quality options. Reusing a segment additionally requires a matching SHA-256 digest, FFprobe-confirmed H.264/dimensions/FPS and a successful full FFmpeg decode.
 - Incomplete or altered parts are discarded and re-encoded. Final concat, full decode, staged publication and QC are repeated. A successful QC pass removes the work directory; failed/interrupted jobs preserve it for retry.
 - This has not yet been exercised by a completed CI run or an interrupted real-footage render. Keep the hidden work directory between retries; changing inputs or encoder settings invalidates the cache.
+
+
+## VFR and audio timestamp handling (partial)
+
+- Every rendered video segment passes through an explicit CFR `fps` filter and `-fps_mode cfr` conversion. When source audio exists, the audio path now uses `aresample=48000:async=1:first_pts=0` before AAC encoding, with any requested fades appended to that filter chain. This compensates for ordinary timestamp gaps/clock drift while preserving the timeline.
+- This is not a guarantee for arbitrary corrupt/non-monotonic PTS, unusual edit lists, damaged timestamps or perceptual lip-sync. Keep VFR source diagnostics advisory and inspect real footage.
