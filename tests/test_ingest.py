@@ -47,6 +47,14 @@ class URLIngestionTests(unittest.TestCase):
             with self.assertRaises(PipelineError):
                 download_source("https:///video", Path(directory) / "out")
 
+    def test_rejects_output_path_that_is_a_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "not-a-directory"
+            output.write_text("keep")
+            with self.assertRaisesRegex(PipelineError, "not a directory"):
+                download_source("https://example.com/video", output)
+            self.assertEqual(output.read_text(), "keep")
+
     def test_rejects_nonempty_output_directory(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "out"
