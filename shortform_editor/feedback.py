@@ -33,6 +33,10 @@ def _read_feedback(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def load_feedback(path: Path = DEFAULT_FEEDBACK_PATH) -> list[dict[str, Any]]:
+    return _read_feedback(path)
+
+
 def record_feedback(candidates: dict[str, Any], candidate_id: str, decision: str,
                     path: Path = DEFAULT_FEEDBACK_PATH, reason: str = "") -> dict[str, Any]:
     if decision not in LABEL_VALUE:
