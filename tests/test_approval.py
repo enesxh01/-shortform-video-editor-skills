@@ -74,7 +74,12 @@ class ApprovalTests(unittest.TestCase):
 
     def test_edl_content_edit_invalidates_approval_hash(self):
         edl = make_edl("sha256:" + "a" * 64)
-        approved_hash = edl_approval_hash(edl)
+        edl["approval"] = {
+            "status": "approved", "approved_by_user": True,
+            "approved_at": "2026-01-01T00:00:00+00:00"
+        }
+        edl["approval"]["approved_edl_sha256"] = edl_approval_hash(edl)
+        approved_hash = edl["approval"]["approved_edl_sha256"]
         edl["segments"][0]["reason"] = "Changed after approval"
         self.assertNotEqual(approved_hash, edl_approval_hash(edl))
 
@@ -90,9 +95,9 @@ class ApprovalTests(unittest.TestCase):
             edl["approval"] = {
                 "status": "approved",
                 "approved_by_user": True,
-                "approved_edl_sha256": edl_approval_hash(edl),
                 "approved_at": "2026-01-01T00:00:00+00:00"
             }
+            edl["approval"]["approved_edl_sha256"] = edl_approval_hash(edl)
             edl["segments"][0]["reason"] = "Edited after approval"
             edl_path.write_text(json.dumps(edl), encoding="utf-8")
             with patch("shortform_editor.cli.probe_media", return_value={
