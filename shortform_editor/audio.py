@@ -198,8 +198,6 @@ def analyze_audio(source: Path, model_size: str = "small", device: str = "auto",
             shift_time(segment)
             for word in segment["words"]:
                 shift_time(word)
-        for word in transcription["words"]:
-            shift_time(word)
 
     return {
         "schema_version": "1.0",
