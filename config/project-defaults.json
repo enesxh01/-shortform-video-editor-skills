@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "workflow": {
+    "local_first": true,
+    "require_human_approval_before_final": true,
+    "preserve_source_media": true,
+    "search_entire_source": true,
+    "allow_cloud_processing": false
+  },
+  "editing": {
+    "supported_layouts": [
+      "fullscreen",
+      "split_vertical",
+      "blurred_bars_20_60_20"
+    ],
+    "default_layout": "fullscreen",
+    "automatic_layout_switching": "only_when_editorially_justified",
+    "background_music": false,
+    "b_roll": false,
+    "sound_effects": false,
+    "caption_style": "kino_editorial"
+  },
+  "export": {
+    "container": "mp4",
+    "width": 1080,
+    "height": 1920,
+    "video_codec": "h264",
+    "pixel_format": "yuv420p",
+    "fps_target": "60/1",
+    "fps_mode": "cfr",
+    "fps_conversion": "source_aware",
+    "audio_codec": "aac",
+    "faststart": true,
+    "final_render_uses_original_source": true
+  },
+  "quality": {
+    "technical_qc_required": true,
+    "visual_qc_required": true,
+    "critical_failures_block_approval": true,
+    "unverified_features_must_be_disclosed": true,
+    "virality_guarantees": false
+  },
+  "excluded_integrations": [
+    "youtube_analytics",
+    "youtube_channel_performance",
+    "views_and_retention_dashboards",
+    "automatic_performance_optimization"
+  ]
+}
