@@ -124,8 +124,8 @@ The latest four-platform CI matrix is green, resumable analysis/rendering is imp
 
 ## Latest CI verification
 
-- Full Linux/Windows × Python 3.10/3.12 matrix passed on commit `d0260766` ([run #43622463389](https://github.com/enesxh01/-shortform-video-editor-skills/actions/runs/43622463389)).
-- All four jobs passed 187 unit/integration tests, synthetic FFmpeg render and recovery checks, CLI verification, wheel/schema packaging, shell and PowerShell syntax checks, end-to-end setup scripts and the environment doctor. The installer-upgrade test confirms existing user skill files are preserved in timestamped backups.
+- Full Linux/Windows × Python 3.10/3.12 matrix passed on commit `b3dec875` ([run #43623089940](https://github.com/enesxh01/-shortform-video-editor-skills/actions/runs/43623089940)).
+- All four jobs passed 189 unit/integration tests, synthetic FFmpeg render and recovery checks, CLI verification, wheel/schema packaging, shell and PowerShell syntax checks, end-to-end setup scripts and the environment doctor. The installer-upgrade test confirms existing user skill files are preserved in timestamped backups.
 - The suite includes interrupted render recovery, synthetic VFR-to-CFR/audio-duration alignment, low-confidence transcript-span diagnostics and KLT optical-flow movement tracking. This does not verify real-footage quality, arbitrary VFR lip-sync or RTX 3060 performance.
 
 
