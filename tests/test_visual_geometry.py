@@ -1,6 +1,8 @@
 import unittest
 
-from shortform_editor.visual import build_ffmpeg_crop_filter, compute_crop_box, sample_region_timestamps, sample_timestamps
+from types import SimpleNamespace
+
+from shortform_editor.visual import build_ffmpeg_crop_filter, compute_crop_box, get_face_tracker_factory, sample_region_timestamps, sample_timestamps
 
 
 class CropGeometryTests(unittest.TestCase):
@@ -16,6 +18,19 @@ class CropGeometryTests(unittest.TestCase):
         self.assertEqual(crop["width"], 1080)
         self.assertAlmostEqual(crop["height"], 1920, places=2)
         self.assertAlmostEqual(crop["y"], 210, places=2)
+
+    def test_face_tracker_factory_supports_modern_opencv_api(self):
+        factory = lambda: "tracker"
+        cv2 = SimpleNamespace(TrackerCSRT_create=factory)
+        self.assertIs(get_face_tracker_factory(cv2), factory)
+
+    def test_face_tracker_factory_supports_legacy_opencv_api(self):
+        factory = lambda: "tracker"
+        cv2 = SimpleNamespace(legacy=SimpleNamespace(TrackerCSRT_create=factory))
+        self.assertIs(get_face_tracker_factory(cv2), factory)
+
+    def test_face_tracker_factory_is_optional(self):
+        self.assertIsNone(get_face_tracker_factory(SimpleNamespace()))
 
     def test_rejects_invalid_geometry(self):
         with self.assertRaises(ValueError):
