@@ -20,5 +20,14 @@ if (Test-Path $RuntimeSource) {
     Copy-Item -Path (Join-Path $RuntimeSource "*") -Destination $SkillRuntime -Recurse -Force
     Write-Host "Installed shortform editor runtime"
 }
+foreach ($SharedDir in @("references", "schemas", "config", "docs")) {
+    $SharedSource = Join-Path $Root $SharedDir
+    $SharedTarget = Join-Path $Dest $SharedDir
+    if (Test-Path $SharedSource) {
+        if (Test-Path $SharedTarget) { Remove-Item -Recurse -Force $SharedTarget }
+        Copy-Item -Recurse $SharedSource $SharedTarget
+        Write-Host "Installed shared $SharedDir"
+    }
+}
 Write-Host "OpenCode skills installed to: $Dest"
 Write-Host "Restart/reload OpenCode if the new skills are not discovered."
