@@ -25,7 +25,7 @@ Write-Host "Installing the shortform-editor CLI and audio/visual/download extras
 & $PythonCommand @PythonPrefix -m pip install --upgrade pip
 if ($LASTEXITCODE -ne 0) { throw "Could not upgrade pip." }
 
-& $PythonCommand @PythonPrefix -m pip install -e "$Root[audio,visual,download]"
+& $PythonCommand @PythonPrefix -m pip install -e "${Root}[audio,visual,download]"
 if ($LASTEXITCODE -ne 0) { throw "Could not install the shortform-editor package and optional extras." }
 
 Write-Host "Installing OpenCode skills..."
