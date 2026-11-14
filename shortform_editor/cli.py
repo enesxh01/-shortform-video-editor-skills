@@ -110,13 +110,15 @@ def analyze_frame_timestamps(timestamps: list[Any], min_samples: int = 12,
             "limitation": "A bounded multi-window sample can miss cadence changes between samples; this is advisory and does not normalize timestamps."}
 
 def probe_frame_timing(source: Path, ffprobe: str, duration_seconds: float | None = None,
-                       sample_frames: int = 240, sample_windows: int = 8) -> dict[str, Any]:
+                       nominal_frame_rate: float | None = None, sample_frames: int = 240,
+                       sample_windows: int = 8) -> dict[str, Any]:
     """Sample bounded frame windows across the file to flag probable variable cadence."""
     if sample_frames < 12 or sample_windows < 1:
         raise ValueError("Frame timing sample requires at least 12 frames and one window")
     frames_per_window = max(2, sample_frames // sample_windows)
     if duration_seconds and math.isfinite(duration_seconds) and duration_seconds > 0:
-        last_start = max(0.0, duration_seconds - (frames_per_window / 10))
+        estimated_window_seconds = frames_per_window / max(1.0, nominal_frame_rate or 30.0)
+        last_start = max(0.0, duration_seconds - estimated_window_seconds)
         starts = [round(last_start * index / max(1, sample_windows - 1), 3)
                   for index in range(sample_windows)]
     else:
@@ -166,7 +168,16 @@ def probe_media(source: Path) -> dict[str, Any]:
         "fingerprint": f"sha256:{digest}",
     }
     try:
-        data["frame_timing"] = probe_frame_timing(\n            source, ffprobe, duration_seconds=float(data.get("format", {}).get("duration") or 0)\n        )
+        video_stream = next(stream for stream in streams if stream.get("codec_type") == "video")
+        try:
+            nominal_frame_rate = float(Fraction(video_stream.get("avg_frame_rate") or video_stream.get("r_frame_rate") or "30/1"))
+        except (ValueError, ZeroDivisionError):
+            nominal_frame_rate = 30.0
+        data["frame_timing"] = probe_frame_timing(
+            source, ffprobe,
+            duration_seconds=float(data.get("format", {}).get("duration") or 0),
+            nominal_frame_rate=nominal_frame_rate
+        )
     except (PipelineError, OSError) as exc:
         data["frame_timing"] = {
             "status": "unavailable", "variable_frame_rate": None,
