@@ -47,7 +47,7 @@ def _write_json(path: Path, data: dict[str, Any]) -> None:
 def _read_json(path: Path) -> dict[str, Any] | None:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return None
     return value if isinstance(value, dict) else None
 
@@ -64,7 +64,11 @@ def _cached_artifact(output_dir: Path, filename: str, source_fingerprint: str,
     expected_digest = state.get("artifact_sha256", {}).get(filename)
     if not expected_digest or not path.is_file():
         return None
-    if hashlib.sha256(path.read_bytes()).hexdigest() != expected_digest:
+    try:
+        actual_digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+    if actual_digest != expected_digest:
         return None
     value = _read_json(path)
     if value is None:
