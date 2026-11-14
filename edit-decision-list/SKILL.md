@@ -7,27 +7,21 @@ description: Define and validate a frame-accurate, versioned edit decision list 
 
 The EDL is the canonical, versioned representation of every edit. Modules propose changes; the editing director approves and writes the final EDL.
 
-## Required concepts
+## Schema and validation
 
-- schema version and project ID;
-- source fingerprint and stream identifiers;
-- explicit time base and frame-rate metadata;
-- ordered timeline segments with source in/out and timeline positions;
-- speed changes only when explicitly intended;
-- layout, crop keyframes, tracking references;
-- caption text, word timing, style, safe-area position;
-- audio gain/filter decisions;
-- transitions and overlays;
-- requested optional B-roll/SFX/music state;
-- render profile, target FPS, and FPS conversion method;
-- provenance, confidence, warnings, and approval state.
-
-## Rules
+The installed schema is at `schemas/edit-decision-list.schema.json` inside this skill. The repository CLI additionally applies semantic checks with `shortform-editor validate-edl`.
 
 - Use integer frame indices or rational timestamps; avoid floating-point drift.
 - Source in/out must be valid and ordered.
+- Segments must be non-empty and IDs unique.
+- Output must be valid portrait 9:16 with even dimensions.
+- Timeline starts must be nondecreasing when supplied.
+- An approved EDL must explicitly set `approved_by_user: true`.
+- If a probe report is supplied, segment out-points must not exceed source duration.
 - Never silently shift audio or video offsets.
 - Every transform must be deterministic and reproducible.
 - Keep previous versions; never overwrite approved EDL history.
 - Validate schema and semantic constraints before rendering.
 - Record why an edit was made and which evidence supports it.
+
+The current EDL is intentionally a minimal first contract. Captions, crop keyframes, tracking, transitions, overlays, per-segment audio processing and provenance expansion remain future schema work; do not add undocumented properties because strict validation rejects them.
