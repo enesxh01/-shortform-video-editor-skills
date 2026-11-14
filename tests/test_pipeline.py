@@ -24,8 +24,8 @@ class PipelineOrchestrationTests(unittest.TestCase):
             "source": {"path": "source.mp4", "sha256": "9" * 64, "fingerprint": fingerprint},
             "format": {"duration": "30.0"},
             "streams": [{
-                "codec_type": "video", "time_base": "1/90000",
-                "avg_frame_rate": "30/1"
+                "codec_type": "video", "width": 1920, "height": 1080,
+                "time_base": "1/90000", "avg_frame_rate": "30/1"
             }]
         }
         audio = {
