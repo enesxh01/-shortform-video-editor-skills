@@ -58,5 +58,15 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(result["candidates"][0]["feedback_adjustment"], 0.0)
 
 
+    def test_feedback_adjusted_score_is_clamped_to_0_through_100(self):
+        candidates = {"candidates": [{"candidate_id": "perfect", "family": "comedy", "score": 100}]}
+        records = [
+            {"candidate_id": f"c{i}", "source_fingerprint": "s", "family": "comedy", "decision": "approve"}
+            for i in range(3)
+        ]
+        result = apply_feedback(candidates, records)
+        self.assertEqual(result["candidates"][0]["score_after_feedback"], 100.0)
+
+
 if __name__ == "__main__":
     unittest.main()
