@@ -36,6 +36,18 @@ class QCTests(unittest.TestCase):
         self.assertEqual(len(result["freeze_regions"]), 1)
         self.assertIn("Audio sample peak is at or near digital clipping", result["failures"])
 
+    def test_handles_missing_or_malformed_frame_rate_metadata(self):
+        report = probe()
+        report["streams"][0]["avg_frame_rate"] = None
+        result = assess_probe(report, "")
+        self.assertEqual(result["status"], "fail")
+        self.assertIn("Unexpected average frame rate", result["failures"])
+
+    def test_handles_malformed_expected_frame_rate(self):
+        result = assess_probe(probe(), "", expected_fps="not-a-frame-rate")
+        self.assertEqual(result["status"], "fail")
+        self.assertIn("Unexpected average frame rate", result["failures"])
+
     def test_flags_wrong_frame_rate(self):
         report = probe()
         report["streams"][0]["avg_frame_rate"] = "30/1"
