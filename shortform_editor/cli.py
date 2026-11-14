@@ -350,6 +350,28 @@ def command_analyze_pacing(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_analyze_visuals(args: argparse.Namespace) -> int:
+    from .visual import analyze_visuals
+
+    source = Path(args.source).expanduser().resolve(strict=True)
+    report = analyze_visuals(
+        source,
+        sample_rate=args.sample_rate,
+        max_frames=args.max_frames,
+        detect_faces=not args.no_face_detection
+    )
+    output = json.dumps(report, indent=2, ensure_ascii=False) + "\\n"
+    if args.output:
+        destination = Path(args.output).expanduser().resolve()
+        if destination == source:
+            raise PipelineError("Visual report cannot overwrite the source media")
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(output, encoding="utf-8")
+    else:
+        print(output, end="")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="shortform-editor", description="Local-first short-form video pipeline foundation")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -383,6 +405,13 @@ def build_parser() -> argparse.ArgumentParser:
     pacing.add_argument("-o", "--output", required=True)
     pacing.add_argument("--long-pause", type=float, default=1.8)
     pacing.set_defaults(func=command_analyze_pacing)
+    visuals = sub.add_parser("analyze-visuals", help="sample scenes and propose conservative face-guided 9:16 crop keyframes")
+    visuals.add_argument("source")
+    visuals.add_argument("-o", "--output")
+    visuals.add_argument("--sample-rate", type=float, default=1.0)
+    visuals.add_argument("--max-frames", type=int, default=120)
+    visuals.add_argument("--no-face-detection", action="store_true")
+    visuals.set_defaults(func=command_analyze_visuals)
     render = sub.add_parser("render", help="render approved EDL segments into a vertical MP4")
     render.add_argument("source")
     render.add_argument("edl")
