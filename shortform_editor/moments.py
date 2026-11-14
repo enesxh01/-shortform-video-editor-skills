@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .cli import PipelineError, timestamp_seconds
+from .cli import PipelineError
 
 
 HOOK_CUES = (
@@ -27,19 +27,26 @@ def _text(segments: list[dict[str, Any]]) -> str:
     return " ".join(str(item.get("text", "")).strip() for item in segments).strip()
 
 
+def _has_cue(text: str, cue: str) -> bool:
+    return re.search(r"(?<!\\w)" + re.escape(cue.lower()) + r"(?!\\w)", text.lower()) is not None
+
+
+def _has_any_cue(text: str, cues: tuple[str, ...]) -> bool:
+    return any(_has_cue(text, cue) for cue in cues)
+
+
 def _cue_score(text: str, cues: tuple[str, ...], cap: int) -> int:
-    lowered = text.lower()
-    hits = sum(1 for cue in cues if cue in lowered)
+    hits = sum(1 for cue in cues if _has_cue(text, cue))
     return min(cap, hits * 5)
 
 
 def _candidate_family(text: str) -> str:
     lowered = text.lower()
-    if any(cue in lowered for cue in COMEDY_CUES):
+    if _has_any_cue(lowered, COMEDY_CUES):
         return "comedy_or_reaction"
-    if any(cue in lowered for cue in CONFLICT_CUES):
+    if _has_any_cue(lowered, CONFLICT_CUES):
         return "conflict_or_debate"
-    if any(cue in lowered for cue in KNOWLEDGE_CUES):
+    if _has_any_cue(lowered, KNOWLEDGE_CUES):
         return "useful_explanation"
     if "?" in text:
         return "curiosity_or_question"
@@ -137,12 +144,14 @@ def detect_moments(analysis: dict[str, Any], min_duration: float = 12.0,
     if limit < 1 or limit > 100:
         raise PipelineError("Candidate limit must be between 1 and 100")
 
-    source_id = analysis.get("source", {}).get("fingerprint", "unknown")
+    source_id = analysis.get("source", {}).get("fingerprint")
+    if not isinstance(source_id, str) or not re.fullmatch(r"sha256:[a-f0-9]{64}", source_id):
+        raise PipelineError("Audio analysis is missing a valid SHA-256 source fingerprint")
     audio_windows = analysis.get("analysis", {}).get("audio_metrics", {}).get("windows", [])
     anchors = []
     for index, segment in enumerate(segments):
         text = str(segment.get("text", "")).lower()
-        if "?" in text or any(cue in text for cue in HOOK_CUES + PAYOFF_CUES):
+        if "?" in text or _has_any_cue(text, HOOK_CUES + PAYOFF_CUES):
             anchors.append(index)
     if not anchors:
         anchors = list(range(0, len(segments), max(1, len(segments) // 8)))
