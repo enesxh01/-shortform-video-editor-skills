@@ -163,5 +163,32 @@ class RenderIntegrationTests(unittest.TestCase):
 
 
 
+    def test_resume_allows_replacing_only_an_existing_output_with_a_render_state(self):
+        from shortform_editor.cli import _existing_output_is_resumable
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / "final.mp4"
+            state = root / ".final.mp4.shortform-work" / "render-state.json"
+            output.write_bytes(b"previous-final")
+            self.assertFalse(_existing_output_is_resumable(output, False, state))
+            self.assertFalse(_existing_output_is_resumable(output, True, state))
+            state.parent.mkdir()
+            state.write_text("{}", encoding="utf-8")
+            self.assertTrue(_existing_output_is_resumable(output, False, state))
+
+    def test_render_resume_fingerprint_changes_with_renderer_or_ffmpeg_version(self):
+        import hashlib
+        import json
+        def fingerprint(renderer_version, ffmpeg_version):
+            settings = {"renderer_cache_version": renderer_version,
+                        "ffmpeg_version": ffmpeg_version, "source_fingerprint": "source"}
+            return hashlib.sha256(json.dumps(settings, sort_keys=True,
+                separators=(",", ":")).encode("utf-8")).hexdigest()
+        baseline = fingerprint("2", "ffmpeg version 7.1")
+        self.assertNotEqual(baseline, fingerprint("3", "ffmpeg version 7.1"))
+        self.assertNotEqual(baseline, fingerprint("2", "ffmpeg version 7.2"))
+
+
+
 if __name__ == "__main__":
     unittest.main()
